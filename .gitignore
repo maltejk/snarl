@@ -1,0 +1,13 @@
+ebin
+standalone.config
+db
+deps
+*~
+.DS_Store
+Mnesia.*
+erl_crash.dump
+*.beam
+rel/sniffle
+rel/sniffle.tar.bz2
+manifest
+gproc_dist_*
