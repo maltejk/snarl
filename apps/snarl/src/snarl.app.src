@@ -5,7 +5,13 @@
   {registered, []},
   {applications, [
                   kernel,
-                  stdlib
+                  stdlib,
+		  redgrid,
+		  alog,
+		  gproc,
+		  redo,
+		  crypto,
+		  uuid
                  ]},
   {mod, { snarl_app, []}},
   {env, []}

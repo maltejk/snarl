@@ -3,7 +3,17 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1]).
+-export([start/2, stop/1, load/0]).
+
+load() ->
+    application:start(sasl),
+    application:start(alog),
+    application:start(redgrid),
+    application:start(crypto),
+    application:start(redo),
+    application:start(uuid),
+    application:start(gproc),
+    application:start(snarl).
 
 %% ===================================================================
 %% Application callbacks
