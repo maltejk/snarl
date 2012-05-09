@@ -5,6 +5,15 @@
 %% Application callbacks
 -export([start/2, stop/1, load/0]).
 
+check_grid() ->
+    timer:sleep(100),
+    case length(redgrid:nodes()) of
+	1 ->
+	    check_grid();
+	_ ->
+	    ok
+    end.
+
 load() ->
     application:start(sasl),
     application:start(alog),
@@ -20,6 +29,7 @@ load() ->
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
+    check_grid(),
     snarl_sup:start_link().
 
 stop(_State) ->

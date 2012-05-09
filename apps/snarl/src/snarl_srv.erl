@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, match/2, call/2, initialize/0, initialize/2]).
+-export([start_link/0, match/2, call/2, initialize/0, initialize/2, reregister/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -48,6 +48,9 @@ initialize() ->
 initialize(Name, Pass) ->
     gen_server:call(?SERVER, {init, Name, Pass}).
 
+reregister() ->
+    gen_server:cast(?SERVER, reregister).
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -61,7 +64,7 @@ initialize(Name, Pass) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    {ok, #state{}}.
+    {ok, #state{}, 1000}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -288,7 +291,6 @@ handle_call({call, Auth, {group, delete, UUID}}, _From, State) ->
 	    end
     end;
 
-
 handle_call({call, Auth, {group, get, Name}}, _From, State) ->
     case test_user(Auth, [group, get, Name]) of
 	true ->	    
@@ -390,6 +392,9 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(reregister, State) ->
+    gproc:reg({n, g, snarl}),
+    {noreply, State};
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -403,7 +408,9 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-
+handle_info(timeout, State) ->
+    reregister(),
+    {noreply, State};
 handle_info(_Info, State) ->
     {noreply, State}.
 
