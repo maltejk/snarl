@@ -2,7 +2,7 @@
 -name snarl@127.0.0.1
 
 ## Cookie for distributed erlang
--setcookie snarl
+-setcookie fifo
 
 #Make processes unbound
 +sbt u
