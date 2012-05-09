@@ -7,7 +7,7 @@ deps
 Mnesia.*
 erl_crash.dump
 *.beam
-rel/sniffle
-rel/sniffle.tar.bz2
+rel/snarl
+rel/snarl.tar.bz2
 manifest
 gproc_dist_*
