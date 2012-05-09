@@ -182,7 +182,7 @@ handle_call({call, Auth, {user, permissions, UUID}}, _From, State) ->
 	    case redo:cmd([<<"GET">>, <<"fifo:users:", UUID/binary, ":name">>]) of
 		undefined ->
 		    {reply, {error, not_found}, State};
-		UUID ->
+		_Name ->
 		    {reply, {ok, user_permissions(UUID)}, State}
 	    end
     end;
