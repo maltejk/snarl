@@ -396,7 +396,7 @@ handle_call({call, Auth, {option, get, Category, Name}}, _From, State) ->
 	true ->
 	    C = ensure_binary(Category),
 	    N = ensure_binary(Name),
-	    case redo:cmd([<<"GET">>, <<"fifo:opions:", C/binary, ":", N/binary>>]) of
+	    case redo:cmd([<<"GET">>, <<"fifo:options:", C/binary, ":", N/binary>>]) of
 		undefined ->
 		    {reply, undefined, State};
 		Res ->
@@ -425,7 +425,7 @@ handle_call({call, Auth, {option, set, Category, Name, Value}}, _From, State) ->
 	    N = ensure_binary(Name),
 	    V = term_to_binary(Value),
 	    redo:cmd([<<"SADD">>, <<"fifo:options:", C/binary>>, term_to_binary(Name)]),
-	    redo:cmd([<<"SET">>, <<"fifo:options:", C/binary, ":", N/binary>>, V]),
+	    redo:cmd([<<"SET">>,  <<"fifo:options:", C/binary, ":", N/binary>>, V]),
 	    {reply, ok, State}
     end;
 
@@ -444,8 +444,16 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(reregister, State) ->
-    gproc:reg({n, g, snarl}),
-    {noreply, State};
+    try
+	gproc:reg({n, g, snarl}),
+	{noreply, State}
+    catch
+	_T:_E ->
+	    application:stop(gproc),
+	    application:start(gproc),
+	    {noreply, State, 1000}
+    end;
+
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
