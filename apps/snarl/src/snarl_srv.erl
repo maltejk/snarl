@@ -145,7 +145,6 @@ handle_call({call, Auth, {user, delete, UUID}}, _From, State) ->
 	    end
     end;
 
-
 handle_call({call, _Auth, {user, auth, Name, Pass}}, _From, State) ->
     Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
     case redo:cmd([<<"GET">>, <<"fifo:users:", Name/binary>>]) of
@@ -376,7 +375,59 @@ handle_call({call, Auth, {group, revoke, UUID, Perm}}, _From, State) ->
 	    {reply, {error, permission_denied}, State}
     end;
 
+handle_call({call, Auth, {option, list, Category}}, _From, State) ->
+    case test_user(Auth, [option, Category, list]) of
+	false -> 	    
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    C = ensure_binary(Category),
+	    case redo:cmd([<<"SMEMBERS">>, <<"fifo:options:", C/binary>>]) of
+		undefined ->
+		    {reply, {ok, []}, State};
+		Res ->
+		    {reply, {ok, [binary_to_term(R)||R<-Res]}, State}
+	    end
+    end;
 
+handle_call({call, Auth, {option, get, Category, Name}}, _From, State) ->
+    case test_user(Auth, [option, Category, get, Name]) of
+	false -> 	    
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    C = ensure_binary(Category),
+	    N = ensure_binary(Name),
+	    case redo:cmd([<<"GET">>, <<"fifo:opions:", C/binary, ":", N/binary>>]) of
+		undefined ->
+		    {reply, undefined, State};
+		Res ->
+		    {reply, {ok, binary_to_term(Res)}, State}
+	    end
+    end;
+
+handle_call({call, Auth, {option, delete, Category, Name}}, _From, State) ->
+    case test_user(Auth, [option, Category, delete, Name]) of
+	false -> 	    
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    C = ensure_binary(Category),
+	    N = ensure_binary(Name),
+	    redo:cmd([<<"SDEL">>, <<"fifo:options:", C/binary>>, N]),
+	    redo:cmd([<<"DEL">>, <<"fifo:options:", C/binary, ":", N/binary>>]),
+	    {reply, ok, State}
+    end;
+
+handle_call({call, Auth, {option, set, Category, Name, Value}}, _From, State) ->
+    case test_user(Auth, [option, Category, set, Name]) of
+	false -> 	    
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    C = ensure_binary(Category),
+	    N = ensure_binary(Name),
+	    V = term_to_binary(Value),
+	    redo:cmd([<<"SADD">>, <<"fifo:options:", C/binary>>, term_to_binary(Name)]),
+	    redo:cmd([<<"SET">>, <<"fifo:options:", C/binary, ":", N/binary>>, V]),
+	    {reply, ok, State}
+    end;
 
 handle_call(_Request, _From, State) ->
     Reply = {error, not_implemented},
@@ -519,3 +570,16 @@ delete_user_from_group(UUUID, GUUID) ->
 		    ok
 	    end
     end.
+
+ensure_binary(L) when is_list(L) ->
+    list_to_binary(L);
+ensure_binary(A) when is_atom(A) ->
+    list_to_binary(atom_to_list(A));
+ensure_binary(B) when is_binary(B) ->
+    B;
+ensure_binary(T) ->
+    term_to_binary(T).
+
+
+
+    
