@@ -84,12 +84,21 @@ init([]) ->
 handle_call({init, Name, Pass}, _From, State) ->
     UUID = uuid:uuid4(),
     Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
+    redo:cmd([<<"SADD">>, <<"fifo:users">>, Name]),
     redo:cmd([<<"SET">>, <<"fifo:users:", Name/binary>>, UUID]),
     redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":hash">>, Hash]),
     redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":name">>, Name]),
     redo:cmd([<<"SADD">>, <<"fifo:users:", UUID/binary, ":permissions">>, term_to_binary(['...'])]),
     {reply, {ok, UUID}, State};
 
+handle_call({call, Auth, {user, list}}, _From, State) ->
+    case test_user(Auth, [user, list]) of
+	false ->
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    Res = redo:cmd([<<"SMEMBERS">>, <<"fifo:users">>]),
+	    {reply, {ok, Res}, State}
+    end;
 handle_call({call, Auth, {user, add, Name, Pass}}, _From, State) ->
     case test_user(Auth, [user, add]) of
 	false ->
@@ -99,6 +108,7 @@ handle_call({call, Auth, {user, add, Name, Pass}}, _From, State) ->
 		undefined ->
 		    UUID = uuid:uuid4(),
 		    Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
+		    redo:cmd([<<"SADD">>, <<"fifo:users">>, Name]),
 		    redo:cmd([<<"SET">>, <<"fifo:users:", Name/binary>>, UUID]),
 		    redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":hash">>, Hash]),
 		    redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":name">>, Name]),
@@ -141,6 +151,7 @@ handle_call({call, Auth, {user, delete, UUID}}, _From, State) ->
 			      <<"fifo:users:", UUID/binary, ":hash">>,
 			      <<"fifo:users:", UUID/binary, ":name">>,
 			      <<"fifo:users:", UUID/binary, ":permissions">>]),
+		    redo:cmd([<<"SREM">>, <<"fifo:users">>, Name]),
 		    {reply, ok, State}
 	    end
     end;
