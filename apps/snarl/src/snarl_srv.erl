@@ -11,7 +11,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, match/2, call/2, initialize/0, initialize/2, reregister/0]).
+-export([start_link/0, match/2, call/2, initialize/0, initialize/2, reregister/0,
+	initialize_groups/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -48,6 +49,10 @@ initialize() ->
 initialize(Name, Pass) ->
     gen_server:call(?SERVER, {init, Name, Pass}).
 
+initialize_groups() ->
+    gen_server:cast(?SERVER, init_groups).
+
+
 reregister() ->
     gen_server:cast(?SERVER, reregister).
 
@@ -82,7 +87,7 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 handle_call({init, Name, Pass}, _From, State) ->
-    UUID = uuid:uuid4(),
+    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
     Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
     redo:cmd([<<"SADD">>, <<"fifo:users">>, Name]),
     redo:cmd([<<"SET">>, <<"fifo:users:", Name/binary>>, UUID]),
@@ -99,14 +104,15 @@ handle_call({call, Auth, {user, list}}, _From, State) ->
 	    Res = redo:cmd([<<"SMEMBERS">>, <<"fifo:users">>]),
 	    {reply, {ok, Res}, State}
     end;
+
 handle_call({call, Auth, {user, add, Name, Pass}}, _From, State) ->
     case test_user(Auth, [user, add]) of
 	false ->
 	    {reply, {error, permission_denied}, State};
-	ture ->
+	true ->
 	    case redo:cmd([<<"GET">>, <<"fifo:users:", Name/binary>>]) of
 		undefined ->
-		    UUID = uuid:uuid4(),
+		    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
 		    Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
 		    redo:cmd([<<"SADD">>, <<"fifo:users">>, Name]),
 		    redo:cmd([<<"SET">>, <<"fifo:users:", Name/binary>>, UUID]),
@@ -184,6 +190,20 @@ handle_call({call, Auth, {user, get, Name}}, _From, State) ->
 	    end
     end;
 
+handle_call({call, Auth, {user, groups, UUID}}, _From, State) ->
+    case test_user(Auth, [user, groups, UUID]) of
+	false ->
+	    {reply, {error, permission_denied}, State};
+	true->
+	    case redo:cmd([<<"SMEMBERS">>, <<"fifo:users:", UUID/binary, ":groups">>]) of
+		undefined ->
+		    {reply, {error, not_found}, State};
+		Res ->
+		    {reply, {ok, Res}, State}
+	    end
+    end;
+    
+
 handle_call({call, Auth, {user, permissions, UUID}}, _From, State) ->
     case test_user(Auth, [user, UUID, permissions]) of
 	false ->
@@ -194,6 +214,21 @@ handle_call({call, Auth, {user, permissions, UUID}}, _From, State) ->
 		    {reply, {error, not_found}, State};
 		_Name ->
 		    {reply, {ok, user_permissions(UUID)}, State}
+	    end
+    end;
+
+handle_call({call, Auth, {user, own_permissions, UUID}}, _From, State) ->
+    case test_user(Auth, [user, UUID, own_permissions]) of
+	false ->
+	    {reply, {error, permission_denied}, State};
+	true->
+	    case redo:cmd([<<"GET">>, <<"fifo:users:", UUID/binary, ":name">>]) of
+		undefined ->
+		    {reply, {error, not_found}, State};
+		_Name ->
+		    Perms = [binary_to_term(T) || 
+				T <- redo:cmd([<<"SMEMBERS">>, <<"fifo:users:", UUID/binary, ":permissions">>])],
+		    {reply, {ok, Perms}, State}
 	    end
     end;
 
@@ -242,13 +277,7 @@ handle_call({call, Auth, {user, groups, delete, UUUID, GUUID}}, _From, State) ->
 handle_call({call, Auth, {user, grant, UUID, Perm}}, _From, State) ->
     case {test_user(Auth, [user, UUID, grant]), test_user(Auth, [permissions, user, grant] ++ Perm)} of
 	{true, true} ->
-	    case redo:cmd([<<"GET">>, <<"fifo:users:", UUID/binary, ":name">>]) of
-		undefined ->
-		    {reply, {error, not_found}, State};
-		_Name ->
-		    redo:cmd([<<"SADD">>, <<"fifo:users:", UUID/binary, ":permissions">>, term_to_binary(Perm)]),
-		    {reply, ok, State}
-	    end;
+	    {reply, group_grant(UUID, Perm), State};
 	_ ->
 	    {reply, {error, permission_denied}, State}
     end;
@@ -267,18 +296,34 @@ handle_call({call, Auth, {user, revoke, UUID, Perm}}, _From, State) ->
 	    {reply, {error, permission_denied}, State}
     end;
 
+handle_call({call, Auth, {group, list}}, _From, State) ->
+    case test_user(Auth, [group, list]) of
+	false ->
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    Res = redo:cmd([<<"SMEMBERS">>, <<"fifo:groups">>]),
+	    {reply, {ok, Res}, State}
+    end;
+
+handle_call({call, Auth, {group, users, UUID}}, _From, State) ->
+    case test_user(Auth, [group, users, UUID]) of
+	false ->
+	    {reply, {error, permission_denied}, State};
+	true->
+	    case redo:cmd([<<"SMEMBERS">>, <<"fifo:groups:", UUID/binary, ":users">>]) of
+		undefined ->
+		    {reply, {error, not_found}, State};
+		Res ->
+		    {reply, {ok, Res}, State}
+	    end
+    end;
+
+
 handle_call({call, Auth, {group, add, Name}}, _From, State) ->
+    io:format("group add~n"),
     case test_user(Auth, [group, add]) of
 	true ->
-	    case redo:cmd([<<"GET">>, <<"fifo:groups:", Name/binary>>]) of
-		undefined ->
-		    UUID = uuid:uuid4(),
-		    redo:cmd([<<"SET">>, <<"fifo:groups:", Name/binary>>, UUID]),
-		    redo:cmd([<<"SET">>, <<"fifo:groups:", UUID/binary, ":name">>, Name]),
-		    {reply, {ok, UUID}, State};
-		UUID ->
-		    {reply, {error, exists, UUID}, State}
-	    end;
+	    {reply, group_add(Name), State};
 	false ->
 	    {reply, {error, permission_denied}, State}
     end;
@@ -294,9 +339,10 @@ handle_call({call, Auth, {group, delete, UUID}}, _From, State) ->
 		Name ->
 		    [delete_user_from_group(UUUID, UUID) ||
 			UUUID <- redo:cmd([<<"SMEMBERS">>, <<"fifo:groups:", UUID/binary, ":users">>])],
+		    redo:cmd([<<"SREM">>, <<"fifo:groups">>, Name]),
 		    redo:cmd([<<"DEL">>, 
-			      <<"fifo:users:", Name/binary>>,
-			      <<"fifo:users:", UUID/binary, ":name">>]),
+			      <<"fifo:groups:", Name/binary>>,
+			      <<"fifo:groups:", UUID/binary, ":name">>]),
 		    {reply, ok, State}
 	    end
     end;
@@ -322,8 +368,10 @@ handle_call({call, Auth, {group, permissions, UUID}}, _From, State) ->
 	    case redo:cmd([<<"GET">>, <<"fifo:groups:", UUID/binary, ":name">>]) of
 		undefined ->
 		    {reply, {error, not_found}, State};
-		UUID ->
-		    {reply, {ok, redo:cmd([<<"SMEMBERS">>, <<"fifo:groups:", UUID/binary, ":permissions">>])}, State}
+		_Name ->
+		    Perms = [binary_to_term(T) || 
+				T <- redo:cmd([<<"SMEMBERS">>, <<"fifo:groups:", UUID/binary, ":permissions">>])],
+		    {reply, {ok, Perms}, State}
 	    end
     end;
 
@@ -454,6 +502,33 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(init_groups, State) ->
+    io:format("1~n"),
+    {ok, Admins} = group_add(<<"admins">>),
+    [group_grant(Admins, Perm) ||
+	Perm <- [['...']]],
+   
+    {ok, Users} = group_add(<<"users">>),
+    io:format("2: ~p~n", [Users]),
+    [group_grant(Users, Perm) ||
+	Perm <- [[service, wiggle, module, about],
+		 [service, wiggle, module, account],
+		 [service, wiggle, module, analytics],
+		 [service, wiggle, module, home],
+		 [service, wiggle, module, system],
+		 [service, wiggle, module, event],
+		 [service, sniffle, info],
+		 [pacakge, '_', view]]],
+    {ok, UsersAdmins} = group_add(<<"user_admins">>),
+    [group_grant(UsersAdmins, Perm) ||
+	Perm <- [[service, wiggle, module, admin],
+		 [user, '...'],
+		 [group, '...']]],
+    {ok, PackageAdmins} = group_add(<<"package_admins">>),
+    [group_grant(PackageAdmins, Perm) ||
+	Perm <- [[service, wiggle, module, home],
+		 [package, '...']]],
+    {noreply, State};
 handle_cast(reregister, State) ->
     try
 	gproc:reg({n, g, snarl}),
@@ -602,3 +677,24 @@ ensure_binary(T) ->
 
 
     
+group_add(Name) ->
+    case redo:cmd([<<"GET">>, <<"fifo:groups:", Name/binary>>]) of
+	undefined ->
+	    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+	    redo:cmd([<<"SET">>, <<"fifo:groups:", Name/binary>>, UUID]),
+	    redo:cmd([<<"SET">>, <<"fifo:groups:", UUID/binary, ":name">>, Name]),
+	    redo:cmd([<<"SADD">>, <<"fifo:groups">>, Name]),
+	    io:format("UUID: ~p~n", [UUID]),
+	    {ok, UUID};
+	UUID ->
+	    {error, exists, UUID}
+    end.
+group_grant(UUID, Perm) ->
+    io:format("group_grant(~p, ~p)~n", [UUID, Perm]),
+    case redo:cmd([<<"GET">>, <<"fifo:groups:", UUID/binary, ":name">>]) of
+	undefined ->
+	    {error, not_found};
+	_Name ->
+	    redo:cmd([<<"SADD">>, <<"fifo:groups:", UUID/binary, ":permissions">>, term_to_binary(Perm)]),
+	    ok
+    end.
