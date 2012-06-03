@@ -488,9 +488,108 @@ handle_call({call, Auth, {option, set, Category, Name, Value}}, _From, State) ->
 	    {reply, ok, State}
     end;
 
+handle_call({call, Auth, {network, add, Name, First, Netmask, Gateway}}, _From, State) ->
+    case test_user(Auth, [network, create]) of
+	false -> 	    
+	    {reply, {error, permission_denied}, State};
+	true ->
+	    case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
+		undefined ->
+		    Network = First band Netmask,
+		    redo:cmd([<<"SADD">>, <<"fifo:networks">>, term_to_binary(Name)]),
+		    redo:cmd([<<"SET">>, <<"fifo:networks:", Name/binary>>, term_to_binary({Network, First, Netmask, Gateway})]),
+		    {reply, ok, State};
+		_ ->
+		    {reply, {error, already_exists}, State}		
+	    end
+    end;
+
+handle_call({call, Auth, {network, delete, Name}}, _From, State) ->
+    Res = case test_user(Auth, [network, Name, delete]) of
+	      false -> 	    
+		  {reply, {error, permission_denied}, State};
+	      true ->
+		  case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
+		      undefined ->
+			  {error, not_found};
+		      _ ->
+			  redo:cmd([<<"SREM">>, <<"fifo:networks">>, term_to_binary(Name)]),	  
+			  redo:cmd([<<"DEL">>, <<"fifo:networks:", Name/binary>>]),
+			  redo:cmd([<<"DEL">>, <<"fifo:networks:", Name/binary, ":free">>]),
+			  ok
+		  end
+	  end,
+    {reply, Res, State};
+
+handle_call({call, Auth, {network, get, Name}}, _From, State) ->
+    Res = case test_user(Auth, [network, Name, get]) of
+	      false ->
+		  {error, permission_denied};
+	      true ->
+		  case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
+		      undefined ->
+			  {error, not_found};
+		      Bin ->
+			  {Network, First, Netmask, Gateway} = binary_to_term(Bin),
+			  case redo:cmd([<<"LPOP">>, <<"fifo:networks:", Name/binary, ":free">>]) of
+			      undefined ->
+				  {ok, {Network, Netmask, Gateway, First}};
+			      Free ->
+				  redo:cmd([<<"LPUSH">>, <<"fifo:networks:", Name/binary, ":free">>, Free]),
+				  {ok, {Network, Netmask, Gateway, binary_to_term(Free)}}
+			  end
+		  end
+	  end,
+    {reply, Res, State};
+
+handle_call({call, Auth, {network, get, ip, Name}}, _From, State) ->
+    Res = case test_user(Auth, [network, Name, next_ip]) of
+	      false ->
+		  {error, permission_denied};
+	      true ->
+		  case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
+		      undefined ->
+			  {error, not_found};
+		      Bin ->
+			  IP = case redo:cmd([<<"LPOP">>, <<"fifo:networks:", Name/binary, ":free">>]) of
+				   undefined ->
+				       {Network, First, Netmask, Gateway} = binary_to_term(Bin),
+				       redo:cmd([<<"SET">>, <<"fifo:networks:", Name/binary>>, 
+						 term_to_binary({Network, First+1, Netmask, Gateway})]),
+				       First;
+				   Free ->
+				       binary_to_term(Free)
+			       end,
+			  {ok, IP}
+		  end
+	  end,
+    {reply, Res, State};
+
+handle_call({call, Auth, {network, release, ip, Name, IP}}, _From, State) ->
+    Res = case test_user(Auth, [network, Name, release, IP]) of
+	      false ->
+		  {error, permission_denied};
+	      true ->
+		  case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
+		      undefined ->
+			  {error, not_found};
+		      _Bin ->
+			  redo:cmd([<<"LPUSH">>, <<"fifo:networks:", Name/binary, ":free">>, term_to_binary(IP)]),
+			  ok
+		  end
+	  end,
+    {reply, Res, State};
+
+
+handle_call({call, Auth, {network, get, What, Name}}, _From, State) ->
+    {reply,
+     net_get(Auth, Name, What),
+     State};
+
 handle_call(_Request, _From, State) ->
     Reply = {error, not_implemented},
     {reply, Reply, State}.
+
 
 %%--------------------------------------------------------------------
 %% @private
@@ -518,6 +617,7 @@ handle_cast(init_groups, State) ->
 		 [service, wiggle, module, system],
 		 [service, wiggle, module, event],
 		 [service, sniffle, info],
+		 [network, '_', next_ip],
 		 [pacakge, '_', view]]],
     {ok, UsersAdmins} = group_add(<<"user_admins">>),
     [group_grant(UsersAdmins, Perm) ||
@@ -528,6 +628,11 @@ handle_cast(init_groups, State) ->
     [group_grant(PackageAdmins, Perm) ||
 	Perm <- [[service, wiggle, module, home],
 		 [package, '...']]],
+    {ok, NetworkAdmins} = group_add(<<"network_admins">>),
+    [group_grant(NetworkAdmins, Perm) ||
+	Perm <- [[service, wiggle, module, admin],
+		 [network, '...']]],
+
     {noreply, State};
 handle_cast(reregister, State) ->
     try
@@ -689,6 +794,7 @@ group_add(Name) ->
 	UUID ->
 	    {error, exists, UUID}
     end.
+
 group_grant(UUID, Perm) ->
     io:format("group_grant(~p, ~p)~n", [UUID, Perm]),
     case redo:cmd([<<"GET">>, <<"fifo:groups:", UUID/binary, ":name">>]) of
@@ -697,4 +803,27 @@ group_grant(UUID, Perm) ->
 	_Name ->
 	    redo:cmd([<<"SADD">>, <<"fifo:groups:", UUID/binary, ":permissions">>, term_to_binary(Perm)]),
 	    ok
+    end.
+
+net_get(Auth, Name, What) ->
+    case test_user(Auth, [network, Name, get]) of
+	false -> 	    
+	    {error, permission_denied};
+	true ->
+	    case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
+		undefined ->
+		    {error, not_found};
+		Bin ->
+		    {Network, _First, Netmask, Gateway} = binary_to_term(Bin),
+		    case What of
+			net ->
+			    {ok, Network};
+			mask ->
+			    {ok, Netmask};
+			gateway ->
+			    {ok, Gateway};
+			_ ->
+			    {error, not_implemented}
+		    end
+	    end
     end.
