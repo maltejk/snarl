@@ -1,8 +1,8 @@
 ## Name of the node
--name snarl@127.0.0.1
+-name snarl@_OWN_IP_
 
 ## Cookie for distributed erlang
--setcookie fifo
+-setcookie _FIFOCOOKIE_
 
 #Make processes unbound
 +sbt u
