@@ -71,13 +71,13 @@ reregister() ->
 init([]) ->
     case redo:cmd([<<"SMEMBERS">>, <<"fifo:groups">>]) of
 	[] ->
-	    initialize_groups();
+	    int_init_groups();
 	_ ->
 	    ok
     end,
     case redo:cmd([<<"SMEMBERS">>, <<"fifo:users">>]) of
 	[] ->
-	    initialize();
+	    int_init(<<"admin">>, <<"admin">>);
 	_ ->
 	    ok
     end,
@@ -99,13 +99,7 @@ init([]) ->
 %%--------------------------------------------------------------------
 
 handle_call({init, Name, Pass}, _From, State) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
-    redo:cmd([<<"SADD">>, <<"fifo:users">>, Name]),
-    redo:cmd([<<"SET">>, <<"fifo:users:", Name/binary>>, UUID]),
-    redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":hash">>, Hash]),
-    redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":name">>, Name]),
-    redo:cmd([<<"SADD">>, <<"fifo:users:", UUID/binary, ":permissions">>, term_to_binary(['...'])]),
+    UUID = int_init(Name, Pass),
     {reply, {ok, UUID}, State};
 
 handle_call({call, Auth, {user, list}}, _From, State) ->
@@ -614,37 +608,7 @@ handle_call(_Request, _From, State) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_cast(init_groups, State) ->
-    io:format("1~n"),
-    {ok, Admins} = group_add(<<"admins">>),
-    [group_grant(Admins, Perm) ||
-	Perm <- [['...']]],
-   
-    {ok, Users} = group_add(<<"users">>),
-    io:format("2: ~p~n", [Users]),
-    [group_grant(Users, Perm) ||
-	Perm <- [[service, wiggle, module, about],
-		 [service, wiggle, module, account],
-		 [service, wiggle, module, analytics],
-		 [service, wiggle, module, home],
-		 [service, wiggle, module, system],
-		 [service, wiggle, module, event],
-		 [service, sniffle, info],
-		 [network, '_', next_ip],
-		 [pacakge, '_', view]]],
-    {ok, UsersAdmins} = group_add(<<"user_admins">>),
-    [group_grant(UsersAdmins, Perm) ||
-	Perm <- [[service, wiggle, module, admin],
-		 [user, '...'],
-		 [group, '...']]],
-    {ok, PackageAdmins} = group_add(<<"package_admins">>),
-    [group_grant(PackageAdmins, Perm) ||
-	Perm <- [[service, wiggle, module, home],
-		 [package, '...']]],
-    {ok, NetworkAdmins} = group_add(<<"network_admins">>),
-    [group_grant(NetworkAdmins, Perm) ||
-	Perm <- [[service, wiggle, module, admin],
-		 [network, '...']]],
-
+    int_init_groups(),
     {noreply, State};
 handle_cast(reregister, State) ->
     try
@@ -839,3 +803,48 @@ net_get(Auth, Name, What) ->
 		    end
 	    end
     end.
+
+
+int_init(Name, Pass) ->
+    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    Hash = crypto:sha256(<<Name/binary, ":", Pass/binary>>),
+    redo:cmd([<<"SADD">>, <<"fifo:users">>, Name]),
+    redo:cmd([<<"SET">>, <<"fifo:users:", Name/binary>>, UUID]),
+    redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":hash">>, Hash]),
+    redo:cmd([<<"SET">>, <<"fifo:users:", UUID/binary, ":name">>, Name]),
+    redo:cmd([<<"SADD">>, <<"fifo:users:", UUID/binary, ":permissions">>, term_to_binary(['...'])]),
+    UUID.
+
+
+
+int_init_groups() ->
+    io:format("1~n"),
+    {ok, Admins} = group_add(<<"admins">>),
+    [group_grant(Admins, Perm) ||
+	Perm <- [['...']]],
+   
+    {ok, Users} = group_add(<<"users">>),
+    io:format("2: ~p~n", [Users]),
+    [group_grant(Users, Perm) ||
+	Perm <- [[service, wiggle, module, about],
+		 [service, wiggle, module, account],
+		 [service, wiggle, module, analytics],
+		 [service, wiggle, module, home],
+		 [service, wiggle, module, system],
+		 [service, wiggle, module, event],
+		 [service, sniffle, info],
+		 [network, '_', next_ip],
+		 [pacakge, '_', view]]],
+    {ok, UsersAdmins} = group_add(<<"user_admins">>),
+    [group_grant(UsersAdmins, Perm) ||
+	Perm <- [[service, wiggle, module, admin],
+		 [user, '...'],
+		 [group, '...']]],
+    {ok, PackageAdmins} = group_add(<<"package_admins">>),
+    [group_grant(PackageAdmins, Perm) ||
+	Perm <- [[service, wiggle, module, home],
+		 [package, '...']]],
+    {ok, NetworkAdmins} = group_add(<<"network_admins">>),
+    [group_grant(NetworkAdmins, Perm) ||
+	Perm <- [[service, wiggle, module, admin],
+		 [network, '...']]].
