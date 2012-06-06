@@ -69,6 +69,18 @@ reregister() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+    case redo:cmd([<<"SMEMBERS">>, <<"fifo:groups">>]) of
+	[] ->
+	    initialize_groups();
+	_ ->
+	    ok
+    end,
+    case redo:cmd([<<"SMEMBERS">>, <<"fifo:users">>]) of
+	[] ->
+	    initialize();
+	_ ->
+	    ok
+    end,
     {ok, #state{}, 1000}.
 
 %%--------------------------------------------------------------------
