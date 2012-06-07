@@ -827,6 +827,7 @@ int_init_groups() ->
     io:format("2: ~p~n", [Users]),
     [group_grant(Users, Perm) ||
 	Perm <- [[service, wiggle, module, about],
+		 [service, wiggle, login],
 		 [service, wiggle, module, account],
 		 [service, wiggle, module, analytics],
 		 [service, wiggle, module, home],
