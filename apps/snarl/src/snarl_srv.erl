@@ -283,7 +283,7 @@ handle_call({call, Auth, {user, groups, delete, UUUID, GUUID}}, _From, State) ->
 handle_call({call, Auth, {user, grant, UUID, Perm}}, _From, State) ->
     case {test_user(Auth, [user, UUID, grant]), test_user(Auth, [permissions, user, grant] ++ Perm)} of
 	{true, true} ->
-	    {reply, group_grant(UUID, Perm), State};
+	    {reply, user_grant(UUID, Perm), State};
 	_ ->
 	    {reply, {error, permission_denied}, State}
     end;
@@ -778,6 +778,16 @@ group_grant(UUID, Perm) ->
 	    {error, not_found};
 	_Name ->
 	    redo:cmd([<<"SADD">>, <<"fifo:groups:", UUID/binary, ":permissions">>, term_to_binary(Perm)]),
+	    ok
+    end.
+
+user_grant(UUID, Perm) ->
+    io:format("user_grant(~p, ~p)~n", [UUID, Perm]),
+    case redo:cmd([<<"GET">>, <<"fifo:users:", UUID/binary, ":name">>]) of
+	undefined ->
+	    {error, not_found};
+	_Name ->
+	    redo:cmd([<<"SADD">>, <<"fifo:users:", UUID/binary, ":permissions">>, term_to_binary(Perm)]),
 	    ok
     end.
 
