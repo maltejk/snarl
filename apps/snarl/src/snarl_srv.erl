@@ -572,7 +572,7 @@ handle_call({call, Auth, {network, get, ip, Name}}, _From, State) ->
     {reply, Res, State};
 
 handle_call({call, Auth, {network, release, ip, Name, IP}}, _From, State) ->
-    Res = case test_user(Auth, [network, Name, release, IP]) of
+    Res = case test_user(Auth, [network, Name, release, ip_to_str(IP)]) of
 	      false ->
 		  {error, permission_denied};
 	      true ->
@@ -849,3 +849,8 @@ int_init_groups() ->
     [group_grant(NetworkAdmins, Perm) ||
 	Perm <- [[service, wiggle, module, admin],
 		 [network, '...']]].
+
+ip_to_str(IP) when is_integer(IP) ->
+    ip_to_str(<<IP:32>>);
+ip_to_str(<<A:8, B:8, C:8, D:8>>) ->
+    list_to_binary(io_lib:format("~p.~p.~p.~p", [A, B, C, D])).
