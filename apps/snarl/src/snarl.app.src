@@ -7,7 +7,7 @@
                   kernel,
                   stdlib,
 		  redgrid,
-		  alog,
+		  lager,
 		  gproc,
 		  redo,
 		  crypto,
