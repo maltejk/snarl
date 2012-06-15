@@ -574,7 +574,7 @@ handle_call({call, Auth, {network, get, ip, Name}}, _From, State) ->
 handle_call({call, Auth, {network, release, ip, Name, IP}}, _From, State) ->
     IPStr = ip_to_str(IP),
     lager:info([{fifi_component, snarl}],
-	       "network:release - Network: ~s, IP: ~s.", [UUID, IPStr]),
+	       "network:release - Network: ~s, IP: ~s.", [Name, IPStr]),
     Res = case test_user(Auth, [network, Name, release, IPStr]) of
 	      false ->
 		  lager:warning([{fifi_component, snarl}],
