@@ -572,8 +572,13 @@ handle_call({call, Auth, {network, get, ip, Name}}, _From, State) ->
     {reply, Res, State};
 
 handle_call({call, Auth, {network, release, ip, Name, IP}}, _From, State) ->
-    Res = case test_user(Auth, [network, Name, release, ip_to_str(IP)]) of
+    IPStr = ip_to_str(IP),
+    lager:info([{fifi_component, snarl}],
+	       "network:release - Network: ~s, IP: ~s.", [UUID, IPStr]),
+    Res = case test_user(Auth, [network, Name, release, IPStr]) of
 	      false ->
+		  lager:warning([{fifi_component, snarl}],
+				"network:releas - forbidden Auth: ~p, Perm: ~p.", [Auth, [network, Name, release, IPStr]]),
 		  {error, permission_denied};
 	      true ->
 		  case redo:cmd([<<"GET">>, <<"fifo:networks:", Name/binary>>]) of
@@ -772,7 +777,6 @@ group_add(Name) ->
     end.
 
 group_grant(UUID, Perm) ->
-    io:format("group_grant(~p, ~p)~n", [UUID, Perm]),
     case redo:cmd([<<"GET">>, <<"fifo:groups:", UUID/binary, ":name">>]) of
 	undefined ->
 	    {error, not_found};
