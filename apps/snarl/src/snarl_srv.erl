@@ -676,9 +676,11 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 match([], []) ->
+    lager:info("snarl:match - Direct match"),
     true;
 
-match(_, ['...']) ->
+match(P, ['...']) ->
+    lager:info("snarl:match - Matched ~p by '...'", [P]),
     true;
 
 match([], ['...'|_Rest]) ->
@@ -709,6 +711,7 @@ test_perms(Perm, [Test|Tests]) ->
     match(Perm, Test) orelse test_perms(Perm, Tests).
 
 test_user(system, _Perm) ->
+    lager:info("snarl:match - Matched by system user."),
     true;
 
 test_user(UUID, Perm) ->
@@ -847,9 +850,11 @@ int_init_groups() ->
 		 [service, wiggle, module, home],
 		 [service, wiggle, module, system],
 		 [service, wiggle, module, event],
+		 [vm, create],
 		 [service, sniffle, info],
 		 [network, '_', next_ip],
-		 [pacakge, '_', view]]],
+		 [dataset, '_', get],
+		 [package, '_', get]]],
     {ok, UsersAdmins} = group_add(<<"user_admins">>),
     [group_grant(UsersAdmins, Perm) ||
 	Perm <- [[service, wiggle, module, admin],
