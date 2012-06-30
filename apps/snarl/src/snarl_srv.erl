@@ -854,7 +854,9 @@ int_init_groups() ->
 		 [service, sniffle, info],
 		 [network, '_', next_ip],
 		 [dataset, '_', get],
-		 [package, '_', get]]],
+		 [package, '_', get],
+		 [package, list],
+		 [options, <<"packages">>, get, '_']]],
     {ok, UsersAdmins} = group_add(<<"user_admins">>),
     [group_grant(UsersAdmins, Perm) ||
 	Perm <- [[service, wiggle, module, admin],
