@@ -69,6 +69,7 @@ reregister() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+    ok = backyard_srv:register_connect_handler(backyard_connect),
     case redo:cmd([<<"SMEMBERS">>, <<"fifo:groups">>]) of
 	[] ->
 	    int_init_groups();
@@ -612,12 +613,15 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(backyard_connect, State) ->
+    gproc:reg({n, g, snarl}),
+    {noreply, State};
 handle_cast(init_groups, State) ->
     int_init_groups(),
     {noreply, State};
 handle_cast(reregister, State) ->
     try
-	gproc:reg({n, g, snarl}),
+%	gproc:reg({n, g, snarl}),
 	{noreply, State}
     catch
 	_T:_E ->
