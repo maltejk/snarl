@@ -6,11 +6,9 @@
   {applications, [
                   kernel,
                   stdlib,
-		  mdns,
+		  backyard,
 		  lager,
-		  gproc,
 		  redo,
-		  crypto,
 		  uuid
                  ]},
   {mod, { snarl_app, []}},

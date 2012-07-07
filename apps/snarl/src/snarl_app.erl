@@ -7,13 +7,12 @@
 
 load() ->
     application:start(sasl),
-    application:start(alog),
     application:start(lager),
-    application:start(mdns),
     application:start(crypto),
+    application:start(nodefinder),
+    application:start(backyard),
     application:start(redo),
     application:start(uuid),
-    application:start(gproc),
     application:start(snarl).
 
 %% ===================================================================

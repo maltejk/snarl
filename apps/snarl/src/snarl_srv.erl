@@ -621,8 +621,6 @@ handle_cast(reregister, State) ->
 	{noreply, State}
     catch
 	_T:_E ->
-	    application:stop(gproc),
-	    application:start(gproc),
 	    {noreply, State, 1000}
     end;
 
