@@ -9,6 +9,8 @@
 		  backyard,
 		  lager,
 		  redo,
+		  statsderl,
+		  vmstats,
 		  uuid
                  ]},
   {mod, { snarl_app, []}},
