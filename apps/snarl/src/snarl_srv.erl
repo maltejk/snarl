@@ -52,7 +52,6 @@ initialize(Name, Pass) ->
 initialize_groups() ->
     gen_server:cast(?SERVER, init_groups).
 
-
 reregister() ->
     gen_server:cast(?SERVER, reregister).
 
@@ -82,6 +81,10 @@ init([]) ->
 	_ ->
 	    ok
     end,
+    StatsdIp = binary_to_term(application:get_env(statsderl, hostname)),
+    redo:cmd([<<"SADD">>, <<"fifo:options:statsd">>, <<"hostname">>]),
+    redo:cmd([<<"SET">>,  <<"fifo:options:statsd:hostname">>, StatsdIp]),
+    
     {ok, #state{}, 1000}.
 
 %%--------------------------------------------------------------------
