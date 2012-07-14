@@ -11,6 +11,8 @@ load() ->
     application:start(crypto),
     application:start(nodefinder),
     application:start(backyard),
+    application:start(statsderl),
+    application:start(vmstats),
     application:start(redo),
     application:start(uuid),
     application:start(snarl).

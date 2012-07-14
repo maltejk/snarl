@@ -81,7 +81,8 @@ init([]) ->
 	_ ->
 	    ok
     end,
-    StatsdIp = binary_to_term(application:get_env(statsderl, hostname)),
+    {ok, IP} = application:get_env(statsderl, hostname),
+    StatsdIp = term_to_binary(IP),
     redo:cmd([<<"SADD">>, <<"fifo:options:statsd">>, <<"hostname">>]),
     redo:cmd([<<"SET">>,  <<"fifo:options:statsd:hostname">>, StatsdIp]),
     
