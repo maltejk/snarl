@@ -861,6 +861,7 @@ int_init_groups() ->
 		 [network, '_', next_ip],
 		 [dataset, '_', get],
 		 [package, '_', get],
+		 [hypervisor, '_', info, memory],
 		 [package, list]]],
     {ok, UsersAdmins} = group_add(<<"user_admins">>),
     [group_grant(UsersAdmins, Perm) ||
