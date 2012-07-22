@@ -856,7 +856,7 @@ int_init_groups() ->
 		 [service, wiggle, module, home],
 		 [service, wiggle, module, system],
 		 [service, wiggle, module, event],
-		 [vm, create],
+		 [host, '_', vm, create],
 		 [service, sniffle, info],
 		 [network, '_', next_ip],
 		 [dataset, '_', get],
