@@ -9,7 +9,7 @@ load() ->
     application:start(sasl),
     application:start(lager),
     application:start(crypto),
-    application:start(nodefinder),
+    application:start(mdns),
     application:start(backyard),
     application:start(statsderl),
     application:start(vmstats),
