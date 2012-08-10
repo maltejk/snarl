@@ -845,7 +845,6 @@ int_init_groups() ->
     {ok, Admins} = group_add(<<"admins">>),
     [group_grant(Admins, Perm) ||
 	Perm <- [['...']]],
-   
     {ok, Users} = group_add(<<"users">>),
     io:format("2: ~p~n", [Users]),
     [group_grant(Users, Perm) ||
@@ -859,6 +858,7 @@ int_init_groups() ->
 		 [host, '_', vm, create],
 		 [service, sniffle, info],
 		 [network, '_', next_ip],
+		 [network, '_', get],
 		 [dataset, '_', get],
 		 [package, '_', get],
 		 [package, list]]],
