@@ -1,4 +1,3 @@
-
 -module(snarl_sup).
 
 -behaviour(supervisor).
@@ -8,9 +7,6 @@
 
 %% Supervisor callbacks
 -export([init/1]).
-
-%% Helper macro for declaring children of supervisor
--define(CHILD(I, Type), {I, {I, start_link, []}, permanent, 5000, Type, [I]}).
 
 %% ===================================================================
 %% API functions
@@ -23,8 +19,23 @@ start_link() ->
 %% Supervisor callbacks
 %% ===================================================================
 
-init([]) ->
-    {ok, { {one_for_one, 5, 10}, [?CHILD(redo, worker),
-				  ?CHILD(snarl_srv, worker)
-				 ]} }.
+init(_Args) ->
+    VMaster = { snarl_vnode_master,
+		{riak_core_vnode_master, start_link, [snarl_vnode]},
+		permanent, 5000, worker, [riak_core_vnode_master]},
+    
+    GroupVMaster = { snarl_group_vnode_master,
+		     {riak_core_vnode_master, start_link, [snarl_group_vnode]},
+		     permanent, 5000, worker, [riak_core_vnode_master]},
+    
+    GroupWFSMs = {snarl_group_write_fsm_sup,
+		 {snarl_group_write_fsm_sup, start_link, []},
+		 permanent, infinity, supervisor, [snarl_group_write_fsm_sup]},
 
+    GroupRFSMs = {snarl_group_read_fsm_sup,
+		 {snarl_group_read_fsm_sup, start_link, []},
+		 permanent, infinity, supervisor, [snarl_group_read_fsm_sup]},
+
+    { ok,
+        { {one_for_one, 5, 10},
+          [VMaster, GroupVMaster, GroupWFSMs, GroupRFSMs]}}.
