@@ -1,7 +1,7 @@
 %% @doc The coordinator for stat write opeartions.  This example will
 %% show how to properly replicate your data in Riak Core by making use
 %% of the _preflist_.
--module(snarl_group_write_fsm).
+-module(snarl_user_write_fsm).
 -behavior(gen_fsm).
 -include("snarl.hrl").
 
@@ -19,7 +19,7 @@
 %%
 %% from: The pid of the sender so a reply can be made.
 %%
-%% group: The group.
+%% user: The user.
 %%
 %% op: The stat op, one of [add, delete, grant, revoke].
 %%
@@ -30,7 +30,7 @@
 %% num_w: The number of successful write replies.
 -record(state, {req_id :: pos_integer(),
                 from :: pid(),
-		group :: string(),
+		user :: string(),
                 op :: atom(),
                 val = undefined :: term() | undefined,
                 preflist :: riak_core_apl:preflist2(),
@@ -40,18 +40,18 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqID, From, Group, Op) ->
-    start_link(ReqID, From, Group, Op, undefined).
+start_link(ReqID, From, User, Op) ->
+    start_link(ReqID, From, User, Op, undefined).
 
-start_link(ReqID, From, Group, Op, Val) ->
-    gen_fsm:start_link(?MODULE, [ReqID, From, Group, Op, Val], []).
+start_link(ReqID, From, User, Op, Val) ->
+    gen_fsm:start_link(?MODULE, [ReqID, From, User, Op, Val], []).
 
-write(Group, Op) ->
-    write(Group, Op, undefined).
+write(User, Op) ->
+    write(User, Op, undefined).
 
-write(Group, Op, Val) ->
+write(User, Op, Val) ->
     ReqID = mk_reqid(),
-    snarl_group_write_fsm_sup:start_write_fsm([ReqID, self(), Group, Op, Val]),
+    snarl_user_write_fsm_sup:start_write_fsm([ReqID, self(), User, Op, Val]),
     {ok, ReqID}.
 
 %%%===================================================================
@@ -59,33 +59,33 @@ write(Group, Op, Val) ->
 %%%===================================================================
 
 %% @doc Initialize the state data.
-init([ReqID, From, Group, Op, Val]) ->
+init([ReqID, From, User, Op, Val]) ->
     SD = #state{req_id=ReqID,
                 from=From,
-                group=Group,
+                user=User,
                 op=Op,
                 val=Val},
     {ok, prepare, SD, 0}.
 
 %% @doc Prepare the write by calculating the _preference list_.
-prepare(timeout, SD0=#state{group=Group}) ->
-    DocIdx = riak_core_util:chash_key({<<"group">>, term_to_binary(Group)}),
-    Preflist = riak_core_apl:get_apl(DocIdx, ?N, snarl_group),
+prepare(timeout, SD0=#state{user=User}) ->
+    DocIdx = riak_core_util:chash_key({<<"user">>, list_to_binary(User)}),
+    Preflist = riak_core_apl:get_apl(DocIdx, ?N, snarl_user),
     SD = SD0#state{preflist=Preflist},
     {next_state, execute, SD, 0}.
 
 %% @doc Execute the write request and then go into waiting state to
 %% verify it has meets consistency requirements.
 execute(timeout, SD0=#state{req_id=ReqID,
-                            group=Group,
+                            user=User,
                             op=Op,
                             val=Val,
                             preflist=Preflist}) ->
     case Val of
         undefined ->
-            snarl_group_vnode:Op(Preflist, ReqID, Group);
+            snarl_user_vnode:Op(Preflist, ReqID, User);
         _ ->
-            snarl_group_vnode:Op(Preflist, ReqID, Group, Val)
+            snarl_user_vnode:Op(Preflist, ReqID, User, Val)
     end,
     {next_state, waiting, SD0}.
 

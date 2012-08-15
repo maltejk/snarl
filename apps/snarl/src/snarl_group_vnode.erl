@@ -17,14 +17,14 @@
          handle_coverage/4,
          handle_exit/3]).
 
--export([
-	 read/3,
+-export([list/2,
+	 get/3,
 	 add/3,
 	 delete/3,
 	 grant/4,
 	 revoke/4]).
 
--record(state, {partition, groups=[]}).
+-record(state, {partition, groups=[], dbref}).
 
 -define(MASTER, snarl_group_vnode_master).
 
@@ -35,20 +35,23 @@
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
-init([Partition]) ->
-    {ok, #state { partition=Partition }}.
 
 %%%===================================================================
 %%% API - reads
 %%%===================================================================
 
-read(Preflist, ReqID, Group) ->
-    ?PRINT({get, Preflist, ReqID, Group}),
-
+get(Preflist, ReqID, Group) ->
     riak_core_vnode_master:command(Preflist,
 				   {get, ReqID, Group},
 				   {fsm, undefined, self()},
 				   ?MASTER).
+
+list(Preflist, ReqID) ->
+    riak_core_vnode_master:command(Preflist,
+				   {list, ReqID},
+				   {fsm, undefined, self()},
+				   ?MASTER).
+
 
 %%%===================================================================
 %%% API - writes
@@ -62,47 +65,95 @@ add(Preflist, ReqID, Group) ->
 
 delete(Preflist, ReqID, Group) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, Group},
+                                   {delete, ReqID, Group},
 				   {fsm, undefined, self()},
                                    ?MASTER).
 
 grant(Preflist, ReqID, Group, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, Group, Val},
+                                   {grant, ReqID, Group, Val},
 				   {fsm, undefined, self()},
 
                                    ?MASTER).
 
 revoke(Preflist, ReqID, Group, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, Group, Val},
+                                   {revoke, ReqID, Group, Val},
 				   {fsm, undefined, self()},
                                    ?MASTER).
+
+%%%===================================================================
+%%% VNode
+%%%===================================================================
+
+
+init([Partition]) ->
+    {ok, DBRef} = eleveldb:open("groups."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
+    Groups = case eleveldb:get(DBRef, <<"#groups">>, []) of
+		 not_found -> 
+		     dict:new();
+		 {ok, Bin} ->
+		     lists:foldl(fun (Group, Groups0) ->
+					{ok, GrBin} = eleveldb:get(DBRef, list_to_binary(Group), []),
+					dict:store(Group, binary_to_term(GrBin), Groups0)
+				end, dict:new(), binary_to_term(Bin))
+	     end,
+    {ok, #state { 
+       groups=Groups,
+       partition=Partition,
+       dbref=DBRef}}.
 
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
 
-handle_command({add, ReqID, Group}, _Sender, #state{groups=Groups} = State) ->
-    ?PRINT({add, ReqID, Group}),
-    {reply, {ok, ReqID}, State#state{groups=[Group|Groups]}};
+handle_command({add, ReqID, Group}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
+    ?PRINT({add, ReqID, Group, Groups}),
+    Groups1 = dict:store(Group,[],Groups),
+    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(dict:fetch_keys(Groups1)), []),
+    eleveldb:put(DBRef, list_to_binary(Group), term_to_binary([]), []),
+    {reply, {ok, ReqID}, State#state{groups=Groups1}};
 
-handle_command({delete, ReqID, Group}, _Sender, #state{groups=Groups} = State) ->
+handle_command({delete, ReqID, Group}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
     ?PRINT({delete, ReqID, Group}),
-    {reply, {ok, ReqID}, State#state{groups=lists:delete(Group, Groups)}};
+    Groups1 = dict:erase(Group, Groups),
+    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(dict:fetch_keys(Groups1)), []),
+    eleveldb:delete(DBRef, list_to_binary(Group), []),
+    {reply, {ok, ReqID}, State#state{groups=Groups1}};
 
-handle_command({grant, ReqID, Group, Permission}, _Sender, State) ->
+handle_command({grant, ReqID, Group, Permission}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
     ?PRINT({grant, ReqID, Group, Permission}),
+    Groups1 = dict:update(Group,
+			  fun (L) ->
+				  [Permission|L]
+			  end, Groups),
+    {ok, Perms} = dict:find(Group, Groups1),
+    eleveldb:put(DBRef, list_to_binary(Group), term_to_binary(Perms), []),
+    {reply, {ok, ReqID}, State#state{groups=Groups1}};
+
+handle_command({revoke, ReqID, Group, Permission}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
+    ?PRINT({delete, ReqID, Group, Permission}),
+    Groups1 = dict:update(Group,
+			  fun (L) ->
+				  lists:delete(Permission, L)
+			  end, Groups),
+    eleveldb:put(DBRef, list_to_binary(Group), term_to_binary(Groups1), []),
     {reply, {ok, ReqID}, State};
 
-handle_command({revoke, ReqID, Group, Permission}, _Sender, State) ->
-    ?PRINT({delete, ReqID, Group, Permission}),
-    {reply, {ok, ReqID}, State};
+handle_command({list, ReqID}, _Sender, #state{groups=Groups} = State) ->
+    ?PRINT({list, ReqID}),
+    {reply, {ok, ReqID, dict:fetch_keys(Groups)}, State};
 
 handle_command({get, ReqID, Group}, _Sender, #state{groups=Groups} = State) ->
     ?PRINT({get, ReqID, Group}),
-    {reply, {ok, ReqID, Groups}, State};
+    Res = case dict:find(Group, Groups) of
+	      error ->
+		  {error, ReqID, not_found};
+	      {ok, V} ->
+		  {ok, ReqID, V}
+	  end,
+    {reply, Res, State};
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),
@@ -138,5 +189,6 @@ handle_coverage(_Req, _KeySpaces, _Sender, State) ->
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.
 
-terminate(_Reason, _State) ->
+terminate(_Reason, #state{dbref=DBRef} = _State) ->
+    eleveldb:close(DBRef),
     ok.

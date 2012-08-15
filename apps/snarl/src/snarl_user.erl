@@ -1,10 +1,9 @@
--module(snarl_group).
+-module(snarl_user).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
          ping/0,
-	 list/0,
 	 get/1,
 	 add/1,
 	 delete/1,
@@ -20,43 +19,37 @@
 %% @doc Pings a random vnode to make sure communication is functional
 ping() ->
     DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_group),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_user),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_group_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
-get(Group) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(Group),
+get(User) ->
+    {ok, ReqID} = snarl_user_read_fsm:get(User),
     wait_for_reqid(ReqID, ?TIMEOUT).
 
+add(User) ->
+    do_write(User, add).
 
-list() ->
-    {ok, ReqID} = snarl_group_read_fsm:list(),
-    wait_for_reqid(ReqID, ?TIMEOUT).
+delete(User) ->
+    do_write(User, delete).
 
+grant(User, Permission) ->
+    do_write(User, grant, Permission).
 
-add(Group) ->
-    do_write(Group, add).
-
-delete(Group) ->
-    do_write(Group, delete).
-
-grant(Group, Permission) ->
-    do_write(Group, grant, Permission).
-
-revoke(Group, Permission) ->
-    do_write(Group, revoke, Permission).
+revoke(User, Permission) ->
+    do_write(User, revoke, Permission).
 
 
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-do_write(Group, Op) ->
-    {ok, ReqID} = snarl_group_write_fsm:write(Group, Op),
+do_write(User, Op) ->
+    {ok, ReqID} = snarl_user_write_fsm:write(User, Op),
     wait_for_reqid(ReqID, ?TIMEOUT).
 
-do_write(Group, Op, Val) ->
-    {ok, ReqID} = snarl_group_write_fsm:write(Group, Op, Val),
+do_write(User, Op, Val) ->
+    {ok, ReqID} = snarl_user_write_fsm:write(User, Op, Val),
     wait_for_reqid(ReqID, ?TIMEOUT).
 
 wait_for_reqid(ReqID, Timeout) ->

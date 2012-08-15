@@ -1,12 +1,12 @@
 %% @doc The coordinator for stat get operations.  The key here is to
 %% generate the preflist just like in wrtie_fsm and then query each
 %% replica and wait until a quorum is met.
--module(snarl_group_read_fsm).
+-module(snarl_user_read_fsm).
 -behavior(gen_fsm).
 -include("snarl.hrl").
 
 %% API
--export([start_link/4, get/1, list/0]).
+-export([start_link/3, get/1]).
 
 %% Callbacks
 -export([init/1, code_change/4, handle_event/3, handle_info/3,
@@ -17,8 +17,7 @@
 
 -record(state, {req_id,
                 from,
-		group,
-		op,
+		user,
                 preflist,
                 num_r=0,
                 replies=[]}).
@@ -27,61 +26,39 @@
 %%% API
 %%%===================================================================
 
-start_link(Op, ReqID, From, Group) ->
-    gen_fsm:start_link(?MODULE, [Op, ReqID, From, Group], []).
+start_link(ReqID, From, User) ->
+    gen_fsm:start_link(?MODULE, [ReqID, From, User], []).
 
-get(Group) ->
-    ?PRINT({get, Group}),
+get(User) ->
     ReqID = mk_reqid(),
-    snarl_group_read_fsm_sup:start_read_fsm([get, ReqID, self(), Group]),
+    snarl_user_read_fsm_sup:start_read_fsm([ReqID, self(), User]),
     {ok, ReqID}.
-
-list() ->
-    ReqID = mk_reqid(),
-    snarl_group_read_fsm_sup:start_read_fsm([list, ReqID, self(), undefined]),
-    {ok, ReqID}.
-
 
 %%%===================================================================
 %%% States
 %%%===================================================================
 
 %% Intiailize state data.
-init([Op, ReqId, From, Group]) ->
-    ?PRINT({init, [Op, ReqId, From, Group]}),
+init([ReqId, From, User]) ->
     SD = #state{req_id=ReqId,
                 from=From,
-		op=Op,
-                group=Group},
-    {ok, prepare, SD, 0};
-
-init([Op, ReqId, From]) ->
-    ?PRINT({init, [Op, ReqId, From]}),
-    SD = #state{req_id=ReqId,
-                from=From,
-		op=Op},
+                user=User},
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
-prepare(timeout, SD0=#state{group=Group}) ->
-    ?PRINT({prepare, Group}),
-    DocIdx = riak_core_util:chash_key({<<"group">>, term_to_binary(Group)}),
-    Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_group),
+prepare(timeout, SD0=#state{user=User}) ->
+    ?PRINT({prepare, User}),
+    DocIdx = riak_core_util:chash_key({<<"user">>, list_to_binary(User)}),
+    Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_user),
     SD = SD0#state{preflist=Prelist},
     {next_state, execute, SD, 0}.
 
 %% @doc Execute the get reqs.
 execute(timeout, SD0=#state{req_id=ReqId,
-                            group=Group,
-			    op=Op,
+                            user=User,
                             preflist=Prelist}) ->
-    ?PRINT({execute, Group}),
-    case Group of
-	undefined ->
-	    snarl_group_vnode:Op(Prelist, ReqId);
-	_ ->
-	    snarl_group_vnode:Op(Prelist, ReqId, Group)
-    end,
+    ?PRINT({execute, User}),
+    snarl_user_vnode:read(Prelist, ReqId, User),
     {next_state, waiting, SD0}.
 
 %% @doc Wait for R replies and then respond to From (original client
