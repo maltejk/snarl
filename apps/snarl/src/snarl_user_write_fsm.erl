@@ -69,7 +69,7 @@ init([ReqID, From, User, Op, Val]) ->
 
 %% @doc Prepare the write by calculating the _preference list_.
 prepare(timeout, SD0=#state{user=User}) ->
-    DocIdx = riak_core_util:chash_key({<<"user">>, list_to_binary(User)}),
+    DocIdx = riak_core_util:chash_key({<<"user">>, term_to_binary(User)}),
     Preflist = riak_core_apl:get_apl(DocIdx, ?N, snarl_user),
     SD = SD0#state{preflist=Preflist},
     {next_state, execute, SD, 0}.
@@ -90,12 +90,21 @@ execute(timeout, SD0=#state{req_id=ReqID,
     {next_state, waiting, SD0}.
 
 %% @doc Wait for W write reqs to respond.
-waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0}) ->
+waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
     if
         NumW =:= ?W ->
             From ! {ReqID, ok},
+            {stop, normal, SD};
+        true -> {next_state, waiting, SD}
+    end;
+waiting({ok, ReqID, Reply}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
+    NumW = NumW0 + 1,
+    SD = SD0#state{num_w=NumW},
+    if
+        NumW =:= ?W ->
+            From ! {ReqID, ok, Reply},
             {stop, normal, SD};
         true -> {next_state, waiting, SD}
     end.

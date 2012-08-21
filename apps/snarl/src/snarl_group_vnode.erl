@@ -109,21 +109,18 @@ handle_command(ping, _Sender, State) ->
 
 
 handle_command({add, ReqID, Group}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
-    ?PRINT({add, ReqID, Group, Groups}),
     Groups1 = dict:store(Group,[],Groups),
     eleveldb:put(DBRef, <<"#groups">>, term_to_binary(dict:fetch_keys(Groups1)), []),
     eleveldb:put(DBRef, list_to_binary(Group), term_to_binary([]), []),
     {reply, {ok, ReqID}, State#state{groups=Groups1}};
 
 handle_command({delete, ReqID, Group}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
-    ?PRINT({delete, ReqID, Group}),
     Groups1 = dict:erase(Group, Groups),
     eleveldb:put(DBRef, <<"#groups">>, term_to_binary(dict:fetch_keys(Groups1)), []),
     eleveldb:delete(DBRef, list_to_binary(Group), []),
     {reply, {ok, ReqID}, State#state{groups=Groups1}};
 
 handle_command({grant, ReqID, Group, Permission}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
-    ?PRINT({grant, ReqID, Group, Permission}),
     Groups1 = dict:update(Group,
 			  fun (L) ->
 				  [Permission|L]
@@ -133,7 +130,6 @@ handle_command({grant, ReqID, Group, Permission}, _Sender, #state{groups=Groups,
     {reply, {ok, ReqID}, State#state{groups=Groups1}};
 
 handle_command({revoke, ReqID, Group, Permission}, _Sender, #state{groups=Groups, dbref=DBRef} = State) ->
-    ?PRINT({delete, ReqID, Group, Permission}),
     Groups1 = dict:update(Group,
 			  fun (L) ->
 				  lists:delete(Permission, L)
@@ -142,21 +138,18 @@ handle_command({revoke, ReqID, Group, Permission}, _Sender, #state{groups=Groups
     {reply, {ok, ReqID}, State};
 
 handle_command({list, ReqID}, _Sender, #state{groups=Groups} = State) ->
-    ?PRINT({list, ReqID}),
     {reply, {ok, ReqID, dict:fetch_keys(Groups)}, State};
 
 handle_command({get, ReqID, Group}, _Sender, #state{groups=Groups} = State) ->
-    ?PRINT({get, ReqID, Group}),
     Res = case dict:find(Group, Groups) of
 	      error ->
-		  {error, ReqID, not_found};
+		  {ok, ReqID, not_found};
 	      {ok, V} ->
 		  {ok, ReqID, V}
 	  end,
     {reply, Res, State};
 
-handle_command(Message, _Sender, State) ->
-    ?PRINT({unhandled_command, Message}),
+handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(_Message, _Sender, State) ->

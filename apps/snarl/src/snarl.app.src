@@ -8,7 +8,8 @@
                   kernel,
                   stdlib,
 		  riak_core,
-                  eleveldb
+		  eleveldb,
+                  zmq_mdns_server
                  ]},
   {mod, { snarl_app, []}},
   {env, []}

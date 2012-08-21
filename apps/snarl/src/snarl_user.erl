@@ -4,9 +4,14 @@
 
 -export([
          ping/0,
+	 list/0,
+	 auth/2,
 	 get/1,
 	 add/1,
 	 delete/1,
+	 passwd/2,
+	 join/2,
+	 leave/2,
 	 grant/2,
 	 revoke/2
         ]).
@@ -23,12 +28,29 @@ ping() ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
+auth(User, Passwd) ->
+    {ok, ReqID} = snarl_user_read_fsm:auth(User, Passwd),
+    wait_for_reqid(ReqID, ?TIMEOUT).
+
 get(User) ->
     {ok, ReqID} = snarl_user_read_fsm:get(User),
     wait_for_reqid(ReqID, ?TIMEOUT).
 
+list() ->
+    {ok, ReqID} = snarl_user_read_fsm:list(),
+    wait_for_reqid(ReqID, ?TIMEOUT).
+
 add(User) ->
     do_write(User, add).
+
+passwd(User, Passwd) ->
+    do_write(User, passwd, Passwd).
+
+join(User, Group) ->
+    do_write(User, join, Group).
+
+leave(User, Group) ->
+    do_write(User, leave, Group).
 
 delete(User) ->
     do_write(User, delete).
