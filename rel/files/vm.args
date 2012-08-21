@@ -1,5 +1,5 @@
 ## Name of the node
--name snarl@_OWN_IP_
+-name snarl@_HOST_
 
 ## Cookie for distributed erlang
 -setcookie _FIFOCOOKIE_

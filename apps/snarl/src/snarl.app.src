@@ -1,16 +1,16 @@
 {application, snarl,
  [
-  {description, ""},
-  {vsn, "0.1.0"},
+  {description, "RBAC server"},
+  {vsn, "0.2.0"},
   {registered, []},
   {applications, [
                   kernel,
                   stdlib,
-		  redgrid,
+		  backyard,
 		  lager,
-		  gproc,
 		  redo,
-		  crypto,
+		  statsderl,
+		  vmstats,
 		  uuid
                  ]},
   {mod, { snarl_app, []}},

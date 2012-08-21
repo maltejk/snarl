@@ -52,7 +52,6 @@ initialize(Name, Pass) ->
 initialize_groups() ->
     gen_server:cast(?SERVER, init_groups).
 
-
 reregister() ->
     gen_server:cast(?SERVER, reregister).
 
@@ -69,6 +68,7 @@ reregister() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
+    ok = backyard_srv:register_connect_handler(backyard_connect),
     case redo:cmd([<<"SMEMBERS">>, <<"fifo:groups">>]) of
 	[] ->
 	    int_init_groups();
@@ -81,6 +81,11 @@ init([]) ->
 	_ ->
 	    ok
     end,
+    {ok, IP} = application:get_env(statsderl, hostname),
+    StatsdIp = term_to_binary(IP),
+    redo:cmd([<<"SADD">>, <<"fifo:options:statsd">>, <<"hostname">>]),
+    redo:cmd([<<"SET">>,  <<"fifo:options:statsd:hostname">>, StatsdIp]),
+    
     {ok, #state{}, 1000}.
 
 %%--------------------------------------------------------------------
@@ -612,17 +617,18 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast(backyard_connect, State) ->
+    gproc:reg({n, g, snarl}),
+    {noreply, State};
 handle_cast(init_groups, State) ->
     int_init_groups(),
     {noreply, State};
 handle_cast(reregister, State) ->
     try
-	gproc:reg({n, g, snarl}),
+%	gproc:reg({n, g, snarl}),
 	{noreply, State}
     catch
 	_T:_E ->
-	    application:stop(gproc),
-	    application:start(gproc),
 	    {noreply, State, 1000}
     end;
 
@@ -839,7 +845,6 @@ int_init_groups() ->
     {ok, Admins} = group_add(<<"admins">>),
     [group_grant(Admins, Perm) ||
 	Perm <- [['...']]],
-   
     {ok, Users} = group_add(<<"users">>),
     io:format("2: ~p~n", [Users]),
     [group_grant(Users, Perm) ||
@@ -850,9 +855,10 @@ int_init_groups() ->
 		 [service, wiggle, module, home],
 		 [service, wiggle, module, system],
 		 [service, wiggle, module, event],
-		 [vm, create],
+		 [host, '_', vm, create],
 		 [service, sniffle, info],
 		 [network, '_', next_ip],
+		 [network, '_', get],
 		 [dataset, '_', get],
 		 [package, '_', get],
 		 [package, list]]],
