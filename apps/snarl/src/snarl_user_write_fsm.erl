@@ -32,6 +32,7 @@
                 from :: pid(),
 		user :: string(),
                 op :: atom(),
+                cordinator :: node(),
                 val = undefined :: term() | undefined,
                 preflist :: riak_core_apl:preflist2(),
                 num_w = 0 :: non_neg_integer()}).
@@ -64,6 +65,7 @@ init([ReqID, From, User, Op, Val]) ->
                 from=From,
                 user=User,
                 op=Op,
+                cordinator=node(),
                 val=Val},
     {ok, prepare, SD, 0}.
 
@@ -80,12 +82,13 @@ execute(timeout, SD0=#state{req_id=ReqID,
                             user=User,
                             op=Op,
                             val=Val,
+                            cordinator=Cordinator,
                             preflist=Preflist}) ->
     case Val of
         undefined ->
-            snarl_user_vnode:Op(Preflist, ReqID, User);
+            snarl_user_vnode:Op(Preflist, {ReqID, Cordinator}, User);
         _ ->
-            snarl_user_vnode:Op(Preflist, ReqID, User, Val)
+            snarl_user_vnode:Op(Preflist, {ReqID, Cordinator}, User, Val)
     end,
     {next_state, waiting, SD0}.
 
@@ -93,6 +96,7 @@ execute(timeout, SD0=#state{req_id=ReqID,
 waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
+    lager:warning("Write(~p) ok", [NumW]),
     if
         NumW =:= ?W ->
             From ! {ReqID, ok},
@@ -102,6 +106,7 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
 waiting({ok, ReqID, Reply}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
+    lager:warning("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= ?W ->
             From ! {ReqID, ok, Reply},

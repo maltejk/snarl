@@ -31,9 +31,10 @@
 	 join/4,
 	 leave/4,
 	 grant/4,
+	 repair/3,
 	 revoke/4]).
 
--record(state, {partition, users=[], dbref}).
+-record(state, {partition, users=[], dbref, node}).
 
 -define(MASTER, snarl_user_vnode_master).
 
@@ -44,6 +45,12 @@
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
+
+repair(IdxNode, User, Obj) ->
+    riak_core_vnode_master:command(IdxNode,
+                                   {repair, undefined, User, Obj},
+                                   ignore,
+                                   ?MASTER).
 
 %%%===================================================================
 %%% API - reads
@@ -109,7 +116,6 @@ grant(Preflist, ReqID, User, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {grant, ReqID, User, Val},
 				   {fsm, undefined, self()},
-
                                    ?MASTER).
 
 revoke(Preflist, ReqID, User, Val) ->
@@ -127,6 +133,7 @@ init([Partition]) ->
     {ok, DBRef} = eleveldb:open("users."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     Users = read_users(DBRef),
     {ok, #state { 
+       node=node(),
        users=Users,
        partition=Partition,
        dbref=DBRef}}.
@@ -136,88 +143,79 @@ handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
 
-handle_command({add, ReqID, User}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = add_user(User, {<<"">>,[],[]}, Users, DBRef),
+handle_command({repair, undefined, User, Obj}, _Sender, #state{users=Users0}=State) ->
+    lager:warning("repair performed ~p~n", [Obj]),
+    Users1 = dict:store(User, Obj, Users0),
+    {noreply, State#state{users=Users1}};
+
+
+handle_command({add, {ReqID, Coordinator}, User}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
+    User0 = statebox:new({snarl_user_state, new}),
+    User1 = statebox:modify({snarl_user_state, name, [User]}, User0),
+    VC0 = vclock:fresh(),
+    VC = vclock:increment(Coordinator, VC0),
+    UserObj = #snarl_obj{val=User1, vclock=VC},
+    {ok, Users1} = add_user(User, UserObj, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-handle_command({delete, ReqID, User}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
+handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
     Users1 = dict:erase(User, Users),
     eleveldb:put(DBRef, <<"#users">>, term_to_binary(dict:fetch_keys(Users1)), []),
     eleveldb:delete(DBRef, list_to_binary(User), []),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-handle_command({grant, ReqID, User, Permission}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = dict:update(User,
-			 fun ({Pass, Groups, Permissions}) ->
-				 {Pass, Groups, [Permission|Permissions]}
-			 end, Users),
-    {ok, UserData} = dict:find(User, Users1),
-    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+handle_command({grant = Action, {ReqID, Coordinator}, User, Permission}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
+    Users1 = change_user_callback(User, Action, Permission, Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-handle_command({revoke, ReqID, User, Permission}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = dict:update(User,
-			 fun ({Pass, Groups, Permissions}) ->
-				 {Pass, Groups, lists:delete(Permission, Permissions)}
-			 end, Users),
-    {ok, UserData} = dict:find(User, Users1),
-    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+handle_command({revoke = Action, {ReqID, Coordinator}, User, Permission}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
+    Users1 = change_user_callback(User, Action, Permission, Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-handle_command({join, ReqID, User, Group}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
+handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
     case snarl_group:get(Group) of
 	{ok, not_found} ->
 	    {reply, {ok, ReqID, not_found}, State};
 	{ok, _} ->
-	    Users1 = dict:update(User,
-				 fun ({Pass, Groups, Permissions}) ->
-					 {Pass, [Group|Groups], Permissions}
-				 end, Users),
-	    {ok, UserData} = dict:find(User, Users1),
-	    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+	    Users1 = change_user_callback(User, Action, Group, Coordinator, Users, DBRef),
 	    {reply, {ok, ReqID, joined}, State#state{users=Users1}}
     end;
 
-handle_command({leave, ReqID, User, Group}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = dict:update(User,
-			 fun ({Pass, Groups, Permissions}) ->
-				 {Pass, lists:delete(Group,Groups), Permissions}
-			 end, Users),
-    {ok, UserData} = dict:find(User, Users1),
-    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+handle_command({leave = Action, {ReqID, Coordinator}, User, Group}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
+    Users1 = change_user_callback(User, Action, Group, Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-handle_command({passwd, ReqID, User, Passwd}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = dict:update(User,
-			 fun ({_Pass, Groups, Permissions}) ->
-				 {crypto:sha([User, Passwd]), Groups, Permissions}
-			 end, Users),
-    {ok, UserData} = dict:find(User, Users1),
-    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+handle_command({passwd = Action, {ReqID, Coordinator}, User, Passwd}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
+    Users1 = change_user_callback(User, Action, Passwd, Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
 
 handle_command({list, ReqID}, _Sender, #state{users=Users} = State) ->
     {reply, {ok, ReqID, dict:fetch_keys(Users)}, State};
 
-handle_command({get, ReqID, User}, _Sender, #state{users=Users} = State) ->
+handle_command({get, ReqID, User}, _Sender, #state{users=Users, partition=Partition, node=Node} = State) ->
     Res = case dict:find(User, Users) of
 	      error ->
-		  {ok, ReqID, not_found};
+		  {ok, ReqID, {Partition,Node}, not_found};
 	      {ok, V} ->
-		  {ok, ReqID, V}
+		  {ok, ReqID, {Partition,Node}, V}
 	  end,
     {reply, Res, State};
 
-handle_command({auth, ReqID, User, Passwd}, _Sender, #state{users=Users} = State) ->
+handle_command({auth, ReqID, User, Passwd}, _Sender, #state{users=Users, partition=Partition, node=Node} = State) ->
     TargetPass = crypto:sha([User, Passwd]),
     Res = case dict:find(User, Users) of
 	      error ->
-		  {ok, ReqID, not_found};
+		  {ok, ReqID, {Partition,Node}, not_found};
 	      {ok, {TargetPass, _Groups, _Permissions} = V} ->
-		  {ok, ReqID, V};
+		  {ok, ReqID, {Partition,Node}, V};
 	      {ok, {_WrongPass, _Groups, _Permissions}} ->
-		  {ok, ReqID, failed}
+		  {ok, ReqID, {Partition,Node}, failed}
 	  end,
     {reply, Res, State};
 
@@ -232,7 +230,8 @@ handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
 handle_handoff_command(_Message, _Sender, State) ->
     {noreply, State}.
 
-handoff_starting(_TargetNode, State) ->
+handoff_starting(TargetNode, State) ->
+    lager:warning("Starting handof to: ~p", [TargetNode]),
     {true, State}.
 
 handoff_cancelled(State) ->
@@ -244,7 +243,7 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, State) ->
     {User, Data} = binary_to_term(Data),
-    Users1 = add_user(User, Data, State#state.users, State#state.dbref),
+    {ok, Users1} = add_user(User, Data, State#state.users, State#state.dbref),
     {reply, ok, State#state{users = Users1}}.
 
 encode_handoff_item(User, Data) ->
@@ -260,8 +259,9 @@ is_empty(State) ->
 
 delete(#state{dbref=DBRef} = State) ->
     eleveldb:close(DBRef),
-    eleveldb:delete("users."++integer_to_list(State#state.partition)++".ldb",[]),
-    {ok, State}.
+    eleveldb:destroy("users."++integer_to_list(State#state.partition)++".ldb",[]),
+    {ok, DBRef1} = eleveldb:open("users."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
+    {ok, State#state{dbref=DBRef1}}.
 
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
     {stop, not_implemented, State}.
@@ -276,7 +276,6 @@ terminate(_Reason, #state{dbref=undefined} = _State) ->
 terminate(_Reason, #state{dbref=DBRef} = _State) ->
     eleveldb:close(DBRef),
     ok.
-
 
 read_users(DBRef) ->
     case eleveldb:get(DBRef, <<"#users">>, []) of
@@ -294,3 +293,19 @@ add_user(User, UserData, Users, DBRef) ->
     eleveldb:put(DBRef, <<"#users">>, term_to_binary(dict:fetch_keys(Users1)), []),
     eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
     {ok, Users1}.
+
+
+
+change_user_callback(User, Action, Val, Coordinator, Users, DBRef) ->    
+    Users1 = dict:update(User, update_user(Coordinator, Val, Action), Users),
+    {ok, UserData} = dict:find(User, Users1),
+    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+    Users1.
+
+
+update_user(Coordinator, Val, Action) ->
+    fun (#snarl_obj{val=User0}=O) ->
+	    User1 = statebox:modify({snarl_user_state, Action, [Val]}, User0),
+	    User2 = statebox:expire(?STATEBOX_EXPIRE, User1),
+	    snarl_obj:update(User2, Coordinator, O)
+    end.

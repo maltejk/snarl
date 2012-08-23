@@ -8,19 +8,24 @@
 %% API
 -export([start_link/5, get/1, list/0, auth/2]).
 
+
+-export([reconcile/1, different/1, needs_repair/2, repair/3, unique/1]).
+
 %% Callbacks
 -export([init/1, code_change/4, handle_event/3, handle_info/3,
          handle_sync_event/4, terminate/3]).
 
 %% States
--export([prepare/2, execute/2, waiting/2]).
+-export([prepare/2, execute/2, waiting/2, wait_for_n/2, finalize/2]).
 
 -record(state, {req_id,
                 from,
 		user,
 		op,
+		r=?R,
                 preflist,
                 num_r=0,
+		timeout=?DEFAULT_TIMEOUT,
 		val,
                 replies=[]}).
 
@@ -105,25 +110,49 @@ execute(timeout, SD0=#state{req_id=ReqId,
     {next_state, waiting, SD0}.
 
 %% @doc Wait for R replies and then respond to From (original client
-%% that called `rts:get/2').
+%% that called `snarl:get/2').
 %% TODO: read repair...or another blog post?
-waiting({ok, ReqID, Val}, SD0=#state{from=From, num_r=NumR0, replies=Replies0}) ->
-    ?PRINT({waiting, ReqID, Val}),
+
+waiting({ok, ReqID, IdxNode, Obj},
+        SD0=#state{from=From, num_r=NumR0, replies=Replies0,
+                   r=R, timeout=Timeout}) ->
     NumR = NumR0 + 1,
-    Replies = [Val|Replies0],
+    Replies = [{IdxNode, Obj}|Replies0],
     SD = SD0#state{num_r=NumR,replies=Replies},
+
     if
-        NumR =:= ?R ->
-            Reply =
-                case lists:any(different(Val), Replies) of
-                    true ->
-                        Replies;
-                    false ->
-                        Val
-                end,
-            From ! {ReqID, ok, Reply},
-            {stop, normal, SD};
+        NumR =:= R ->
+            Reply = snarl_obj:val(merge(Replies)),
+            From ! {ReqID, ok, statebox:value(Reply)},
+            if NumR =:= ?N -> {next_state, finalize, SD, 0};
+               true -> {next_state, wait_for_n, SD, Timeout}
+            end;
         true -> {next_state, waiting, SD}
+    end.
+
+wait_for_n({ok, _ReqID, IdxNode, Obj},
+             SD0=#state{num_r=?N - 1, replies=Replies0}) ->
+    Replies = [{IdxNode, Obj}|Replies0],
+    {next_state, finalize, SD0#state{num_r=?N, replies=Replies}, 0};
+
+wait_for_n({ok, _ReqID, IdxNode, Obj},
+             SD0=#state{num_r=NumR0, replies=Replies0, timeout=Timeout}) ->
+    NumR = NumR0 + 1,
+    Replies = [{IdxNode, Obj}|Replies0],
+    {next_state, wait_for_n, SD0#state{num_r=NumR, replies=Replies}, Timeout};
+
+%% TODO partial repair?
+wait_for_n(timeout, SD) ->
+    {stop, timeout, SD}.
+
+finalize(timeout, SD=#state{replies=Replies, user=User}) ->
+    MObj = merge(Replies),
+    case needs_repair(MObj, Replies) of
+        true ->
+            repair(User, MObj, Replies),
+            {stop, normal, SD};
+        false ->
+            {stop, normal, SD}
     end.
 
 
@@ -146,6 +175,55 @@ terminate(_Reason, _SN, _SD) ->
 %%% Internal Functions
 %%%===================================================================
 
-different(A) -> fun(B) -> A =/= B end.
-
 mk_reqid() -> erlang:phash2(erlang:now()).
+
+
+%% @pure
+%%
+%% @doc Given a list of `Replies' return the merged value.
+-spec merge([vnode_reply()]) -> snarl_obj() | not_found.
+merge(Replies) ->
+    Objs = [Obj || {_,Obj} <- Replies],
+    snarl_obj:merge(Objs).
+
+%% @pure
+%%
+%% @doc Reconcile conflicts among conflicting values.
+-spec reconcile([A :: statebox:statebox()]) -> A :: statebox:statebox().
+
+reconcile(Vals) -> 
+    statebox:merge(Vals).
+
+
+%% @pure
+%%
+%% @doc Given the merged object `MObj' and a list of `Replies'
+%% determine if repair is needed.
+-spec needs_repair(any(), [vnode_reply()]) -> boolean().
+needs_repair(MObj, Replies) ->
+    Objs = [Obj || {_,Obj} <- Replies],
+    lists:any(different(MObj), Objs).
+
+%% @pure
+different(A) -> fun(B) -> not snarl_obj:equal(A,B) end.
+
+%% @impure
+%%
+%% @doc Repair any vnodes that do not have the correct object.
+-spec repair(string(), snarl_obj(), [vnode_reply()]) -> io.
+repair(_, _, []) -> io;
+
+repair(StatName, MObj, [{IdxNode,Obj}|T]) ->
+    case snarl_obj:equal(MObj, Obj) of
+        true -> repair(StatName, MObj, T);
+        false ->
+            snarl_user_vnode:repair(IdxNode, StatName, MObj),
+            repair(StatName, MObj, T)
+    end.
+
+%% pure
+%%
+%% @doc Given a list return the set of unique values.
+-spec unique([A::any()]) -> [A::any()].
+unique(L) ->
+    sets:to_list(sets:from_list(L)).

@@ -9,7 +9,8 @@
                   stdlib,
 		  riak_core,
 		  eleveldb,
-                  zmq_mdns_server
+                  zmq_mdns_server,
+                  lager
                  ]},
   {mod, { snarl_app, []}},
   {env, []}
