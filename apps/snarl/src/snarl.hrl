@@ -12,12 +12,12 @@
 	       permissions = [] :: list(),
 	       groups = [] :: list()}).
 
--type val()             ::  statebox:statebox().
+-type val() ::  statebox:statebox().
 
--record(snarl_obj,        {val    :: val(),
-			   vclock :: vclock:vclock()}).
+-record(snarl_obj, {val    :: val(),
+		    vclock :: vclock:vclock()}).
 
--type snarl_obj()         :: #snarl_obj{} | not_found.
+-type snarl_obj() :: #snarl_obj{} | not_found.
 
 -type idx_node() :: {integer(), node()}.
 

@@ -29,8 +29,19 @@ ping() ->
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
 auth(User, Passwd) ->
-    {ok, ReqID} = snarl_user_read_fsm:auth(User, Passwd),
-    wait_for_reqid(ReqID, ?TIMEOUT).
+    {ok, ReqID} = snarl_user_read_fsm:get(User),
+    case wait_for_reqid(ReqID, ?TIMEOUT) of
+	{ok, not_found} ->
+	    not_found;
+	{ok, UserObj} ->
+	    CurrentHash = UserObj#user.passwd,
+	    case crypto:sha([User, Passwd]) of
+		CurrentHash ->
+		    true;
+		_ ->
+		    false
+	    end
+	end.
 
 get(User) ->
     {ok, ReqID} = snarl_user_read_fsm:get(User),
