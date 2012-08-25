@@ -12,6 +12,10 @@
 	       permissions = [] :: list(),
 	       groups = [] :: list()}).
 
+-record(group, {name :: binary(),
+		permissions = [] :: list(),
+		users = [] :: list()}).
+
 -type val() ::  statebox:statebox().
 
 -record(snarl_obj, {val    :: val(),
@@ -22,3 +26,4 @@
 -type idx_node() :: {integer(), node()}.
 
 -type vnode_reply() :: {idx_node(), snarl_obj() | not_found}.
+

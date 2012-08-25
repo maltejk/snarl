@@ -122,11 +122,16 @@ waiting({ok, ReqID, IdxNode, Obj},
 
     if
         NumR =:= R ->
-            Reply = snarl_obj:val(merge(Replies)),
-            From ! {ReqID, ok, statebox:value(Reply)},
-            if NumR =:= ?N -> {next_state, finalize, SD, 0};
-               true -> {next_state, wait_for_n, SD, Timeout}
-            end;
+	    case merge(Replies) of
+		not_found ->
+		    From ! {ReqID, ok, not_found};
+		Merged ->
+		    Reply = snarl_obj:val(Merged),
+		    From ! {ReqID, ok, statebox:value(Reply)},
+		    if NumR =:= ?N -> {next_state, finalize, SD, 0};
+		       true -> {next_state, wait_for_n, SD, Timeout}
+		    end
+	    end;
         true -> {next_state, waiting, SD}
     end.
 
@@ -184,7 +189,7 @@ mk_reqid() -> erlang:phash2(erlang:now()).
 -spec merge([vnode_reply()]) -> snarl_obj() | not_found.
 merge(Replies) ->
     Objs = [Obj || {_,Obj} <- Replies],
-    snarl_obj:merge(Objs).
+    snarl_obj:merge(snarl_user_read_fsm, Objs).
 
 %% @pure
 %%

@@ -21,8 +21,7 @@
 
 % Reads
 -export([list/2,
-	 get/3,
-	 auth/4]).
+	 get/3]).
 
 % Writes
 -export([add/3,
@@ -61,14 +60,6 @@ get(Preflist, ReqID, User) ->
 				   {get, ReqID, User},
 				   {fsm, undefined, self()},
 				   ?MASTER).
-
-
-auth(Preflist, ReqID, User, Passwd) ->
-    riak_core_vnode_master:command(Preflist,
-				   {auth, ReqID, User, Passwd},
-				   {fsm, undefined, self()},
-				   ?MASTER).
-
 
 list(Preflist, ReqID) ->
     riak_core_vnode_master:command(Preflist,
@@ -127,7 +118,6 @@ revoke(Preflist, ReqID, User, Val) ->
 %%%===================================================================
 %%% VNode
 %%%===================================================================
-
     
 init([Partition]) ->
     {ok, DBRef} = eleveldb:open("users."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
@@ -141,7 +131,6 @@ init([Partition]) ->
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
-
 
 handle_command({repair, undefined, User, Obj}, _Sender, #state{users=Users0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
@@ -164,16 +153,6 @@ handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, #state{users=User
     eleveldb:delete(DBRef, list_to_binary(User), []),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-handle_command({grant = Action, {ReqID, Coordinator}, User, Permission}, _Sender, 
-	       #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = change_user_callback(User, Action, Permission, Coordinator, Users, DBRef),
-    {reply, {ok, ReqID}, State#state{users=Users1}};
-
-handle_command({revoke = Action, {ReqID, Coordinator}, User, Permission}, _Sender, 
-	       #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = change_user_callback(User, Action, Permission, Coordinator, Users, DBRef),
-    {reply, {ok, ReqID}, State#state{users=Users1}};
-
 handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, 
 	       #state{users=Users, dbref=DBRef} = State) ->
     case snarl_group:get(Group) of
@@ -183,17 +162,6 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender,
 	    Users1 = change_user_callback(User, Action, Group, Coordinator, Users, DBRef),
 	    {reply, {ok, ReqID, joined}, State#state{users=Users1}}
     end;
-
-handle_command({leave = Action, {ReqID, Coordinator}, User, Group}, _Sender, 
-	       #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = change_user_callback(User, Action, Group, Coordinator, Users, DBRef),
-    {reply, {ok, ReqID}, State#state{users=Users1}};
-
-handle_command({passwd = Action, {ReqID, Coordinator}, User, Passwd}, _Sender, 
-	       #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = change_user_callback(User, Action, Passwd, Coordinator, Users, DBRef),
-    {reply, {ok, ReqID}, State#state{users=Users1}};
-
 
 handle_command({list, ReqID}, _Sender, #state{users=Users} = State) ->
     {reply, {ok, ReqID, dict:fetch_keys(Users)}, State};
@@ -207,17 +175,10 @@ handle_command({get, ReqID, User}, _Sender, #state{users=Users, partition=Partit
 	  end,
     {reply, Res, State};
 
-handle_command({auth, ReqID, User, Passwd}, _Sender, #state{users=Users, partition=Partition, node=Node} = State) ->
-    TargetPass = crypto:sha([User, Passwd]),
-    Res = case dict:find(User, Users) of
-	      error ->
-		  {ok, ReqID, {Partition,Node}, not_found};
-	      {ok, {TargetPass, _Groups, _Permissions} = V} ->
-		  {ok, ReqID, {Partition,Node}, V};
-	      {ok, {_WrongPass, _Groups, _Permissions}} ->
-		  {ok, ReqID, {Partition,Node}, failed}
-	  end,
-    {reply, Res, State};
+handle_command({Action, {ReqID, Coordinator}, User, Passwd}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
+    Users1 = change_user_callback(User, Action, Passwd, Coordinator, Users, DBRef),
+    {reply, {ok, ReqID}, State#state{users=Users1}};
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.

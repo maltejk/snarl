@@ -13,11 +13,11 @@
 	 join/2,
 	 leave/2,
 	 grant/2,
-	 revoke/2
+	 revoke/2,
+	 allowed/2
         ]).
 
 -define(TIMEOUT, 5000).
-
 
 %% Public API
 
@@ -41,6 +41,15 @@ auth(User, Passwd) ->
 		_ ->
 		    false
 	    end
+	end.
+
+allowed(User, Permission) ->
+    {ok, ReqID} = snarl_user_read_fsm:get(User),
+    case wait_for_reqid(ReqID, ?TIMEOUT) of
+	{ok, not_found} ->
+	    not_found;
+	{ok, UserObj} ->
+	    test_user(UserObj, Permission)
 	end.
 
 get(User) ->
@@ -96,4 +105,65 @@ wait_for_reqid(ReqID, Timeout) ->
 	    ?PRINT({yuck, Other})
     after Timeout ->
 	    {error, timeout}
+    end.
+
+
+
+match([], []) ->
+    lager:info("snarl:match - Direct match"),
+    true;
+
+match(P, ['...']) ->
+    lager:info("snarl:match - Matched ~p by '...'", [P]),
+    true;
+
+match([], ['...'|_Rest]) ->
+    false;
+
+match([], [_X|_R]) ->
+    false;
+
+match([X | InRest], ['...', X|TestRest] = Test) ->
+    match(InRest, TestRest) orelse match(InRest, Test);
+
+match([_,X|InRest], ['...', X|TestRest] = Test) ->
+    match(InRest, TestRest) orelse match([X| InRest], Test);
+
+match([X|InRest], [X|TestRest]) ->
+    match(InRest, TestRest);
+
+match([_|InRest], ['_'|TestRest]) ->
+    match(InRest, TestRest);
+
+match(_, _) ->
+    false.
+
+test_perms(_Perm, []) ->
+    false;
+
+test_perms(Perm, [Test|Tests]) ->
+    match(Perm, Test) orelse test_perms(Perm, Tests).
+
+test_groups(_Permission, []) ->
+    false;
+
+test_groups(Permission, [Group|Groups]) ->
+    case snarl_group:get(Group) of
+	{ok, GroupObj} ->
+	    case test_perms(Permission, GroupObj#group.permissions) of
+		true ->
+		    true;
+		false ->
+		    test_groups(Permission, Groups)
+	    end;
+	_ ->
+	    test_groups(Permission, Groups)
+    end.
+
+test_user(UserObj, Permission) ->
+    case test_perms(Permission, UserObj#user.permissions) of
+	true ->
+	    true;
+	false ->
+	    test_groups(Permission, UserObj#user.groups)
     end.

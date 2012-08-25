@@ -25,6 +25,9 @@ message({user, add, User}, State) ->
 message({user, auth, User, Pass}, State) ->
     {reply, snarl_user:auth(User, Pass), State};
 
+message({user, allowed, User, Permission}, State) ->
+    {reply, snarl_user:allowed(User, Permission), State};
+
 message({user, delete, User}, State) ->
     {reply, snarl_user:delete(User), State};
 

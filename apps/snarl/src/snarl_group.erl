@@ -28,11 +28,9 @@ get(Group) ->
     {ok, ReqID} = snarl_group_read_fsm:get(Group),
     wait_for_reqid(ReqID, ?TIMEOUT).
 
-
 list() ->
     {ok, ReqID} = snarl_group_read_fsm:list(),
     wait_for_reqid(ReqID, ?TIMEOUT).
-
 
 add(Group) ->
     do_write(Group, add).

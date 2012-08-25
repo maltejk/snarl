@@ -7,7 +7,7 @@
 %% Taken form https://github.com/Licenser/try-try-try/blob/master/2011/riak-core-conflict-resolution/rts/src/rts_obj.erl
 
 -module(snarl_obj).
--export([ancestors/1, children/1, equal/1, equal/2, merge/1, unique/1,
+-export([ancestors/1, children/1, equal/1, equal/2, merge/2, unique/1,
          update/3]).
 -export([val/1, vclock/1]).
 
@@ -60,20 +60,20 @@ equal(ObjA) ->
 %%
 %% @doc Merge the list of `Objs', calling the appropriate reconcile
 %% fun if there are siblings.
--spec merge([snarl_obj()]) -> snarl_obj().
-merge([not_found|_]=Objs) ->
+-spec merge(atom(),[snarl_obj()]) -> snarl_obj().
+merge(FSM, [not_found|_]=Objs) ->
     P = fun(X) -> X == not_found end,
     case lists:all(P, Objs) of
         true -> not_found;
-        false -> merge(lists:dropwhile(P, Objs))
+        false -> merge(FSM, lists:dropwhile(P, Objs))
     end;
 
-merge([#snarl_obj{}|_]=Objs) ->
+merge(FSM, [#snarl_obj{}|_]=Objs) ->
     case snarl_obj:children(Objs) of
         [] -> not_found;
         [Child] -> Child;
         Chldrn ->
-            Val = snarl_get_fsm:reconcile(lists:map(fun val/1, Chldrn)),
+            Val = FSM:reconcile(lists:map(fun val/1, Chldrn)),
             MergedVC = vclock:merge(lists:map(fun vclock/1, Chldrn)),
             #snarl_obj{val=Val, vclock=MergedVC}
     end.
