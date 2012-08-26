@@ -6,15 +6,16 @@
 -define(STATEBOX_EXPIRE, 60000).
 -define(DEFAULT_TIMEOUT, 10000).
 
-
 -record(user, {name :: binary(),
 	       passwd :: binary(),
-	       permissions = [] :: list(),
-	       groups = [] :: list()}).
+	       permissions = [] :: [permission()],
+	       groups = [] :: [binary()]}).
 
 -record(group, {name :: binary(),
-		permissions = [] :: list(),
-		users = [] :: list()}).
+		permissions = [] :: [permission()],
+		users = [] :: [binary()]}).
+
+-type permission() :: [binary() | atom()].
 
 -type val() ::  statebox:statebox().
 

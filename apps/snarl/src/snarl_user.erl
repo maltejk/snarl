@@ -2,6 +2,11 @@
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
+
 -export([
          ping/0,
 	 list/0,
@@ -81,11 +86,10 @@ grant(User, Permission) ->
 revoke(User, Permission) ->
     do_write(User, revoke, Permission).
 
-
-
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
 do_write(User, Op) ->
     {ok, ReqID} = snarl_user_write_fsm:write(User, Op),
     wait_for_reqid(ReqID, ?TIMEOUT).
@@ -107,8 +111,6 @@ wait_for_reqid(ReqID, Timeout) ->
 	    {error, timeout}
     end.
 
-
-
 match([], []) ->
     lager:info("snarl:match - Direct match"),
     true;
@@ -128,6 +130,9 @@ match([X | InRest], ['...', X|TestRest] = Test) ->
 
 match([_,X|InRest], ['...', X|TestRest] = Test) ->
     match(InRest, TestRest) orelse match([X| InRest], Test);
+
+match([_ | InRest], ['...'|_TestRest] = Test) ->
+     match(InRest, Test);
 
 match([X|InRest], [X|TestRest]) ->
     match(InRest, TestRest);
@@ -167,3 +172,54 @@ test_user(UserObj, Permission) ->
 	false ->
 	    test_groups(Permission, UserObj#user.groups)
     end.
+
+
+-ifdef(TEST).
+
+match_direct_test() ->
+    ?assert(true == match([some_permission], [some_permission])).
+
+nomatch_direct_test() ->
+    ?assert(false == match([some_permission], [some_other_permission])).
+
+match_direct_list_test() ->
+    ?assert(true == match([some, permission], [some, permission])).
+
+nomatch_direct_list_test() ->
+    ?assert(false == match([some, permission], [some, other, permission])),
+    ?assert(false == match([some, permission], [some, other_permission])).
+
+nomatch_short_list_test() ->
+    ?assert(false == match([some, permission], [some])).
+
+nomatch_long_list_test() ->
+    ?assert(false == match([some, permission], [some, permission, yap])).
+
+match_tripoint_test() ->
+    ?assert(true == match([some, permission], ['...'])).
+
+match_tripoint_start_test() ->
+    ?assert(true == match([some, cool, permission], ['...', permission])).
+
+match_tripoint_end_test() ->
+    ?assert(true == match([some, cool, permission], [some, '...'])).
+
+match_tripoint_middle_test() ->
+    ?assert(true == match([some, really, cool, permission], [some, '...', permission])).
+
+match_underscore_test() ->
+    ?assert(true == match([some], ['_'])).
+
+match_underscore_start_test() ->
+    ?assert(true == match([some, permission], ['_', permission])).
+
+match_underscore_end_test() ->
+    ?assert(true == match([some, permission], [some, '_'])).
+
+match_underscore_middle_test() ->
+    ?assert(true == match([some, cool, permission], [some, '_', permission])).
+
+nomatch_underscore_double_test() ->
+    ?assert(false == match([some, really, cool, permission], [some, '_', permission])).
+
+-endif.
