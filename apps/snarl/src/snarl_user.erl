@@ -198,6 +198,10 @@ nomatch_long_list_test() ->
 match_tripoint_test() ->
     ?assert(true == match([some, permission], ['...'])).
 
+match_tripoint_at_end_test() ->
+    ?assert(true == match([some, permission], [some, permission, '...'])).
+
+
 match_tripoint_start_test() ->
     ?assert(true == match([some, cool, permission], ['...', permission])).
 
