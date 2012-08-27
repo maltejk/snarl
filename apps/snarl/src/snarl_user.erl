@@ -54,7 +54,7 @@ allowed(User, Permission) ->
 	    not_found;
 	{ok, UserObj} ->
 	    test_user(UserObj, Permission)
-	end.
+    end.
 
 get(User) ->
     {ok, ReqID} = snarl_user_read_fsm:get(User),
@@ -65,7 +65,13 @@ list() ->
     wait_for_reqid(ReqID, ?TIMEOUT).
 
 add(User) ->
-    do_update(User, add).
+    {ok, ReqID} = snarl_user_read_fsm:get(User),
+    case wait_for_reqid(ReqID, ?TIMEOUT) of
+	{ok, not_found} ->
+	    do_update(User, add);
+	{ok, _UserObj} ->
+	    duplicate
+    end.
 
 passwd(User, Passwd) ->
     do_update(User, passwd, Passwd).

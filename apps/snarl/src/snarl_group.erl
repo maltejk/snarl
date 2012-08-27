@@ -33,7 +33,13 @@ list() ->
     wait_for_reqid(ReqID, ?TIMEOUT).
 
 add(Group) ->
-    do_write(Group, add).
+    {ok, ReqID} = snarl_group_read_fsm:get(Group),
+    case wait_for_reqid(ReqID, ?TIMEOUT) of
+	{ok, not_found} ->
+	    do_update(Group, add);
+	{ok, _GroupObj} ->
+	    duplicate
+    end.
 
 delete(Group) ->
     do_update(Group, delete).
@@ -49,22 +55,22 @@ revoke(Group, Permission) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-do_update(User, Op) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(User),
+do_update(Group, Op) ->
+    {ok, ReqID} = snarl_group_read_fsm:get(Group),
     case wait_for_reqid(ReqID, ?TIMEOUT) of
 	{ok, not_found} ->
 	    not_found;
-	{ok, _UserObj} ->
-	    do_write(User, Op)
+	{ok, _GroupObj} ->
+	    do_write(Group, Op)
     end.
 
-do_update(User, Op, Val) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(User),
+do_update(Group, Op, Val) ->
+    {ok, ReqID} = snarl_group_read_fsm:get(Group),
     case wait_for_reqid(ReqID, ?TIMEOUT) of
 	{ok, not_found} ->
 	    not_found;
-	{ok, _UserObj} ->
-	    do_write(User, Op, Val)
+	{ok, _GroupObj} ->
+	    do_write(Group, Op, Val)
     end.
 
 do_write(Group, Op) ->

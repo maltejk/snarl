@@ -7,7 +7,7 @@ Build status (dev): [![Build Status](https://secure.travis-ci.org/project-fifo/s
 
 Snarl is a right management server build on top of [riak_core](https://github.com/basho/riak_core/). The permission architecture is as following:
 
-Each permission consists of a list of values, where the values '...' and '_' (both Erlang atoms) have a special meaning.
+Each permission consists of a list of values, where the values **'…'** and **'_'** (both Erlang atoms) have a special meaning.
 
 * '...' matches one, more or no values.
 * '_' matches exactly one value.
@@ -37,17 +37,17 @@ _snarl._zmq._tcp.<domain>
 
 the txt record of the annoucements contains:
 
-* *server*: ip of the server
-* *port*: port of ZMQ
+* **server**: ip of the server
+* **port**: port of ZMQ
 
 Message
 -------
-
+Each message is passed as a BERT encoded Erlang terms.
 
 User Rleated
 * {user, list} -> [user()]
 * {user, get, User} -> {ok, {user, Name, Password, Permissions, Groups}} | not_found
-* {user, add, User} -> ok
+* {user, add, User} -> ok | duplicate 
 * {user, auth, User, Pass} -> true | false
 * {user, allowed, User, Permission} -> true/false
 * {user, delete, User} -> ok 
@@ -61,7 +61,7 @@ User Rleated
 Group Functions
 * {group, list} -> [group()]
 * {group, get, Group} -> {ok, {group, Name, Permissions}} | not_found
-* {group, add, Group} -> ok | not_found
+* {group, add, Group} -> ok | duplicate
 * {group, delete, Group} -> ok | not_found
 * {group, grant, Group, Permission} -> ok | not_found
 * {group, revoke, Group, Permission} -> ok | not_found
