@@ -59,7 +59,7 @@ User Rleated
 
 
 Group Functions
-* {group, list} -> [user()]
+* {group, list} -> [group()]
 * {group, get, Group} -> {ok, {group, Name, Permissions}} | not_found
 * {group, add, Group} -> ok | not_found
 * {group, delete, Group} -> ok | not_found
