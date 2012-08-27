@@ -35,7 +35,7 @@ Snarl publishes it's servers via mDNS as
 _snarl._zmq._tcp.<domain>
 ```
 
-the txt record of the annoucements contains:
+The txt record of the announcements contains:
 
 * **server**: ip of the server
 * **port**: port of ZMQ
@@ -44,18 +44,18 @@ Message
 -------
 Each message is passed as a BERT encoded Erlang terms.
 
-User Rleated
+User Functions
 * {user, list} -> [user()]
 * {user, get, User} -> {ok, {user, Name, Password, Permissions, Groups}} | not_found
 * {user, add, User} -> ok | duplicate 
-* {user, auth, User, Pass} -> true | false
-* {user, allowed, User, Permission} -> true/false
-* {user, delete, User} -> ok 
+* {user, delete, User} -> ok | not_found
+* {user, grant, User, Permission} -> ok | not_found
+* {user, revoke, User, Permission} -> ok | not_found
 * {user, passwd, User, Pass} -> ok | not_found
 * {user, join, User, Group} -> ok | not_found
 * {user, leave, User, Group} -> ok | not_found
-* {user, grant, User, Permission} -> ok | not_found
-* {user, revoke, User, Permission} -> ok | not_found
+* {user, auth, User, Pass} -> true | false
+* {user, allowed, User, Permission} -> true | false
 
 
 Group Functions
