@@ -1,16 +1,17 @@
-%% -*- erlang -*-
 {application, snarl,
  [
-  {description, "RBAC server"},
-  {vsn, "0.2.0"},
+  {description, ""},
+  {vsn, "0.1.0"},
   {registered, []},
   {applications, [
                   kernel,
                   stdlib,
-		  riak_core,
-		  eleveldb,
-                  zmq_mdns_server,
-                  lager
+		  backyard,
+		  lager,
+		  redo,
+		  statsderl,
+		  vmstats,
+		  uuid
                  ]},
   {mod, { snarl_app, []}},
   {env, []}

@@ -1,3 +1,5 @@
+.eunit
+dev
 ebin
 standalone.config
 db
