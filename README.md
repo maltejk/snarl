@@ -20,7 +20,7 @@ Examples
 
 * [some, cool, permission]
 * [some, '_', permission]
-* ['_', '_', permission]
+* ['\_', '_', permission]
 * ['...', permission]
 * [some, '...', permission]
 * [some, '...']
