@@ -207,9 +207,11 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-handle_handoff_data(Data, State) ->
+handle_handoff_data(Data, #state{dbref=DBRef} = State) ->
     {User, Data} = binary_to_term(Data),
-    {ok, Users1} = add_user(User, Data, State#state.users, State#state.dbref),
+    Index1 = snarl_user_state:add(User, State#state.index),
+    eleveldb:put(DBRef, <<"#users">>, term_to_binary(Index1), []),
+    {ok, Users1} = add_user(User, Data, State#state.users, DBRef),
     {reply, ok, State#state{users = Users1}}.
 
 encode_handoff_item(User, Data) ->
@@ -227,7 +229,7 @@ delete(#state{dbref=DBRef} = State) ->
     eleveldb:close(DBRef),
     eleveldb:destroy("users."++integer_to_list(State#state.partition)++".ldb",[]),
     {ok, DBRef1} = eleveldb:open("users."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
-    {ok, State#state{dbref=DBRef1}}.
+    {ok, State#state{dbref=DBRef1, index=[], users=dict:new()}}.
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, 
 		#state{index=Index, partition=Partition, node=Node} = State) ->

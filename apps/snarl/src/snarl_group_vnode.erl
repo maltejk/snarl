@@ -120,26 +120,24 @@ handle_command({repair, undefined, Group, Obj}, _Sender, #state{groups=Groups0}=
 
 
 handle_command({add, {ReqID, Coordinator}, Group}, _Sender,
-	       #state{groups=Groups,  dbref=DBRef, index=#snarl_obj{val=Index0}=IndexO} = State) ->
+	       #state{groups=Groups,  dbref=DBRef, index=Index0} = State) ->
     Group0 = statebox:new(fun snarl_group_state:new/0),
     Group1 = statebox:modify({snarl_group_state, name, [Group]}, Group0),
-    Index1 = statebox:modify({fun snarl_group_state:add/2, [Group]}, Index0),
-    Index2 = snarl_obj:update(Index1, Coordinator, IndexO),
-    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(Index2), []),
+    Index1 = snarl_group_state:add(Group, Index0),
+    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(Index1), []),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     GroupObj = #snarl_obj{val=Group1, vclock=VC},
     {ok, Groups1} = add_group(Group, GroupObj, Groups, DBRef),
-    {reply, {ok, ReqID}, State#state{groups=Groups1, index = Index2}};
+    {reply, {ok, ReqID}, State#state{groups=Groups1, index = Index1}};
 
-handle_command({delete, {ReqID, Coordinator}, Group}, _Sender, 
-	       #state{groups=Groups, dbref=DBRef, index=#snarl_obj{val=Index0}=IndexO} = State) ->
+handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender, 
+	       #state{groups=Groups, dbref=DBRef, index=Index0} = State) ->
     Groups1 = dict:erase(Group, Groups),
-    Index1 = statebox:modify({fun snarl_group_state:delete/2, [Group]}, Index0),
-    Index2 = snarl_obj:update(Index1, Coordinator, IndexO),
-    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(Index2), []),
+    Index1 = snarl_group_state:delete(Group, Index0),
+    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(Index1), []),
     eleveldb:delete(DBRef, Group, []),
-    {reply, {ok, ReqID}, State#state{groups=Groups1, index=Index2}};
+    {reply, {ok, ReqID}, State#state{groups=Groups1, index=Index1}};
 
 handle_command({get, ReqID, Group}, _Sender, #state{groups=Groups, partition=Partition, node=Node} = State) ->
     Res = case dict:find(Group, Groups) of
@@ -177,10 +175,12 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-handle_handoff_data(Data, State) ->
+handle_handoff_data(Data, #state{dbref=DBRef} = State) ->
     {Group, Data} = binary_to_term(Data),
-    {ok, Groups1} = add_group(Group, Data, State#state.groups, State#state.dbref),
-    {reply, ok, State#state{groups = Groups1}}.
+    Index1 = snarl_group_state:add(Group, State#state.index),
+    eleveldb:put(DBRef, <<"#groups">>, term_to_binary(Index1), []),
+    {ok, Groups1} = add_group(Group, Data, State#state.groups, DBRef),
+    {reply, ok, State#state{groups = Groups1, index=Index1}}.
 
 encode_handoff_item(Group, Data) ->
     term_to_binary({Group, Data}).
@@ -197,7 +197,7 @@ delete(#state{dbref=DBRef} = State) ->
     eleveldb:close(DBRef),
     eleveldb:destroy("groups."++integer_to_list(State#state.partition)++".ldb",[]),
     {ok, DBRef1} = eleveldb:open("groups."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
-    {ok, State#state{dbref=DBRef1}}.
+    {ok, State#state{dbref=DBRef1, groups=dict:new(), index=[]}}.
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, 
 		#state{index=Index, partition=Partition, node=Node} = State) ->
@@ -223,20 +223,14 @@ terminate(_Reason, #state{dbref=DBRef} = _State) ->
 read_groups(DBRef) ->
     case eleveldb:get(DBRef, <<"#groups">>, []) of
 	not_found -> 
-	    GroupsIdexSB = statebox:new(fun ordsets:new/0),
-	    VC0 = vclock:fresh(),
-	    VC = vclock:increment(snar_group_vnode, VC0),
-	    GroupsIndexObj = #snarl_obj{val=GroupsIdexSB, vclock=VC},
-	    {GroupsIndexObj, dict:new()};
+	    {[], dict:new()};
 	{ok, Bin} ->
-	    GroupsIndexObj = binary_to_term(Bin),
-	    GroupsIdexSB = snarl_obj:val(GroupsIndexObj),
-	    GroupsIndex = statebox:value(GroupsIdexSB),
-	    {GroupsIndexObj,
+	    Index = binary_to_term(Bin),
+	    {Index,
 	     lists:foldl(fun (Group, Groups0) ->
 				 {ok, GrBin} = eleveldb:get(DBRef, Group, []),
 				 dict:store(Group, binary_to_term(GrBin), Groups0)
-			 end, dict:new(), GroupsIndex)}
+			 end, dict:new(), Index)}
     end.
 
 add_group(Group, GroupData, Groups, DBRef) ->
