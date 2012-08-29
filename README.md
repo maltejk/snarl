@@ -65,3 +65,8 @@ Group Functions
 * {group, delete, Group} -> ok | not_found
 * {group, grant, Group, Permission} -> ok | not_found
 * {group, revoke, Group, Permission} -> ok | not_found
+
+Credits
+-------
+
+If you want to learn something about riak_core I can recommend [rzezeski's working blog](https://github.com/rzezeski/try-try-try) the implementation is heavily build on top of the content provided there.
