@@ -36,7 +36,7 @@ add(Group) ->
     {ok, ReqID} = snarl_group_read_fsm:get(Group),
     case wait_for_reqid(ReqID, ?TIMEOUT) of
 	{ok, not_found} ->
-	    do_update(Group, add);
+	    do_write(Group, add);
 	{ok, _GroupObj} ->
 	    duplicate
     end.

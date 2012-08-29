@@ -13,7 +13,9 @@
 	 new/0,
 	 name/2,
 	 grant/2,
-	 revoke/2
+	 revoke/2,
+	 add/2,
+	 delete/2
 	]).
 
 new() ->
@@ -27,3 +29,9 @@ grant(Permission, Group) ->
 
 revoke(Permission, Group) ->
     Group#group{permissions = ordsets:del_element(Permission, Group#group.permissions)}.
+
+add(Group, Groups) ->
+    ordsets:add_element(Group, Groups).
+
+delete(Group, Groups) ->
+    ordsets:del_element(Group, Groups).

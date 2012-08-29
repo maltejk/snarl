@@ -25,7 +25,7 @@
 		r=?R,
                 preflist,
                 num_r=0,
-		ch,
+		size,
 		timeout=?DEFAULT_TIMEOUT,
 		val,
                 replies=[]}).
@@ -91,8 +91,8 @@ prepare(timeout, SD0=#state{user=User, op=Op,
 		     riak_core_coverage_plan:create_plan(
 		       all, ?N, PVC, ReqId, snarl_user),
 		 {ok, CHash} = riak_core_ring_manager:get_my_ring(),
-		 {_, CH} = riak_core_ring:chash(CHash),
-		 SD0#state{preflist=Nodes, ch=CH};
+		 {Num, _} = riak_core_ring:chash(CHash),
+		 SD0#state{preflist=Nodes, size=Num};
 	     _ ->
 		 DocIdx = riak_core_util:chash_key({<<"user">>, term_to_binary(User)}),
 		 Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_user),
@@ -121,56 +121,37 @@ execute(timeout, SD0=#state{req_id=ReqId,
     end,
     {next_state, waiting, SD0}.
 
-%% @doc Wait for R replies and then respond to From (original client
-%% that called `snarl:get/2').
-%% TODO: read repair...or another blog post?
+%% Waiting for returns from coverage replies
 
-
-waiting({{undefined,{Partition, _Node} = IdxNode},
+waiting({{undefined,{_Partition, _Node} = IdxNode},
 	 {ok,ReqID,IdxNode,Obj}},
-	SD0=#state{from=From, replies=Replies0, r=R, ch=Ch}) ->
-    Idx = ch_index(Partition, Ch),
-    Group = Idx div ?N,
+	SD0=#state{num_r = NumR0, size=Size, from=From, replies=Replies0, r=R}) ->
+    NumR = NumR0 + 1,
     Replies1 = case Replies0 of
-		   [] ->
+		   [] ->		      
 		       dict:new();
 		   _ ->
 		       Replies0
 	       end,
-    Replies = dict:update(Group,
-			  fun(PartReplies) ->
-				  [{IdxNode, Obj} | PartReplies]
-			  end, [{IdxNode, Obj}], Replies1),
-    NumR = dict:fold(fun(_, Rs, AccIn) ->
-			     case length(Rs) of
-				 L when L < AccIn ->
-				     L;
-				 L when AccIn == 0 ->
-				     L;
-				 _  ->
-				     AccIn
-			     end
-		     end, 0, Replies),
-    KeyCount = length(dict:fetch_keys(Replies1)),
-    ExpectedCount = length(Ch) div ?N,
+    Replies = lists:foldl(fun (Key, D) ->
+				   dict:update_counter(Key, 1, D)
+			   end, Replies1, Obj),
     SD = SD0#state{num_r=NumR,replies=Replies},
     if
-        NumR =:= R 
-	andalso
-	KeyCount =:= ExpectedCount ->
-	    MergedReplies = dict:map(fun(_, Rs) ->
-					     merge(Rs)
-				     end, Replies),
-	    ReplyList = dict:fold(fun(_, Merged, AccIn) ->
-					  Rs = snarl_obj:val(Merged),
-					  statebox:value(Rs) ++ AccIn
-				  end, [], MergedReplies),
-	    ?PRINT(finished),
-	    From ! {ReqID, ok, ReplyList},
+        NumR =:= Size ->
+	    MergedReplies = dict:fold(fun(_Key, Count, Keys) when Count < R->
+					      Keys;
+					 (Key, _Count, Keys) ->
+					      [Key | Keys]
+				      end, [], Replies),
+	    From ! {ReqID, ok, MergedReplies},
 	    {stop, normal, SD};
         true -> 
 	    {next_state, waiting, SD}
     end;
+%% @doc Wait for R replies and then respond to From (original client
+%% that called `snarl:get/2').
+%% TODO: read repair...or another blog post?
 
 waiting({ok, ReqID, IdxNode, Obj},
         SD0=#state{from=From, num_r=NumR0, replies=Replies0,
@@ -212,19 +193,14 @@ wait_for_n({ok, _ReqID, IdxNode, Obj},
 wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
-finalize(timeout, SD=#state{op=Op, replies=Replies, user=User}) ->
-    case Op of
-	list ->
+finalize(timeout, SD=#state{replies=Replies, user=User}) ->
+    MObj = merge(Replies),
+    case needs_repair(MObj, Replies) of
+	true ->
+	    repair(User, MObj, Replies),
 	    {stop, normal, SD};
-	_ ->
-	    MObj = merge(Replies),
-	    case needs_repair(MObj, Replies) of
-		true ->
-		    repair(User, MObj, Replies),
-		    {stop, normal, SD};
-		false ->
-		    {stop, normal, SD}
-	    end
+	false ->
+	    {stop, normal, SD}
     end.
 
 handle_info(_Info, _StateName, StateData) ->
@@ -297,16 +273,3 @@ repair(StatName, MObj, [{IdxNode,Obj}|T]) ->
 -spec unique([A::any()]) -> [A::any()].
 unique(L) ->
     sets:to_list(sets:from_list(L)).
-
-
-ch_index(I, L) ->
-    ch_index(I, L, 0).
-
-ch_index(_I, [{_I, _}|_], N) ->
-    N;
-
-ch_index(I, [{_O, _}|R], N) ->
-    ch_index(I, R, N+1);
-
-ch_index(_I, [], _N) ->
-    failed.

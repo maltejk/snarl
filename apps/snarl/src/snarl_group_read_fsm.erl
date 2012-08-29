@@ -25,6 +25,7 @@
 		r=?R,
                 preflist,
                 num_r=0,
+		ch,
 		timeout=?DEFAULT_TIMEOUT,
 		val,
                 replies=[]}).
@@ -81,11 +82,22 @@ init([Op, ReqId, From]) ->
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
-prepare(timeout, SD0=#state{group=Group}) ->
-    ?PRINT({prepare, Group}),
-    DocIdx = riak_core_util:chash_key({<<"group">>, term_to_binary(Group)}),
-    Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_group),
-    SD = SD0#state{preflist=Prelist},
+prepare(timeout, SD0=#state{group=Group, op=Op,
+			   req_id=ReqId}) ->
+    SD = case Op of
+	     list ->
+		 PVC = ?N,
+		 {Nodes, _Other} = 
+		     riak_core_coverage_plan:create_plan(
+		       all, ?N, PVC, ReqId, snarl_group),
+		 {ok, CHash} = riak_core_ring_manager:get_my_ring(),
+		 {_, CH} = riak_core_ring:chash(CHash),
+		 SD0#state{preflist=Nodes, ch=CH};
+	     _ ->
+		 DocIdx = riak_core_util:chash_key({<<"group">>, term_to_binary(Group)}),
+		 Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_group),
+		 SD0#state{preflist=Prelist}
+	 end,
     {next_state, execute, SD, 0}.
 
 %% @doc Execute the get reqs.
@@ -108,6 +120,54 @@ execute(timeout, SD0=#state{req_id=ReqId,
 	    end
     end,
     {next_state, waiting, SD0}.
+
+%% Waiting for returns from coverage replies
+
+waiting({{undefined,{Partition, _Node} = IdxNode},
+	 {ok,ReqID,IdxNode,Obj}},
+	SD0=#state{from=From, replies=Replies0, r=R, ch=Ch}) ->
+    Idx = ch_index(Partition, Ch),
+    Group = Idx div ?N,
+    Replies1 = case Replies0 of
+		   [] ->
+		       dict:new();
+		   _ ->
+		       Replies0
+	       end,
+    Replies = dict:update(Group,
+			  fun(PartReplies) ->
+				  [{IdxNode, Obj} | PartReplies]
+			  end, [{IdxNode, Obj}], Replies1),
+    NumR = dict:fold(fun(_, Rs, AccIn) ->
+			     case length(Rs) of
+				 L when L < AccIn ->
+				     L;
+				 L when AccIn == 0 ->
+				     L;
+				 _  ->
+				     AccIn
+			     end
+		     end, 0, Replies),
+    KeyCount = length(dict:fetch_keys(Replies1)),
+    ExpectedCount = length(Ch) div ?N,
+    SD = SD0#state{num_r=NumR,replies=Replies},
+    if
+        NumR =:= R 
+	andalso
+	KeyCount =:= ExpectedCount ->
+	    MergedReplies = dict:map(fun(_, Rs) ->
+					     merge(Rs)
+				     end, Replies),
+	    ReplyList = dict:fold(fun(_, Merged, AccIn) ->
+					  Rs = snarl_obj:val(Merged),
+					  statebox:value(Rs) ++ AccIn
+				  end, [], MergedReplies),
+	    ?PRINT(finished),
+	    From ! {ReqID, ok, ReplyList},
+	    {stop, normal, SD};
+        true -> 
+	    {next_state, waiting, SD}
+    end;
 
 %% @doc Wait for R replies and then respond to From (original client
 %% that called `snarl:get/2').
@@ -235,3 +295,15 @@ repair(StatName, MObj, [{IdxNode,Obj}|T]) ->
 -spec unique([A::any()]) -> [A::any()].
 unique(L) ->
     sets:to_list(sets:from_list(L)).
+
+ch_index(I, L) ->
+    ch_index(I, L, 0).
+
+ch_index(_I, [{_I, _}|_], N) ->
+    N;
+
+ch_index(I, [{_O, _}|R], N) ->
+    ch_index(I, R, N+1);
+
+ch_index(_I, [], _N) ->
+    failed.

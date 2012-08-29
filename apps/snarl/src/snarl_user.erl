@@ -65,7 +65,13 @@ list() ->
     wait_for_reqid(ReqID, ?TIMEOUT).
 
 add(User) ->
-    do_write(User, add).
+    {ok, ReqID} = snarl_user_read_fsm:get(User),
+    case wait_for_reqid(ReqID, ?TIMEOUT) of
+	{ok, not_found} ->
+	    do_write(User, add);
+	{ok, _UserObj} ->
+	    duplicate
+    end.
 
 passwd(User, Passwd) ->
     do_update(User, passwd, Passwd).
