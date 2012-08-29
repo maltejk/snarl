@@ -1,15 +1,15 @@
 %% @doc The coordinator for stat get operations.  The key here is to
 %% generate the preflist just like in wrtie_fsm and then query each
 %% replica and wait until a quorum is met.
--module(snarl_group_read_fsm).
+-module(snarl_entity_read_fsm).
 -behavior(gen_fsm).
 -include("snarl.hrl").
 
 %% API
--export([start_link/5, get/1, list/0, auth/2]).
+-export([start_link/6, start/2, start/3, start/4]).
 
 
--export([reconcile/1, different/1, needs_repair/2, repair/3, unique/1]).
+-export([reconcile/1, different/1, needs_repair/2, repair/4, unique/1]).
 
 %% Callbacks
 -export([init/1, code_change/4, handle_event/3, handle_info/3,
@@ -20,155 +20,152 @@
 
 -record(state, {req_id,
                 from,
-		group,
+		entity,
 		op,
 		r=?R,
                 preflist,
                 num_r=0,
-		ch,
+		size,
 		timeout=?DEFAULT_TIMEOUT,
 		val,
+		vnode,
+		system,
                 replies=[]}).
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
-start_link(Op, ReqID, From, Group, Val) ->
-    gen_fsm:start_link(?MODULE, [Op, ReqID, From, Group, Val], []).
+start_link(ReqID, {VNode, System}, Op, From, Entity, Val) ->
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val], []).
 
-auth(Group, Passwd) ->
-    ReqID = mk_reqid(),
-    snarl_group_read_fsm_sup:start_read_fsm([auth, ReqID, self(), Group, Passwd]),
-    {ok, ReqID}.
+start(VNodeInfo, Op) ->
+    start(VNodeInfo, Op, undefined).
 
-get(Group) ->
-    ReqID = mk_reqid(),
-    snarl_group_read_fsm_sup:start_read_fsm([get, ReqID, self(), Group, undefined]),
-    {ok, ReqID}.
+start(VNodeInfo, Op, User) ->
+    start(VNodeInfo, Op, User, undefined).
 
-list() ->
+start(VNodeInfo, Op, User, Val) ->
     ReqID = mk_reqid(),
-    snarl_group_read_fsm_sup:start_read_fsm([list, ReqID, self(), undefined, undefined]),
-    {ok, ReqID}.
+    snarl_entity_read_fsm_sup:start_read_fsm(
+      [ReqID, VNodeInfo, Op, self(), User, Val]
+     ),
+    receive
+	{ReqID, ok} -> 
+	    ok;
+        {ReqID, ok, Result} -> 
+	    {ok, Result}
+    after ?DEFAULT_TIMEOUT ->
+	    {error, timeout}
+    end.
 
 %%%===================================================================
 %%% States
 %%%===================================================================
 
 %% Intiailize state data.
-init([Op, ReqId, From, Group, Val]) ->
-    ?PRINT({init, [Op, ReqId, From, Group, Val]}),
+init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
+    ?PRINT({init, [Op, ReqId, From, Entity, Val]}),
     SD = #state{req_id=ReqId,
                 from=From,
 		op=Op,
 		val=Val,
-                group=Group},
+		vnode=VNode,
+		system=System,
+                entity=Entity},
     {ok, prepare, SD, 0};
 
-init([Op, ReqId, From, Group]) ->
-    ?PRINT({init, [Op, ReqId, From, Group]}),
+init([ReqId, {VNode, System}, Op, From, Entity]) ->
+    ?PRINT({init, [Op, ReqId, From, Entity]}),
     SD = #state{req_id=ReqId,
                 from=From,
 		op=Op,
-                group=Group},
+		vnode=VNode,
+		system=System,
+                entity=Entity},
     {ok, prepare, SD, 0};
 
-init([Op, ReqId, From]) ->
+init([ReqId, {VNode, System}, Op, From]) ->
     ?PRINT({init, [Op, ReqId, From]}),
     SD = #state{req_id=ReqId,
                 from=From,
+		vnode=VNode,
+		system=System,
 		op=Op},
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
-prepare(timeout, SD0=#state{group=Group, op=Op,
-			   req_id=ReqId}) ->
+prepare(timeout, SD0=#state{entity=Entity, 
+			    op=Op,
+			    system=System,
+			    req_id=ReqId}) ->
     SD = case Op of
 	     list ->
 		 PVC = ?N,
-		 {Nodes, _Other} = 
+		 {Nodes, _Other} =
 		     riak_core_coverage_plan:create_plan(
-		       all, ?N, PVC, ReqId, snarl_group),
+		       all, ?N, PVC, ReqId, System),
 		 {ok, CHash} = riak_core_ring_manager:get_my_ring(),
-		 {_, CH} = riak_core_ring:chash(CHash),
-		 SD0#state{preflist=Nodes, ch=CH};
+		 {Num, _} = riak_core_ring:chash(CHash),
+		 SD0#state{preflist=Nodes, size=Num};
 	     _ ->
-		 DocIdx = riak_core_util:chash_key({<<"group">>, term_to_binary(Group)}),
-		 Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_group),
+		 Bucket = list_to_binary(atom_to_list(System)),
+		 DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
+		 Prelist = riak_core_apl:get_apl(DocIdx, ?N, System),
 		 SD0#state{preflist=Prelist}
 	 end,
     {next_state, execute, SD, 0}.
 
 %% @doc Execute the get reqs.
 execute(timeout, SD0=#state{req_id=ReqId,
-                            group=Group,
+                            entity=Entity,
 			    op=Op,
 			    val=Val,
+			    vnode=VNode,
                             preflist=Prelist}) ->
-    ?PRINT({execute, Group, Val}),
-    case Group of
+    ?PRINT({execute, Entity, Val}),
+    case Entity of
 	undefined ->
-	    snarl_group_vnode:Op(Prelist, ReqId);
+	    VNode:Op(Prelist, ReqId);
 	_ ->
 	    case Val of
 		undefined ->
-		    snarl_group_vnode:Op(Prelist, ReqId, Group);
+		    VNode:Op(Prelist, ReqId, Entity);
 		_ ->
 		    
-		    snarl_group_vnode:Op(Prelist, ReqId, Group, Val)
+		    VNode:Op(Prelist, ReqId, Entity, Val)
 	    end
     end,
     {next_state, waiting, SD0}.
 
 %% Waiting for returns from coverage replies
 
-waiting({{undefined,{Partition, _Node} = IdxNode},
+waiting({{undefined,{_Partition, _Node} = IdxNode},
 	 {ok,ReqID,IdxNode,Obj}},
-	SD0=#state{from=From, replies=Replies0, r=R, ch=Ch}) ->
-    Idx = ch_index(Partition, Ch),
-    Group = Idx div ?N,
+	SD0=#state{num_r = NumR0, size=Size, from=From, replies=Replies0, r=R}) ->
+    NumR = NumR0 + 1,
     Replies1 = case Replies0 of
-		   [] ->
+		   [] ->		      
 		       dict:new();
 		   _ ->
 		       Replies0
 	       end,
-    Replies = dict:update(Group,
-			  fun(PartReplies) ->
-				  [{IdxNode, Obj} | PartReplies]
-			  end, [{IdxNode, Obj}], Replies1),
-    NumR = dict:fold(fun(_, Rs, AccIn) ->
-			     case length(Rs) of
-				 L when L < AccIn ->
-				     L;
-				 L when AccIn == 0 ->
-				     L;
-				 _  ->
-				     AccIn
-			     end
-		     end, 0, Replies),
-    KeyCount = length(dict:fetch_keys(Replies1)),
-    ExpectedCount = length(Ch) div ?N,
+    Replies = lists:foldl(fun (Key, D) ->
+				   dict:update_counter(Key, 1, D)
+			   end, Replies1, Obj),
     SD = SD0#state{num_r=NumR,replies=Replies},
     if
-        NumR =:= R 
-	andalso
-	KeyCount =:= ExpectedCount ->
-	    MergedReplies = dict:map(fun(_, Rs) ->
-					     merge(Rs)
-				     end, Replies),
-	    ReplyList = dict:fold(fun(_, Merged, AccIn) ->
-					  Rs = snarl_obj:val(Merged),
-					  statebox:value(Rs) ++ AccIn
-				  end, [], MergedReplies),
-	    ?PRINT(finished),
-	    From ! {ReqID, ok, ReplyList},
+        NumR =:= Size ->
+	    MergedReplies = dict:fold(fun(_Key, Count, Keys) when Count < R->
+					      Keys;
+					 (Key, _Count, Keys) ->
+					      [Key | Keys]
+				      end, [], Replies),
+	    From ! {ReqID, ok, MergedReplies},
 	    {stop, normal, SD};
         true -> 
 	    {next_state, waiting, SD}
     end;
-
 %% @doc Wait for R replies and then respond to From (original client
 %% that called `snarl:get/2').
 %% TODO: read repair...or another blog post?
@@ -213,17 +210,18 @@ wait_for_n({ok, _ReqID, IdxNode, Obj},
 wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
-finalize(timeout, SD=#state{replies=Replies, group=Group}) ->
+finalize(timeout, SD=#state{
+		    vnode=VNode,
+		    replies=Replies, 
+		    entity=Entity}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
-        true ->
-            repair(Group, MObj, Replies),
-            {stop, normal, SD};
-        false ->
-            {stop, normal, SD}
+	true ->
+	    repair(VNode, Entity, MObj, Replies),
+	    {stop, normal, SD};
+	false ->
+	    {stop, normal, SD}
     end.
-
-
 
 handle_info(_Info, _StateName, StateData) ->
     {stop,badmsg,StateData}.
@@ -243,16 +241,13 @@ terminate(_Reason, _SN, _SD) ->
 %%% Internal Functions
 %%%===================================================================
 
-mk_reqid() -> erlang:phash2(erlang:now()).
-
-
 %% @pure
 %%
 %% @doc Given a list of `Replies' return the merged value.
 -spec merge([vnode_reply()]) -> snarl_obj() | not_found.
 merge(Replies) ->
     Objs = [Obj || {_,Obj} <- Replies],
-    snarl_obj:merge(snarl_group_read_fsm, Objs).
+    snarl_obj:merge(snarl_entity_read_fsm, Objs).
 
 %% @pure
 %%
@@ -278,15 +273,15 @@ different(A) -> fun(B) -> not snarl_obj:equal(A,B) end.
 %% @impure
 %%
 %% @doc Repair any vnodes that do not have the correct object.
--spec repair(string(), snarl_obj(), [vnode_reply()]) -> io.
-repair(_, _, []) -> io;
+-spec repair(atom(), string(), snarl_obj(), [vnode_reply()]) -> io.
+repair(_, _, _, []) -> io;
 
-repair(StatName, MObj, [{IdxNode,Obj}|T]) ->
+repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
     case snarl_obj:equal(MObj, Obj) of
-        true -> repair(StatName, MObj, T);
+        true -> repair(VNode, StatName, MObj, T);
         false ->
-            snarl_group_vnode:repair(IdxNode, StatName, MObj),
-            repair(StatName, MObj, T)
+            snarl_entity_vnode:repair(VNode, IdxNode, StatName, MObj),
+            repair(VNode, StatName, MObj, T)
     end.
 
 %% pure
@@ -296,14 +291,5 @@ repair(StatName, MObj, [{IdxNode,Obj}|T]) ->
 unique(L) ->
     sets:to_list(sets:from_list(L)).
 
-ch_index(I, L) ->
-    ch_index(I, L, 0).
-
-ch_index(_I, [{_I, _}|_], N) ->
-    N;
-
-ch_index(I, [{_O, _}|R], N) ->
-    ch_index(I, R, N+1);
-
-ch_index(_I, [], _N) ->
-    failed.
+mk_reqid() -> 
+    erlang:phash2(erlang:now()).

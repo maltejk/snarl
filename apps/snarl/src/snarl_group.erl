@@ -25,16 +25,19 @@ ping() ->
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_group_vnode_master).
 
 get(Group) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(Group),
-    wait_for_reqid(ReqID, ?TIMEOUT).
+    snarl_entity_read_fsm:start(
+      {snarl_group_vnode, snarl_group},
+      get, Group
+     ).
 
 list() ->
-    {ok, ReqID} = snarl_group_read_fsm:list(),
-    wait_for_reqid(ReqID, ?TIMEOUT).
+    snarl_entity_read_fsm:start(
+      {snarl_group_vnode, snarl_group},
+      list
+     ).
 
 add(Group) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(Group),
-    case wait_for_reqid(ReqID, ?TIMEOUT) of
+    case snarl_group:get(Group) of
 	{ok, not_found} ->
 	    do_write(Group, add);
 	{ok, _GroupObj} ->
@@ -55,9 +58,9 @@ revoke(Group, Permission) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
 do_update(Group, Op) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(Group),
-    case wait_for_reqid(ReqID, ?TIMEOUT) of
+    case snarl_group:get(Group) of
 	{ok, not_found} ->
 	    not_found;
 	{ok, _GroupObj} ->
@@ -65,8 +68,7 @@ do_update(Group, Op) ->
     end.
 
 do_update(Group, Op, Val) ->
-    {ok, ReqID} = snarl_group_read_fsm:get(Group),
-    case wait_for_reqid(ReqID, ?TIMEOUT) of
+    case snarl_group:get(Group) of
 	{ok, not_found} ->
 	    not_found;
 	{ok, _GroupObj} ->
@@ -74,22 +76,7 @@ do_update(Group, Op, Val) ->
     end.
 
 do_write(Group, Op) ->
-    {ok, ReqID} = snarl_group_write_fsm:write(Group, Op),
-    wait_for_reqid(ReqID, ?TIMEOUT).
+    snarl_entity_write_fsm:write({snarl_group_vnode, snarl_group}, Group, Op).
 
 do_write(Group, Op, Val) ->
-    {ok, ReqID} = snarl_group_write_fsm:write(Group, Op, Val),
-    wait_for_reqid(ReqID, ?TIMEOUT).
-
-wait_for_reqid(ReqID, Timeout) ->
-    ?PRINT({waiting_for, ReqID}),
-    receive
-	{ReqID, ok} -> 
-	    ok;
-        {ReqID, ok, Val} -> 
-	    {ok, Val};
-	Other -> 
-	    ?PRINT({yuck, Other})
-    after Timeout ->
-	    {error, timeout}
-    end.
+    snarl_entity_write_fsm:write({snarl_group_vnode, snarl_group}, Group, Op, Val).
