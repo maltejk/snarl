@@ -35,6 +35,10 @@ init(_Args) ->
     WriteFSMs = {snarl_entity_write_fsm_sup,
 		{snarl_entity_write_fsm_sup, start_link, []},
 		permanent, infinity, supervisor, [snarl_entity_write_fsm_sup]},
+
+    CoverageFSMs = {snarl_entity_coverage_fsm_sup,
+		    {snarl_entity_coverage_fsm_sup, start_link, []},
+		    permanent, infinity, supervisor, [snarl_entity_coverage_fsm_sup]},
     
     ReadFSMs = {snarl_entity_read_fsm_sup,
 	       {snarl_entity_read_fsm_sup, start_link, []},
@@ -44,4 +48,4 @@ init(_Args) ->
      {{one_for_one, 5, 10},
       [VMaster, 
        GroupVMaster, UserVMaster,
-       ReadFSMs, WriteFSMs]}}.
+       ReadFSMs, WriteFSMs, CoverageFSMs]}}.

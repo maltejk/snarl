@@ -61,7 +61,7 @@ get(User) ->
      ).
 
 list() ->
-    snarl_entity_read_fsm:start(
+    snarl_entity_coverage_fsm:start(
       {snarl_user_vnode, snarl_user},
       list
      ).

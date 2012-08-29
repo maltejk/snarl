@@ -31,7 +31,7 @@ get(Group) ->
      ).
 
 list() ->
-    snarl_entity_read_fsm:start(
+    snarl_entity_coverage_fsm:start(
       {snarl_group_vnode, snarl_group},
       list
      ).
