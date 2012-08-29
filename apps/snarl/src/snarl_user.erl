@@ -65,13 +65,7 @@ list() ->
     wait_for_reqid(ReqID, ?TIMEOUT).
 
 add(User) ->
-    {ok, ReqID} = snarl_user_read_fsm:get(User),
-    case wait_for_reqid(ReqID, ?TIMEOUT) of
-	{ok, not_found} ->
-	    do_update(User, add);
-	{ok, _UserObj} ->
-	    duplicate
-    end.
+    do_write(User, add).
 
 passwd(User, Passwd) ->
     do_update(User, passwd, Passwd).
@@ -222,7 +216,6 @@ match_tripoint_test() ->
 
 match_tripoint_at_end_test() ->
     ?assert(true == match([some, permission], [some, permission, '...'])).
-
 
 match_tripoint_start_test() ->
     ?assert(true == match([some, cool, permission], ['...', permission])).

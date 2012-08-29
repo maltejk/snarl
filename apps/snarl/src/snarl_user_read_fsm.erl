@@ -25,6 +25,7 @@
 		r=?R,
                 preflist,
                 num_r=0,
+		ch,
 		timeout=?DEFAULT_TIMEOUT,
 		val,
                 replies=[]}).
@@ -81,11 +82,22 @@ init([Op, ReqId, From]) ->
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
-prepare(timeout, SD0=#state{user=User}) ->
-    ?PRINT({prepare, User}),
-    DocIdx = riak_core_util:chash_key({<<"user">>, term_to_binary(User)}),
-    Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_user),
-    SD = SD0#state{preflist=Prelist},
+prepare(timeout, SD0=#state{user=User, op=Op,
+			   req_id=ReqId}) ->
+    SD = case Op of
+	     list ->
+		 PVC = ?N,
+		 {Nodes, _Other} = 
+		     riak_core_coverage_plan:create_plan(
+		       all, ?N, PVC, ReqId, snarl_user),
+		 {ok, CHash} = riak_core_ring_manager:get_my_ring(),
+		 {_, CH} = riak_core_ring:chash(CHash),
+		 SD0#state{preflist=Nodes, ch=CH};
+	     _ ->
+		 DocIdx = riak_core_util:chash_key({<<"user">>, term_to_binary(User)}),
+		 Prelist = riak_core_apl:get_apl(DocIdx, ?N, snarl_user),
+		 SD0#state{preflist=Prelist}
+	 end,
     {next_state, execute, SD, 0}.
 
 %% @doc Execute the get reqs.
@@ -113,13 +125,59 @@ execute(timeout, SD0=#state{req_id=ReqId,
 %% that called `snarl:get/2').
 %% TODO: read repair...or another blog post?
 
+
+waiting({{undefined,{Partition, _Node} = IdxNode},
+	 {ok,ReqID,IdxNode,Obj}},
+	SD0=#state{from=From, replies=Replies0, r=R, ch=Ch}) ->
+    Idx = ch_index(Partition, Ch),
+    Group = Idx div ?N,
+    Replies1 = case Replies0 of
+		   [] ->
+		       dict:new();
+		   _ ->
+		       Replies0
+	       end,
+    Replies = dict:update(Group,
+			  fun(PartReplies) ->
+				  [{IdxNode, Obj} | PartReplies]
+			  end, [{IdxNode, Obj}], Replies1),
+    NumR = dict:fold(fun(_, Rs, AccIn) ->
+			     case length(Rs) of
+				 L when L < AccIn ->
+				     L;
+				 L when AccIn == 0 ->
+				     L;
+				 _  ->
+				     AccIn
+			     end
+		     end, 0, Replies),
+    KeyCount = length(dict:fetch_keys(Replies1)),
+    ExpectedCount = length(Ch) div ?N,
+    SD = SD0#state{num_r=NumR,replies=Replies},
+    if
+        NumR =:= R 
+	andalso
+	KeyCount =:= ExpectedCount ->
+	    MergedReplies = dict:map(fun(_, Rs) ->
+					     merge(Rs)
+				     end, Replies),
+	    ReplyList = dict:fold(fun(_, Merged, AccIn) ->
+					  Rs = snarl_obj:val(Merged),
+					  statebox:value(Rs) ++ AccIn
+				  end, [], MergedReplies),
+	    ?PRINT(finished),
+	    From ! {ReqID, ok, ReplyList},
+	    {stop, normal, SD};
+        true -> 
+	    {next_state, waiting, SD}
+    end;
+
 waiting({ok, ReqID, IdxNode, Obj},
         SD0=#state{from=From, num_r=NumR0, replies=Replies0,
                    r=R, timeout=Timeout}) ->
     NumR = NumR0 + 1,
     Replies = [{IdxNode, Obj}|Replies0],
     SD = SD0#state{num_r=NumR,replies=Replies},
-
     if
         NumR =:= R ->
 	    case merge(Replies) of
@@ -127,12 +185,16 @@ waiting({ok, ReqID, IdxNode, Obj},
 		    From ! {ReqID, ok, not_found};
 		Merged ->
 		    Reply = snarl_obj:val(Merged),
-		    From ! {ReqID, ok, statebox:value(Reply)},
-		    if NumR =:= ?N -> {next_state, finalize, SD, 0};
-		       true -> {next_state, wait_for_n, SD, Timeout}
-		    end
+		    From ! {ReqID, ok, statebox:value(Reply)}
+	    end,
+	    if 
+		NumR =:= ?N -> 
+		    {next_state, finalize, SD, 0};
+	       true -> 
+		    {next_state, wait_for_n, SD, Timeout}
 	    end;
-        true -> {next_state, waiting, SD}
+        true -> 
+	    {next_state, waiting, SD}
     end.
 
 wait_for_n({ok, _ReqID, IdxNode, Obj},
@@ -150,17 +212,20 @@ wait_for_n({ok, _ReqID, IdxNode, Obj},
 wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
-finalize(timeout, SD=#state{replies=Replies, user=User}) ->
-    MObj = merge(Replies),
-    case needs_repair(MObj, Replies) of
-        true ->
-            repair(User, MObj, Replies),
-            {stop, normal, SD};
-        false ->
-            {stop, normal, SD}
+finalize(timeout, SD=#state{op=Op, replies=Replies, user=User}) ->
+    case Op of
+	list ->
+	    {stop, normal, SD};
+	_ ->
+	    MObj = merge(Replies),
+	    case needs_repair(MObj, Replies) of
+		true ->
+		    repair(User, MObj, Replies),
+		    {stop, normal, SD};
+		false ->
+		    {stop, normal, SD}
+	    end
     end.
-
-
 
 handle_info(_Info, _StateName, StateData) ->
     {stop,badmsg,StateData}.
@@ -232,3 +297,16 @@ repair(StatName, MObj, [{IdxNode,Obj}|T]) ->
 -spec unique([A::any()]) -> [A::any()].
 unique(L) ->
     sets:to_list(sets:from_list(L)).
+
+
+ch_index(I, L) ->
+    ch_index(I, L, 0).
+
+ch_index(_I, [{_I, _}|_], N) ->
+    N;
+
+ch_index(I, [{_O, _}|R], N) ->
+    ch_index(I, R, N+1);
+
+ch_index(_I, [], _N) ->
+    failed.

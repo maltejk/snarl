@@ -33,7 +33,7 @@
 	 repair/3,
 	 revoke/4]).
 
--record(state, {partition, users=[], dbref, node}).
+-record(state, {partition, users=[], index=[], dbref, node}).
 
 -define(MASTER, snarl_user_vnode_master).
 
@@ -62,10 +62,12 @@ get(Preflist, ReqID, User) ->
 				   ?MASTER).
 
 list(Preflist, ReqID) ->
-    riak_core_vnode_master:command(Preflist,
-				   {list, ReqID},
-				   {fsm, undefined, self()},
-				   ?MASTER).
+    riak_core_vnode_master:coverage(
+      {list, ReqID},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
 
 
 %%%===================================================================
@@ -121,12 +123,13 @@ revoke(Preflist, ReqID, User, Val) ->
     
 init([Partition]) ->
     {ok, DBRef} = eleveldb:open("users."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
-    Users = read_users(DBRef),
+    {Index, Users} = read_users(DBRef),
     {ok, #state { 
-       node=node(),
-       users=Users,
-       partition=Partition,
-       dbref=DBRef}}.
+       index = Index,
+       node = node(),
+       users = Users,
+       partition = Partition,
+       dbref = DBRef}}.
 
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
@@ -138,20 +141,27 @@ handle_command({repair, undefined, User, Obj}, _Sender, #state{users=Users0}=Sta
     {noreply, State#state{users=Users1}};
 
 
-handle_command({add, {ReqID, Coordinator}, User}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
-    User0 = statebox:new({snarl_user_state, new}),
+handle_command({add, {ReqID, Coordinator}, User}, _Sender,
+	       #state{users=Users,  dbref=DBRef, index=#snarl_obj{val=Index0}=IndexO} = State) ->
+    User0 = statebox:new(fun snarl_user_state:new/0),
     User1 = statebox:modify({snarl_user_state, name, [User]}, User0),
+    Index1 = statebox:modify({fun snarl_user_state:add/2, [User]}, Index0),
+    Index2 = snarl_obj:update(Index1, Coordinator, IndexO),
+    eleveldb:put(DBRef, <<"#users">>, term_to_binary(Index2), []),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User1, vclock=VC},
     {ok, Users1} = add_user(User, UserObj, Users, DBRef),
-    {reply, {ok, ReqID}, State#state{users=Users1}};
+    {reply, {ok, ReqID}, State#state{users=Users1, index = Index2}};
 
-handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, #state{users=Users, dbref=DBRef} = State) ->
+handle_command({delete, {ReqID, Coordinator}, User}, _Sender, 
+	       #state{users=Users, dbref=DBRef, index=#snarl_obj{val=Index0}=IndexO} = State) ->
     Users1 = dict:erase(User, Users),
-    eleveldb:put(DBRef, <<"#users">>, term_to_binary(dict:fetch_keys(Users1)), []),
-    eleveldb:delete(DBRef, list_to_binary(User), []),
-    {reply, {ok, ReqID}, State#state{users=Users1}};
+    Index1 = statebox:modify({fun snarl_user_state:delete/2, [User]}, Index0),
+    Index2 = snarl_obj:update(Index1, Coordinator, IndexO),
+    eleveldb:put(DBRef, <<"#users">>, term_to_binary(Index2), []),
+    eleveldb:delete(DBRef, User, []),
+    {reply, {ok, ReqID}, State#state{users=Users1, index=Index2}};
 
 handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, 
 	       #state{users=Users, dbref=DBRef} = State) ->
@@ -162,9 +172,6 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender,
 	    Users1 = change_user_callback(User, Action, Group, Coordinator, Users, DBRef),
 	    {reply, {ok, ReqID, joined}, State#state{users=Users1}}
     end;
-
-handle_command({list, ReqID}, _Sender, #state{users=Users} = State) ->
-    {reply, {ok, ReqID, dict:fetch_keys(Users)}, State};
 
 handle_command({get, ReqID, User}, _Sender, #state{users=Users, partition=Partition, node=Node} = State) ->
     Res = case dict:find(User, Users) of
@@ -196,8 +203,8 @@ handoff_starting(TargetNode, State) ->
     {true, State}.
 
 handoff_cancelled(State) ->
-    Users = read_users(State#state.dbref),
-    {ok, State#state{users=Users}}.
+    {Index, Users} = read_users(State#state.dbref),
+    {ok, State#state{users=Users, index=Index}}.
 
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
@@ -224,6 +231,13 @@ delete(#state{dbref=DBRef} = State) ->
     {ok, DBRef1} = eleveldb:open("users."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
     {ok, State#state{dbref=DBRef1}}.
 
+handle_coverage({list, ReqID}, _KeySpaces, _Sender, 
+		#state{index=Index, partition=Partition, node=Node} = State) ->
+    ?PRINT({handle_coverage, {list, ReqID}}),
+    Res = {ok, ReqID, {Partition,Node}, Index},
+    {reply, Res, State};
+
+
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
     {stop, not_implemented, State}.
 
@@ -241,28 +255,32 @@ terminate(_Reason, #state{dbref=DBRef} = _State) ->
 read_users(DBRef) ->
     case eleveldb:get(DBRef, <<"#users">>, []) of
 	not_found -> 
-	    dict:new();
+	    UsersIdexSB = statebox:new(fun ordsets:new/0),
+	    VC0 = vclock:fresh(),
+	    VC = vclock:increment(snar_user_vnode, VC0),
+	    UsersIndexObj = #snarl_obj{val=UsersIdexSB, vclock=VC},
+	    {UsersIndexObj, dict:new()};
 	{ok, Bin} ->
-	    lists:foldl(fun (User, Users0) ->
-				{ok, GrBin} = eleveldb:get(DBRef, list_to_binary(User), []),
-				dict:store(User, binary_to_term(GrBin), Users0)
-			end, dict:new(), binary_to_term(Bin))
+	    UsersIndexObj = binary_to_term(Bin),
+	    UsersIdexSB = snarl_obj:val(UsersIndexObj),
+	    UsersIndex = statebox:value(UsersIdexSB),
+	    {UsersIndexObj,
+	     lists:foldl(fun (User, Users0) ->
+				 {ok, GrBin} = eleveldb:get(DBRef, User, []),
+				 dict:store(User, binary_to_term(GrBin), Users0)
+			 end, dict:new(), UsersIndex)}
     end.
 
 add_user(User, UserData, Users, DBRef) ->
     Users1 = dict:store(User, UserData, Users),
-    eleveldb:put(DBRef, <<"#users">>, term_to_binary(dict:fetch_keys(Users1)), []),
-    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+    eleveldb:put(DBRef, User, term_to_binary(UserData), []),
     {ok, Users1}.
-
-
 
 change_user_callback(User, Action, Val, Coordinator, Users, DBRef) ->    
     Users1 = dict:update(User, update_user(Coordinator, Val, Action), Users),
     {ok, UserData} = dict:find(User, Users1),
-    eleveldb:put(DBRef, list_to_binary(User), term_to_binary(UserData), []),
+    eleveldb:put(DBRef, User, term_to_binary(UserData), []),
     Users1.
-
 
 update_user(Coordinator, Val, Action) ->
     fun (#snarl_obj{val=User0}=O) ->

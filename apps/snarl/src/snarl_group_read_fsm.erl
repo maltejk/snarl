@@ -126,12 +126,16 @@ waiting({ok, ReqID, IdxNode, Obj},
 		    From ! {ReqID, ok, not_found};
 		Merged ->
 		    Reply = snarl_obj:val(Merged),
-		    From ! {ReqID, ok, statebox:value(Reply)},
-		    if NumR =:= ?N -> {next_state, finalize, SD, 0};
-		       true -> {next_state, wait_for_n, SD, Timeout}
-		    end
+		    From ! {ReqID, ok, statebox:value(Reply)}
+	    end,
+	    if 
+		NumR =:= ?N -> 
+		    {next_state, finalize, SD, 0};
+	       true -> 
+		    {next_state, wait_for_n, SD, Timeout}
 	    end;
-        true -> {next_state, waiting, SD}
+        true -> 
+	    {next_state, waiting, SD}
     end.
 
 wait_for_n({ok, _ReqID, IdxNode, Obj},

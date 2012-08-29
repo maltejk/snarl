@@ -16,9 +16,10 @@
 	 grant/2,
 	 revoke/2,
 	 join/2,
-	 leave/2
+	 leave/2,
+	 add/2,
+	 delete/2
 	]).
-
 
 new() ->
     #user{}.
@@ -41,9 +42,8 @@ join(Group, User) ->
 leave(Group, User) ->
     User#user{groups = ordsets:del_element(Group, User#user.groups)}.
 
+add(User, Users) ->
+    ordsets:add_element(User, Users).
 
-
-    
-	
-
-
+delete(User, Users) ->
+    ordsets:del_element(User, Users).
