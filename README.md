@@ -45,8 +45,8 @@ Message
 Each message is passed as a BERT encoded Erlang terms.
 
 User Functions
-* {user, list} -> [user()]
-* {user, get, User} -> {ok, {user, Name, Password, Permissions, Groups}} | not_found
+* {user, list} -> [Name::binary()]
+* {user, get, User} -> {ok, {user, Name::binary(), Password::binary(), Permissions, GroupNames}} | not_found
 * {user, add, User} -> ok | duplicate 
 * {user, delete, User} -> ok | not_found
 * {user, grant, User, Permission} -> ok | not_found
@@ -59,8 +59,8 @@ User Functions
 
 
 Group Functions
-* {group, list} -> [group()]
-* {group, get, Group} -> {ok, {group, Name, Permissions}} | not_found
+* {group, list} -> [Name::binary()]
+* {group, get, Group} -> {ok, {group, Name::binary(), Permissions}} | not_found
 * {group, add, Group} -> ok | duplicate
 * {group, delete, Group} -> ok | not_found
 * {group, grant, Group, Permission} -> ok | not_found
