@@ -3,7 +3,6 @@
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
-
 -export([start_vnode/1,
          init/1,
          terminate/2,
@@ -146,7 +145,7 @@ handle_command({add, {ReqID, Coordinator}, User}, _Sender,
     Index1 = snarl_user_state:add(User, Index0),
     eleveldb:put(DBRef, <<"#users">>, term_to_binary(Index1), []),
     User0 = statebox:new(fun snarl_user_state:new/0),
-    User1 = statebox:modify({snarl_user_state, name, [User]}, User0),
+    User1 = statebox:modify({fun snarl_user_state:name/2, [User]}, User0),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User1, vclock=VC},
@@ -208,10 +207,10 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, #state{dbref=DBRef} = State) ->
-    {User, Data} = binary_to_term(Data),
+    {User, UserData} = binary_to_term(Data),
     Index1 = snarl_user_state:add(User, State#state.index),
     eleveldb:put(DBRef, <<"#users">>, term_to_binary(Index1), []),
-    {ok, Users1} = add_user(User, Data, State#state.users, DBRef),
+    {ok, Users1} = add_user(User, UserData, State#state.users, DBRef),
     {reply, ok, State#state{users = Users1}}.
 
 encode_handoff_item(User, Data) ->
@@ -278,7 +277,7 @@ change_user_callback(User, Action, Val, Coordinator, Users, DBRef) ->
 
 update_user(Coordinator, Val, Action) ->
     fun (#snarl_obj{val=User0}=O) ->
-	    User1 = statebox:modify({snarl_user_state, Action, [Val]}, User0),
+	    User1 = statebox:modify({fun snarl_user_state:Action/2, [Val]}, User0),
 	    User2 = statebox:expire(?STATEBOX_EXPIRE, User1),
 	    snarl_obj:update(User2, Coordinator, O)
     end.

@@ -240,7 +240,7 @@ repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
     case snarl_obj:equal(MObj, Obj) of
         true -> repair(VNode, StatName, MObj, T);
         false ->
-            snarl_entity_vnode:repair(VNode, IdxNode, StatName, MObj),
+            VNode:repair(VNode, IdxNode, StatName, MObj),
             repair(VNode, StatName, MObj, T)
     end.
 

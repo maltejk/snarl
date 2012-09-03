@@ -1,6 +1,5 @@
 -module(snarl_zmq_handler).
 
-
 -export([init/1, message/2]).
 
 init([]) ->
@@ -93,8 +92,3 @@ ensure_binary(F) when is_float(F) ->
     list_to_binary(float_to_list(F));
 ensure_binary(T) ->
     term_to_binary(T).
-
-
-
-
-
