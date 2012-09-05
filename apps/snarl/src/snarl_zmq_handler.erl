@@ -12,6 +12,13 @@ init([]) ->
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
+
+message({user, get, {token, Token}}, State) ->
+    {ok, User} = snarl_token:get(Token),
+    {reply,
+     snarl_user:get(User),
+     State};
+
 message({user, get, User}, State) ->
     {reply,
      snarl_user:get(ensure_binary(User)),
@@ -23,8 +30,23 @@ message({user, add, User}, State) ->
      State};
 
 message({user, auth, User, Pass}, State) ->
+    UserB = ensure_binary(User),
+    Res = case snarl_user:auth(UserB, ensure_binary(Pass)) of
+	      true ->
+		  {ok, Token} = snarl_token:add(UserB),
+		  {ok, {token, Token}};
+	      Other -> 
+		  {error, Other}
+	  end,
     {reply,
-     snarl_user:auth(ensure_binary(User), ensure_binary(Pass)),
+     Res,
+     State};
+
+
+message({user, allowed, {token, Token}, Permission}, State) ->
+    {ok, User} = snarl_token:get(Token),
+    {reply, 
+     snarl_user:allowed(User, Permission),
      State};
 
 message({user, allowed, User, Permission}, State) ->

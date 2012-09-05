@@ -10,7 +10,8 @@
 		  riak_core,
 		  eleveldb,
                   zmq_mdns_server,
-                  lager
+                  lager,
+                  uuid
                  ]},
   {mod, { snarl_app, []}},
   {env, []}

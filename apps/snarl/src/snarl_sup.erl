@@ -36,6 +36,10 @@ init(_Args) ->
 		{snarl_entity_write_fsm_sup, start_link, []},
 		permanent, infinity, supervisor, [snarl_entity_write_fsm_sup]},
 
+    TokebVMaster = {snarl_token_vnode_master,
+		    {riak_core_vnode_master, start_link, [snarl_token_vnode]},
+		    permanent, 5000, worker, [riak_core_vnode_master]},
+
     CoverageFSMs = {snarl_entity_coverage_fsm_sup,
 		    {snarl_entity_coverage_fsm_sup, start_link, []},
 		    permanent, infinity, supervisor, [snarl_entity_coverage_fsm_sup]},
@@ -47,5 +51,5 @@ init(_Args) ->
     {ok,
      {{one_for_one, 5, 10},
       [VMaster, 
-       GroupVMaster, UserVMaster,
+       GroupVMaster, UserVMaster, TokebVMaster,
        ReadFSMs, WriteFSMs, CoverageFSMs]}}.
