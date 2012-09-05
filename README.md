@@ -15,7 +15,6 @@ Each permission consists of a list of values, where the values **'…'** and **'
 
 Examples
 --------
-
 [some, cool, permission] matches:
 
 * [some, cool, permission]
@@ -27,8 +26,6 @@ Examples
 
 Interface
 ---------
-
-
 Snarl publishes it's servers via mDNS as
 
 ```
@@ -46,7 +43,7 @@ Each message is passed as a BERT encoded Erlang terms.
 
 User Functions
 * {user, list} -> [Name::binary()]
-* {user, get, User} -> {ok, {user, Name::binary(), Password::binary(), Permissions, GroupNames}} | not_found
+* {user, get, User|Token} -> {ok, {user, Name::binary(), Password::binary(), Permissions, GroupNames}} | not_found
 * {user, add, User} -> ok | duplicate 
 * {user, delete, User} -> ok | not_found
 * {user, grant, User, Permission} -> ok | not_found
@@ -54,8 +51,8 @@ User Functions
 * {user, passwd, User, Pass} -> ok | not_found
 * {user, join, User, Group} -> ok | not_found
 * {user, leave, User, Group} -> ok | not_found
-* {user, auth, User, Pass} -> true | false
-* {user, allowed, User, Permission} -> true | false
+* {user, auth, User, Pass} -> {ok, Token} | false
+* {user, allowed, User|Token, Permission} -> true | false
 
 
 Group Functions
@@ -68,5 +65,4 @@ Group Functions
 
 Credits
 -------
-
 If you want to learn something about riak_core I can recommend [rzezeski's working blog](https://github.com/rzezeski/try-try-try) the implementation is heavily build on top of the content provided there.
