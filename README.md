@@ -1,6 +1,5 @@
 Snarl
 =====
-
 Build status (master): [![Build Status](https://secure.travis-ci.org/project-fifo/snarl.png?branch=master)](http://travis-ci.org/project-fifo/snarl)
 
 Build status (dev): [![Build Status](https://secure.travis-ci.org/project-fifo/snarl.png?branch=dev)](http://travis-ci.org/project-fifo/snarl)
@@ -43,7 +42,7 @@ Each message is passed as a BERT encoded Erlang terms.
 
 User Functions
 * {user, list} -> [Name::binary()]
-* {user, get, User|Token} -> {ok, {user, Name::binary(), Password::binary(), Permissions, GroupNames}} | not_found
+* {user, get, User|Token} -> {ok, {user, Name::binary(), Password::binary(), Permissions, Groups}} | not_found
 * {user, add, User} -> ok | duplicate 
 * {user, delete, User} -> ok | not_found
 * {user, grant, User, Permission} -> ok | not_found
@@ -53,7 +52,6 @@ User Functions
 * {user, leave, User, Group} -> ok | not_found
 * {user, auth, User, Pass} -> {ok, Token} | false
 * {user, allowed, User|Token, Permission} -> true | false
-
 
 Group Functions
 * {group, list} -> [Name::binary()]
