@@ -1,5 +1,7 @@
 -module(snarl_vnode).
+
 -behaviour(riak_core_vnode).
+
 -include("snarl.hrl").
 
 -export([start_vnode/1,

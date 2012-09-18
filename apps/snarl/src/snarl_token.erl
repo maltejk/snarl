@@ -12,8 +12,6 @@
 	 add/1
         ]).
 
--define(TIMEOUT, 5000).
-
 %% Public API
 
 %% @doc Pings a random vnode to make sure communication is functional
@@ -26,15 +24,14 @@ ping() ->
 get(Token) ->
     snarl_entity_read_fsm:start(
       {snarl_token_vnode, snarl_token},
-      get, Token
-     ).
+      get, Token).
 
 add(User) ->
     Token = uuid:uuid4(),
     case snarl_token:get(Token) of
 	{ok, not_found} ->
 	    do_write(Token, add, User);
-	{ok, _TokenObj} ->
+	{ok, _TokenObj} -> 
 	    duplicate
     end.
 

@@ -1,5 +1,7 @@
 -module(snarl_zmq_handler).
 
+-include("snarl.hrl").
+
 -export([init/1, message/2]).
 
 init([]) ->
@@ -15,14 +17,37 @@ message({user, list}, State) ->
 
 message({user, get, {token, Token}}, State) ->
     {ok, User} = snarl_token:get(Token),
-    {reply,
-     snarl_user:get(User),
-     State};
+    message({user, get, User}, State);
 
 message({user, get, User}, State) ->
     {reply,
      snarl_user:get(ensure_binary(User)),
      State};
+
+message({user, cache, {token, Token}}, State) ->
+    {ok, User} = snarl_token:get(Token),
+    message({user, get, User}, State);
+
+message({user, cache, User}, State) ->
+    Res = case snarl_user:get(ensure_binary(User)) of
+	      not_found ->
+		  not_found;
+	      #user{permissions = Permissions,
+		    groups = Groups} ->
+		  {ok,
+		   lists:foldl(fun(Group, Acc) ->
+				     case snarl_group:get(Group) of
+					 {ok, #group{permissions = P }} ->
+					     P ++ Acc;
+					 _ ->
+					     Acc
+				     end
+			       end, Permissions, Groups)}
+	  end,
+    {reply,
+     Res,
+     State};
+
 
 message({user, add, User}, State) ->
     {reply,
@@ -41,7 +66,6 @@ message({user, auth, User, Pass}, State) ->
     {reply,
      Res,
      State};
-
 
 message({user, allowed, {token, Token}, Permission}, State) ->
     {ok, User} = snarl_token:get(Token),

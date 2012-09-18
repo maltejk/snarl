@@ -6,21 +6,38 @@
 -define(STATEBOX_EXPIRE, 60000).
 -define(DEFAULT_TIMEOUT, 10000).
 
+
+-record(resource_claim, {id :: binary(),
+			 ammount :: number()}).
+
+
+-record(resource, {name :: binary(),
+		   granted = 0:: number(),
+		   claims = [] :: [resource_claim()],
+		   reservations = [] :: [reservation()]}).
+
 -record(user, {name :: binary(),
 	       passwd :: binary(),
 	       permissions = [] :: [permission()],
+	       resources = [] :: [resource()],
 	       groups = [] :: [binary()]}).
 
 -record(group, {name :: binary(),
 		permissions = [] :: [permission()],
 		users = [] :: [binary()]}).
 
--type permission() :: [binary() | atom()].
-
--type val() ::  statebox:statebox().
-
 -record(snarl_obj, {val    :: val(),
 		    vclock :: vclock:vclock()}).
+
+-type reservation() :: {resource_claim(), integer()}.
+
+-type resource() :: #resource{}.
+
+-type permission() :: [binary() | atom()].
+
+-type resource_claim() :: #resource_claim{}.
+
+-type val() ::  statebox:statebox().
 
 -type snarl_obj() :: #snarl_obj{} | not_found.
 
