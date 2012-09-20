@@ -30,7 +30,11 @@
 	 leave/4,
 	 grant/4,
 	 repair/3,
-	 revoke/4]).
+	 revoke/4,
+	 set_resource/4,
+	 claim_resource/4,
+	 free_resource/4
+	]).
 
 -record(state, {partition, users=[], index=[], dbref, node}).
 
@@ -116,6 +120,26 @@ revoke(Preflist, ReqID, User, Val) ->
 				   {fsm, undefined, self()},
                                    ?MASTER).
 
+set_resource(Preflist, ReqID, User, [Resource, Value]) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {set_resource, ReqID, User, Resource, Value},
+				   {fsm, undefined, self()},
+                                   ?MASTER).
+
+claim_resource(Preflist, ReqID, User, [Resource, ID, Ammount]) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {claim_resource, ReqID, User, Resource, ID, Ammount},
+				   {fsm, undefined, self()},
+                                   ?MASTER).
+
+free_resource(Preflist, ReqID, User, [Resource, ID]) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {free_resource, ReqID, User, Resource, ID},
+				   {fsm, undefined, self()},
+                                   ?MASTER).
+
+
+
 %%%===================================================================
 %%% VNode
 %%%===================================================================
@@ -166,7 +190,7 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender,
 	{ok, not_found} ->
 	    {reply, {ok, ReqID, not_found}, State};
 	{ok, _} ->
-	    Users1 = change_user_callback(User, Action, Group, Coordinator, Users, DBRef),
+	    Users1 = change_user_callback(User, Action, [Group], Coordinator, Users, DBRef),
 	    {reply, {ok, ReqID, joined}, State#state{users=Users1}}
     end;
 
@@ -179,10 +203,17 @@ handle_command({get, ReqID, User}, _Sender, #state{users=Users, partition=Partit
 	  end,
     {reply, Res, State};
 
-handle_command({Action, {ReqID, Coordinator}, User, Passwd}, _Sender, 
+handle_command({Action, {ReqID, Coordinator}, User, Param1, Param2}, _Sender, 
 	       #state{users=Users, dbref=DBRef} = State) ->
-    Users1 = change_user_callback(User, Action, Passwd, Coordinator, Users, DBRef),
+    Users1 = change_user_callback(User, Action, [Param1, Param2], Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
+    
+handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender, 
+	       #state{users=Users, dbref=DBRef} = State) ->
+    Users1 = change_user_callback(User, Action, [Param], Coordinator, Users, DBRef),
+    {reply, {ok, ReqID}, State#state{users=Users1}};
+
+
 
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
@@ -269,15 +300,15 @@ add_user(User, UserData, Users, DBRef) ->
     eleveldb:put(DBRef, User, term_to_binary(UserData), []),
     {ok, Users1}.
 
-change_user_callback(User, Action, Val, Coordinator, Users, DBRef) ->    
-    Users1 = dict:update(User, update_user(Coordinator, Val, Action), Users),
+change_user_callback(User, Action, Vals, Coordinator, Users, DBRef) ->    
+    Users1 = dict:update(User, update_user(Coordinator, Vals, Action), Users),
     {ok, UserData} = dict:find(User, Users1),
     eleveldb:put(DBRef, User, term_to_binary(UserData), []),
     Users1.
 
-update_user(Coordinator, Val, Action) ->
+update_user(Coordinator, Vals, Action) ->
     fun (#snarl_obj{val=User0}=O) ->
-	    User1 = statebox:modify({fun snarl_user_state:Action/2, [Val]}, User0),
+	    User1 = statebox:modify({fun snarl_user_state:Action/2, Vals}, User0),
 	    User2 = statebox:expire(?STATEBOX_EXPIRE, User1),
 	    snarl_obj:update(User2, Coordinator, O)
     end.

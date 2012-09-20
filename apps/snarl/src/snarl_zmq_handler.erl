@@ -101,6 +101,26 @@ message({user, revoke, User, Permission}, State) ->
     {reply, snarl_user:grant(ensure_binary(User), Permission), State};
 
 %%%===================================================================
+%%% Resource Functions
+%%%===================================================================
+
+message({user, set_resource, User, Resource, Value}, State) ->
+    {reply, snarl_user:set_resource(ensure_binary(User), Resource, Value), State};
+
+message({user, get_resource, User, Resource}, State) ->
+    {reply, snarl_user:get_resource(ensure_binary(User), Resource), State};
+
+message({user, claim_resource, User, Resource, Ammount}, State) ->
+    ID = uuid:uuid4(),
+    {reply, {ID, snarl_user:claim_resource(ensure_binary(User), ID, Resource, Ammount)}, State};
+
+message({user, free_resource, User, ID}, State) ->
+    {reply, snarl_user:free_resource(ensure_binary(User), ID), State};
+
+message({user, resource_stat, User}, State) ->
+    {reply, snarl_user:get_resource_stat(ensure_binary(User)), State};
+
+%%%===================================================================
 %%% Group Functions
 %%%===================================================================
 

@@ -18,7 +18,11 @@
 	 leave/2,
 	 grant/2,
 	 revoke/2,
-	 allowed/2
+	 allowed/2,
+	 set_resource/3,
+	 claim_resource/4,
+	 free_resource/3,
+	 get_resource_stat/1
         ]).
 
 -define(TIMEOUT, 5000).
@@ -91,6 +95,37 @@ grant(User, Permission) ->
 
 revoke(User, Permission) ->
     do_update(User, revoke, Permission).
+
+%%%===================================================================
+%%% Resource Functions
+%%%===================================================================
+
+set_resource(User, Resource, Value) ->
+    do_update(User, set_resource, [Resource, Value]).
+
+claim_resource(User, ID, Resource, Ammount) ->
+    case snarl_user:get(User) of
+	{ok, not_found} ->
+	    not_found;
+	{ok, UserObj} ->
+	    case snarl_user_state:get_free_resource(UserObj, Resource) of
+		Free when Free >= Ammount ->
+		    do_write(User, claim_resource, [Resource, ID, Ammount]);
+		_ ->
+		    limit_reached
+	    end
+    end.
+
+free_resource(User, Resource, ID) ->
+    do_update(User, free_resource, [Resource, ID]).
+
+get_resource_stat(User) ->
+    case snarl_user:get(User) of
+	{ok, not_found} ->
+	    not_found;
+	{ok, UserObj} ->
+	    snarl_user_state:get_resource_stat(UserObj)
+    end.
 
 %%%===================================================================
 %%% Internal Functions

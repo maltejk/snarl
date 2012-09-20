@@ -25,10 +25,11 @@
 	 add/2,
 	 delete/2,
 	 set_resource/3,
+	 get_resource/2,
 	 claim_resource/4,
 	 free_resource/3,
-	 get_resource/2,
-	 get_free_resource/2
+	 get_free_resource/2,
+	 get_resource_stat/1
 	]).
 
 new() ->
@@ -74,13 +75,28 @@ free_resource(Resource, ID, User) ->
     Resources0 = User#user.resources,
     {_, R0, Resources1} = lists:keytake(Resource, 2, Resources0),
     R1 = R0#resource{claims =  lists:keydelete(ID, 2, R0#resource.claims)},
-    User#user{resources =  ordsets:add_element(R1, Resources1)}.
+    User#user{resources =  ordsets:add_element(R1, Resources1)}.    
 
 add(User, Users) ->
     ordsets:add_element(User, Users).
 
 delete(User, Users) ->
     ordsets:del_element(User, Users).
+
+get_resource_stat(User) ->
+
+    lists:map(fun(R) ->
+		      Used = lists:foldl(fun(#resource_claim{ammount=In}, Acc) ->
+						 Acc + In
+					 end, 0, R#resource.claims),
+		      Reserved = lists:foldl(fun({#resource_claim{ammount=In}, _}, Acc) ->
+						     Acc + In
+					     end, 0, R#resource.reservations),
+		      {R#resource.name,
+		       R#resource.granted,
+		       Used,
+		       Reserved}
+	      end, User#user.resources).
 
 get_resource(Resource, User) -> 
     lists:keyfind(Resource, 2, User#user.resources).
@@ -159,6 +175,33 @@ resource_test() ->
     ?assert(R0#resource.granted == 10),
     ?assert(R1#resource.granted == 20),
     ?assert(R2#resource.granted == 42).
+
+resource_stat_test() ->
+    User0 = new(),
+    User1 = set_resource(cookies, 10, User0),
+    User2 = claim_resource(cookies, c1, 1, User1),
+    User3 = claim_resource(cookies, c2, 2, User2),
+    User4 = free_resource(cookies, c1, User3),
+    User5 = free_resource(cookies, c2, User3),
+    User6 = free_resource(cookies, c1, User4),
+    User7 = set_resource(cake, 5, User6),
+    User8 = claim_resource(cake, c1, 1, User7),
+
+    Free0 = get_resource_stat(User1),
+    Free1 = get_resource_stat(User2),
+    Free2 = get_resource_stat(User3),
+    Free3 = get_resource_stat(User4),
+    Free4 = get_resource_stat(User5),
+    Free5 = get_resource_stat(User6),
+    Free6 = get_resource_stat(User8),
+
+    ?assert(Free0 == [{cookies, 10, 0, 0}]),
+    ?assert(Free1 == [{cookies, 10, 1, 0}]),
+    ?assert(Free2 == [{cookies, 10, 3, 0}]),
+    ?assert(Free3 == [{cookies, 10, 2, 0}]),
+    ?assert(Free4 == [{cookies, 10, 1, 0}]),
+    ?assert(Free5 == [{cookies, 10, 2, 0}]),
+    ?assert(Free6 == [{cake, 5, 1, 0}, {cookies, 10, 2, 0}]).
 
 resource_claim_test() ->
     User0 = new(),
