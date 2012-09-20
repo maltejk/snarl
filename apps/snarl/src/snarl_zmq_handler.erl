@@ -114,8 +114,8 @@ message({user, claim_resource, User, Resource, Ammount}, State) ->
     ID = uuid:uuid4(),
     {reply, {ID, snarl_user:claim_resource(ensure_binary(User), ID, Resource, Ammount)}, State};
 
-message({user, free_resource, User, ID}, State) ->
-    {reply, snarl_user:free_resource(ensure_binary(User), ID), State};
+message({user, free_resource, User, Resource, ID}, State) ->
+    {reply, snarl_user:free_resource(ensure_binary(User), Resource, ID), State};
 
 message({user, resource_stat, User}, State) ->
     {reply, snarl_user:get_resource_stat(ensure_binary(User)), State};

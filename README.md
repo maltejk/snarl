@@ -53,6 +53,12 @@ User Functions
 * {user, auth, User, Pass} -> {ok, Token} | false
 * {user, allowed, User|Token, Permission} -> true | false
 
+* {user, set_resource, User, Resource, Value} -> ok | not_found
+* {user, get_resource, User, Resource} -> not_found | {ok, {resource, {Name :: binary(), Granted :: number(), claims :: [{resource_claim, ID :: binary(), Ammount :: number()}], reservations :: [{{resource_claim, ID :: binary(), Ammount :: number()}, Timeout :: integer()}]}
+* {user, claim_resource, User, Resource, Ammount} -> ID | not_found | limit_reached
+* {user, free_resource, User, Resource, ID} -> ok
+* {user, resource_stat, User} -> [{Name :: binary(), Granted :: integer(), Claimed :: integer(), Reserved :: integer()}]
+
 Group Functions
 * {group, list} -> [Name::binary()]
 * {group, get, Group} -> {ok, {group, Name::binary(), Permissions}} | not_found
