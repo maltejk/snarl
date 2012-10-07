@@ -9,7 +9,7 @@
                   stdlib,
 		  riak_core,
 		  eleveldb,
-                  zmq_mdns_server,
+                  mdns_server_lib,
                   lager,
                   uuid
                  ]},
