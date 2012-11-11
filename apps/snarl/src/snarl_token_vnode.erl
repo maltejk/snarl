@@ -202,7 +202,7 @@ expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State) when Cycle < Cnt
 
 expire(#state{tokens = Tokens, timeout = Timeout} = State) ->
     Tokens1 = dict:filter(fun(_K, {Timer, _V}) ->
-				  timer:diff(Timer, now()) =< Timeout
+				  timer:now_diff(Timer, now()) =< Timeout
 			  end, Tokens),
     State#state{
       access_cnt = 0,
