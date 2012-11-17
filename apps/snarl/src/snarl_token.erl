@@ -27,7 +27,7 @@ get(Token) ->
       get, Token).
 
 add(User) ->
-    Token = uuid:uuid4(),
+    Token = list_to_binary(uuid:to_string(uuid:uuid4())),
     case snarl_token:get(Token) of
 	{ok, not_found} ->
 	    do_write(Token, add, User);
