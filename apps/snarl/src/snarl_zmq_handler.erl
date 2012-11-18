@@ -98,7 +98,7 @@ message({user, grant, User, Permission}, State) ->
     {reply, snarl_user:grant(ensure_binary(User), Permission), State};
 
 message({user, revoke, User, Permission}, State) ->
-    {reply, snarl_user:grant(ensure_binary(User), Permission), State};
+    {reply, snarl_user:revoke(ensure_binary(User), Permission), State};
 
 %%%===================================================================
 %%% Resource Functions
@@ -140,7 +140,7 @@ message({group, grant, Group, Permission}, State) ->
     {reply, snarl_group:grant(ensure_binary(Group), Permission), State};
 
 message({group, revoke, Group, Permission}, State) ->
-    {reply, snarl_group:grant(ensure_binary(Group), Permission), State};
+    {reply, snarl_group:revoke(ensure_binary(Group), Permission), State};
 
 message(Message, State) ->
     io:format("Unsuppored 0MQ message: ~p", [Message]),
