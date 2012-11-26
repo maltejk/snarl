@@ -1,5 +1,6 @@
+rel/pkg/packlist
+rel/pkg/*.tgz
 rel/pkg/build-info
-rel/pkg/files/*
 .eunit
 dev
 ebin
