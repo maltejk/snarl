@@ -10,8 +10,7 @@ build_info:
 	echo "DEPENDS=erlang>=15.1.1" >> build-info
 
 clean:
-	-rm -r files/*
-	-rm build-info
+	-rm *.tgz build-info packlist
 
 package: package_list build_info
 	pkg_create -B build-info -c comment -d description -f packlist -I /opt/local/$(COMPONENT) -p ../$(COMPONENT) -U $(COMPONENT)-$(VERSION).tgz
