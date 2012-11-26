@@ -12,6 +12,7 @@ deps:
 
 clean:
 	$(REBAR) clean
+	make -C rel/pkg clean
 
 distclean: clean devclean relclean
 	$(REBAR) delete-deps
