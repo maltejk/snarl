@@ -1,3 +1,5 @@
+rel/pkg/build-info
+rel/pkg/files/*
 .eunit
 dev
 ebin
