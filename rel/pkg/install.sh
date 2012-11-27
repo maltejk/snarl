@@ -19,7 +19,7 @@ case $2 in
 	svccfg import /opt/local/snarl/etc/snarl.xml
 	echo Trying to guess configuration ...
 	IP=`ifconfig net0 | grep inet | awk -e '{print $2}'`
-	sed --in-place=.bak -e 's/127.0.0.1/${IP}/g' /opt/local/snarl/etc/vm.args
-	sed --in-place=.bak -e 's/127.0.0.1/${IP}/g' /opt/local/snarl/etc/app.config
+	sed --in-place=.bak -e "s/127.0.0.1/${IP}/g" /opt/local/snarl/etc/vm.args
+	sed --in-place=.bak -e "s/127.0.0.1/${IP}/g" /opt/local/snarl/etc/app.config
 	;;
 esac
