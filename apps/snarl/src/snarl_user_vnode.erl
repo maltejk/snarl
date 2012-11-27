@@ -143,11 +143,11 @@ free_resource(Preflist, ReqID, User, [Resource, ID]) ->
 %%%===================================================================
 %%% VNode
 %%%===================================================================
-    
 init([Partition]) ->
-    {ok, DBRef} = eleveldb:open("users."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
+    {ok, DBLoc} = application:get_env(snarl, db_path),
+    {ok, DBRef} = eleveldb:open(DBLoc ++ "/users."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     {Index, Users} = read_users(DBRef),
-    {ok, #state { 
+    {ok, #state {
        index = Index,
        node = node(),
        users = Users,
@@ -176,7 +176,7 @@ handle_command({add, {ReqID, Coordinator}, User}, _Sender,
     {ok, Users1} = add_user(User, UserObj, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1, index = Index1}};
 
-handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, 
+handle_command({delete, {ReqID, _Coordinator}, User}, _Sender,
 	       #state{users=Users, dbref=DBRef, index=Index0} = State) ->
     Users1 = dict:erase(User, Users),
     Index1 = snarl_user_state:delete(User, Index0),
@@ -184,7 +184,7 @@ handle_command({delete, {ReqID, _Coordinator}, User}, _Sender,
     eleveldb:delete(DBRef, User, []),
     {reply, {ok, ReqID}, State#state{users=Users1, index=Index1}};
 
-handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, 
+handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender,
 	       #state{users=Users, dbref=DBRef} = State) ->
     case snarl_group:get(Group) of
 	{ok, not_found} ->
@@ -203,21 +203,18 @@ handle_command({get, ReqID, User}, _Sender, #state{users=Users, partition=Partit
 	  end,
     {reply, Res, State};
 
-handle_command({Action, {ReqID, Coordinator}, User, Param1, Param2}, _Sender, 
+handle_command({Action, {ReqID, Coordinator}, User, Param1, Param2}, _Sender,
 	       #state{users=Users, dbref=DBRef} = State) ->
     Users1 = change_user_callback(User, Action, [Param1, Param2], Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
-    
-handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender, 
+
+handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender,
 	       #state{users=Users, dbref=DBRef} = State) ->
     Users1 = change_user_callback(User, Action, [Param], Coordinator, Users, DBRef),
     {reply, {ok, ReqID}, State#state{users=Users1}};
 
-
-
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
-
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     Acc = dict:fold(Fun, Acc0, State#state.users),
@@ -261,7 +258,7 @@ delete(#state{dbref=DBRef} = State) ->
     {ok, DBRef1} = eleveldb:open("users."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
     {ok, State#state{dbref=DBRef1, index=[], users=dict:new()}}.
 
-handle_coverage({list, ReqID}, _KeySpaces, _Sender, 
+handle_coverage({list, ReqID}, _KeySpaces, _Sender,
 		#state{index=Index, partition=Partition, node=Node} = State) ->
     ?PRINT({handle_coverage, {list, ReqID}}),
     Res = {ok, ReqID, {Partition,Node}, Index},
@@ -284,7 +281,7 @@ terminate(_Reason, #state{dbref=DBRef} = _State) ->
 
 read_users(DBRef) ->
     case eleveldb:get(DBRef, <<"#users">>, []) of
-	not_found -> 
+	not_found ->
 	    {[], dict:new()};
 	{ok, Bin} ->
 	    Index = binary_to_term(Bin),
@@ -300,7 +297,7 @@ add_user(User, UserData, Users, DBRef) ->
     eleveldb:put(DBRef, User, term_to_binary(UserData), []),
     {ok, Users1}.
 
-change_user_callback(User, Action, Vals, Coordinator, Users, DBRef) ->    
+change_user_callback(User, Action, Vals, Coordinator, Users, DBRef) ->
     Users1 = dict:update(User, update_user(Coordinator, Vals, Action), Users),
     {ok, UserData} = dict:find(User, Users1),
     eleveldb:put(DBRef, User, term_to_binary(UserData), []),

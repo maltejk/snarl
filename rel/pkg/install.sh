@@ -1,1 +1,9 @@
-#!/usr/bin/basn
+#!/usr/bin/bash
+
+echo Creating snarl group ...
+groupadd snarl
+echo Creating snarl user ...
+useradd -g snarl -d /opt/local/snarl -s /bin/false snarl
+echo Creating database directory ...
+mkdir -p /var/db/snarl
+chown snarl:snarl /var/db/snarl

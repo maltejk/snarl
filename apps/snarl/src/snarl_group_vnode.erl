@@ -98,11 +98,13 @@ revoke(Preflist, ReqID, Group, Val) ->
 %%%===================================================================
 %%% VNode
 %%%===================================================================
-    
 init([Partition]) ->
+    {ok, DBLoc} = application:get_env(snarl, db_path),
+    {ok, DBRef} = eleveldb:open(DBLoc ++ "/groups."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
+
     {ok, DBRef} = eleveldb:open("groups."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     {Index, Groups} = read_groups(DBRef),
-    {ok, #state { 
+    {ok, #state {
        index = Index,
        node = node(),
        groups = Groups,
@@ -131,7 +133,7 @@ handle_command({add, {ReqID, Coordinator}, Group}, _Sender,
     {ok, Groups1} = add_group(Group, GroupObj, Groups, DBRef),
     {reply, {ok, ReqID}, State#state{groups=Groups1, index = Index1}};
 
-handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender, 
+handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender,
 	       #state{groups=Groups, dbref=DBRef, index=Index0} = State) ->
     Groups1 = dict:erase(Group, Groups),
     Index1 = snarl_group_state:delete(Group, Index0),
@@ -148,7 +150,7 @@ handle_command({get, ReqID, Group}, _Sender, #state{groups=Groups, partition=Par
 	  end,
     {reply, Res, State};
 
-handle_command({Action, {ReqID, Coordinator}, Group, Passwd}, _Sender, 
+handle_command({Action, {ReqID, Coordinator}, Group, Passwd}, _Sender,
 	       #state{groups=Groups, dbref=DBRef} = State) ->
     Groups1 = change_group_callback(Group, Action, Passwd, Coordinator, Groups, DBRef),
     {reply, {ok, ReqID}, State#state{groups=Groups1}};
@@ -199,7 +201,7 @@ delete(#state{dbref=DBRef} = State) ->
     {ok, DBRef1} = eleveldb:open("groups."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
     {ok, State#state{dbref=DBRef1, groups=dict:new(), index=[]}}.
 
-handle_coverage({list, ReqID}, _KeySpaces, _Sender, 
+handle_coverage({list, ReqID}, _KeySpaces, _Sender,
 		#state{index=Index, partition=Partition, node=Node} = State) ->
     ?PRINT({handle_coverage, {list, ReqID}}),
     Res = {ok, ReqID, {Partition,Node}, Index},
@@ -222,7 +224,7 @@ terminate(_Reason, #state{dbref=DBRef} = _State) ->
 
 read_groups(DBRef) ->
     case eleveldb:get(DBRef, <<"#groups">>, []) of
-	not_found -> 
+	not_found ->
 	    {[], dict:new()};
 	{ok, Bin} ->
 	    Index = binary_to_term(Bin),
@@ -238,7 +240,7 @@ add_group(Group, GroupData, Groups, DBRef) ->
     eleveldb:put(DBRef, Group, term_to_binary(GroupData), []),
     {ok, Groups1}.
 
-change_group_callback(Group, Action, Val, Coordinator, Groups, DBRef) ->    
+change_group_callback(Group, Action, Val, Coordinator, Groups, DBRef) ->
     Groups1 = dict:update(Group, update_group(Coordinator, Val, Action), Groups),
     {ok, GroupData} = dict:find(Group, Groups1),
     eleveldb:put(DBRef, Group, term_to_binary(GroupData), []),

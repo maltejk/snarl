@@ -84,6 +84,65 @@ run()
 
 # Check the first argument for instructions
 case "$1" in
+    user)
+	shift
+	case "$1" in
+	    add)
+		shift
+		run snarl_console add_user $@
+		;;
+	    join)
+		shift
+		run snarl_console join_group $@
+		;;
+	    leave)
+		shift
+		run snarl_console leave_group $@
+		;;
+	    passwd)
+		shift
+		run snarl_console passwd $@
+		;;
+	    grant)
+		shift
+		run snarl_console grant_user $@
+		;;
+	    revoke)
+		shift
+		run snarl_console revoke_user $@
+		;;
+
+	    *)
+		echo "Usage: snarl-admin user { add | passwd | join | leave "
+		echo "                          grant | revoke }."
+		exit 1
+		;;
+	esac
+	;;
+    group)
+	shift
+	case "$1" in
+	    add)
+		shift
+		run snarl_console add_group $@
+		;;
+	    grant)
+		shift
+		run snarl_console grant_group $@
+		;;
+	    revoke)
+		shift
+		run snarl_console revoke_group $@
+		;;
+
+	    *)
+		echo "Usage: snarl-admin group { add | grant | revoke }."
+		exit 1
+		;;
+	esac
+	;;
+
+
     join)
         shift
         run snarl_console join $@
@@ -166,7 +225,7 @@ case "$1" in
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
-        echo "                 ring_status }"
+        echo "                 ring_status | user | group}"
         exit 1
         ;;
 esac

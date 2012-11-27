@@ -15,4 +15,4 @@ clean:
 	-rm *.tgz build-info packlist
 
 package: package_list build_info
-	pkg_create -i install.sh -D displayfile -B build-info -c comment -d description -f packlist -I /opt/local/$(COMPONENT) -p ../$(COMPONENT) -U $(COMPONENT)-$(VERSION)$(SUFFIX).tgz
+	pkg_create -g $(COMPONENT) -u $(COMPONENT) -i install.sh -D displayfile -B build-info -c comment -d description -f packlist -I /opt/local/$(COMPONENT) -p ../$(COMPONENT) -U $(COMPONENT)-$(VERSION)$(SUFFIX).tgz
