@@ -1,11 +1,24 @@
 #!/usr/bin/bash
 
+USER=snarl
+GROUP=$USER
+
 case $2 in
     PRE-INSTALL)
-	echo Creating snarl group ...
-	groupadd snarl
-	echo Creating snarl user ...
-	useradd -g snarl -d /var/db/snarl -s /bin/false snarl
+	if grep "^$GROUP:" /etc/group > /dev/null 2>&1
+	then
+	    echo "Group already exists, skipping creation."
+	else
+	    echo Creating snarl group ...
+	    groupadd $GROUP
+	fi
+	if id $USER > /dev/null 2>&1
+	then
+	    echo "User already exists, skipping creation."
+	else
+	    echo Creating snarl user ...
+	    useradd -g $GROUP -d /var/db/snarl -s /bin/false $USER
+	fi
 	echo Creating directories ...
 	mkdir -p /var/db/snarl/ring
 	mkdir -p /var/db/snarl/users
