@@ -9,6 +9,7 @@
     name='network/snarl'
     type='service'
     version='0.3.0'>
+    <create_default_instance enabled='false' />
     <single_instance />
     <dependency
 	name='net-loopback'
