@@ -11,6 +11,7 @@
 		  eleveldb,
                   mdns_server_lib,
                   lager,
+                  libsnarlmatch,
                   uuid
                  ]},
   {mod, { snarl_app, []}},
