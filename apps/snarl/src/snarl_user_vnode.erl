@@ -145,7 +145,7 @@ free_resource(Preflist, ReqID, User, [Resource, ID]) ->
 %%%===================================================================
 init([Partition]) ->
     {ok, DBLoc} = application:get_env(snarl, db_path),
-    {ok, DBRef} = eleveldb:open(DBLoc ++ "/users."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
+    {ok, DBRef} = eleveldb:open(DBLoc ++ "/users/"++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     {Index, Users} = read_users(DBRef),
     {ok, #state {
        index = Index,
@@ -253,9 +253,10 @@ is_empty(State) ->
     end.
 
 delete(#state{dbref=DBRef} = State) ->
+    {ok, DBLoc} = application:get_env(snarl, db_path),
     eleveldb:close(DBRef),
-    eleveldb:destroy("users."++integer_to_list(State#state.partition)++".ldb",[]),
-    {ok, DBRef1} = eleveldb:open("users."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
+    eleveldb:destroy(DBLoc ++ "/users/"++integer_to_list(State#state.partition)++".ldb",[]),
+    {ok, DBRef1} = eleveldb:open(DBLoc ++ "/users/"++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
     {ok, State#state{dbref=DBRef1, index=[], users=dict:new()}}.
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender,

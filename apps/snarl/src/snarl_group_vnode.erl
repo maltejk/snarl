@@ -100,9 +100,7 @@ revoke(Preflist, ReqID, Group, Val) ->
 %%%===================================================================
 init([Partition]) ->
     {ok, DBLoc} = application:get_env(snarl, db_path),
-    {ok, DBRef} = eleveldb:open(DBLoc ++ "/groups."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
-
-    {ok, DBRef} = eleveldb:open("groups."++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
+    {ok, DBRef} = eleveldb:open(DBLoc ++ "/groups/"++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     {Index, Groups} = read_groups(DBRef),
     {ok, #state {
        index = Index,
@@ -196,9 +194,10 @@ is_empty(State) ->
     end.
 
 delete(#state{dbref=DBRef} = State) ->
+    {ok, DBLoc} = application:get_env(snarl, db_path),
     eleveldb:close(DBRef),
-    eleveldb:destroy("groups."++integer_to_list(State#state.partition)++".ldb",[]),
-    {ok, DBRef1} = eleveldb:open("groups."++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
+    eleveldb:destroy(DBLoc ++ "/groups/"++integer_to_list(State#state.partition)++".ldb",[]),
+    {ok, DBRef1} = eleveldb:open(DBLoc ++ "/groups/"++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),
     {ok, State#state{dbref=DBRef1, groups=dict:new(), index=[]}}.
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender,
