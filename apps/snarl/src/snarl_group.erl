@@ -12,8 +12,9 @@
 	 revoke/2
         ]).
 
--define(TIMEOUT, 5000).
+-ignore_xref([ping/0]).
 
+-define(TIMEOUT, 5000).
 
 %% Public API
 

@@ -30,6 +30,18 @@
 	 repair/3,
 	 revoke/4]).
 
+-ignore_xref([
+	       start_vnode/1,
+	       list/2,
+	       get/3,
+	       add/3,
+	       delete/3,
+	       grant/4,
+	       repair/3,
+	       revoke/4
+	      ]).
+
+
 -record(state, {partition, groups=[], index=[], dbref, node}).
 
 -define(MASTER, snarl_group_vnode_master).

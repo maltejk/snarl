@@ -24,6 +24,13 @@
          handle_coverage/4,
          handle_exit/3]).
 
+-ignore_xref([
+	      start_vnode/1,
+	      repair/3,
+	      get/3,
+	      add/4
+	     ]).
+
 
 -define(TIMEOUT, 43200000).
 

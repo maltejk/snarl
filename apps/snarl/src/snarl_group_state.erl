@@ -18,6 +18,12 @@
 	 delete/2
 	]).
 
+-ignore_xref([
+	      name/2,
+	      grant/2,
+	      revoke/2
+	     ]).
+
 new() ->
     #group{}.
 

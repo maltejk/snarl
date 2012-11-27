@@ -15,6 +15,21 @@
 	 revoke_group/1,
 	 passwd/1]).
 
+-ignore_xref([
+              join/1,
+              leave/1,
+              remove/1,
+              ringready/1,
+	      add_user/1,
+	      add_group/1,
+	      join_group/1,
+	      leave_group/1,
+	      grant_group/1,
+	      grant_user/1,
+	      revoke_user/1,
+	      revoke_group/1,
+	      passwd/1
+             ]).
 
 add_user([User]) ->
     case snarl_user:add(list_to_binary(User)) of

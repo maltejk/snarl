@@ -32,6 +32,15 @@
 	 get_resource_stat/1
 	]).
 
+-ignore_xref([claim_resource/4,
+	      free_resource/3,
+	      get_resource/2,
+	      grant/2,
+	      join/2,
+	      leave/2,
+	      passwd/2,
+	      revoke/2,
+	      set_resource/3]).
 new() ->
     #user{}.
 
@@ -53,7 +62,7 @@ join(Group, User) ->
 leave(Group, User) ->
     User#user{groups = ordsets:del_element(Group, User#user.groups)}.
 
-set_resource(Resource, Granted, User) -> 
+set_resource(Resource, Granted, User) ->
     R = #resource{
       name = Resource,
       granted = Granted

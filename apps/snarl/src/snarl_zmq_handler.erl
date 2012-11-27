@@ -4,6 +4,8 @@
 
 -export([init/1, message/2]).
 
+-ignore_xref([init/1, message/2]).
+
 init([]) ->
     {ok, stateless}.
 
@@ -19,35 +21,19 @@ message({user, get, {token, Token}}, State) ->
     {ok, User} = snarl_token:get(Token),
     message({user, get, User}, State);
 
+message({user, cache, {token, Token}}, State) ->
+    {ok, User} = snarl_token:get(Token),
+    message({user, cache, User}, State);
+
 message({user, get, User}, State) ->
     {reply,
      snarl_user:get(ensure_binary(User)),
      State};
 
-message({user, cache, {token, Token}}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    message({user, get, User}, State);
-
 message({user, cache, User}, State) ->
-    Res = case snarl_user:get(ensure_binary(User)) of
-	      not_found ->
-		  not_found;
-	      #user{permissions = Permissions,
-		    groups = Groups} ->
-		  {ok,
-		   lists:foldl(fun(Group, Acc) ->
-				     case snarl_group:get(Group) of
-					 {ok, #group{permissions = P }} ->
-					     P ++ Acc;
-					 _ ->
-					     Acc
-				     end
-			       end, Permissions, Groups)}
-	  end,
     {reply,
-     Res,
+     snarl_user:cache(ensure_binary(User)),
      State};
-
 
 message({user, add, User}, State) ->
     {reply,
@@ -60,7 +46,7 @@ message({user, auth, User, Pass}, State) ->
 	      true ->
 		  {ok, Token} = snarl_token:add(UserB),
 		  {ok, {token, Token}};
-	      Other -> 
+	      Other ->
 		  {error, Other}
 	  end,
     {reply,
@@ -69,22 +55,22 @@ message({user, auth, User, Pass}, State) ->
 
 message({user, allowed, {token, Token}, Permission}, State) ->
     {ok, User} = snarl_token:get(Token),
-    {reply, 
+    {reply,
      snarl_user:allowed(User, Permission),
      State};
 
 message({user, allowed, User, Permission}, State) ->
-    {reply, 
+    {reply,
      snarl_user:allowed(ensure_binary(User), Permission),
      State};
 
 message({user, delete, User}, State) ->
-    {reply, 
-     snarl_user:delete(ensure_binary(User)), 
+    {reply,
+     snarl_user:delete(ensure_binary(User)),
      State};
 
 message({user, passwd, User, Pass}, State) ->
-    {reply, 
+    {reply,
      snarl_user:passwd(ensure_binary(User), ensure_binary(Pass)),
      State};
 
@@ -107,8 +93,8 @@ message({user, revoke, User, Permission}, State) ->
 message({user, set_resource, User, Resource, Value}, State) ->
     {reply, snarl_user:set_resource(ensure_binary(User), Resource, Value), State};
 
-message({user, get_resource, User, Resource}, State) ->
-    {reply, snarl_user:get_resource(ensure_binary(User), Resource), State};
+%message({user, get_resource, User, Resource}, State) ->
+%    {reply, snarl_user:get_resource(ensure_binary(User), Resource), State};
 
 message({user, claim_resource, User, Resource, Ammount}, State) ->
     ID = uuid:uuid4(),

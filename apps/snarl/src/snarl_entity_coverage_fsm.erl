@@ -15,6 +15,21 @@
 %% States
 -export([prepare/2, execute/2, waiting/2]).
 
+-ignore_xref([
+              code_change/4,
+              execute/2,
+              handle_event/3,
+              handle_info/3,
+              handle_sync_event/4,
+              init/1,
+              prepare/2,
+              start_link/6,
+              terminate/3,
+              waiting/2,
+              start/3,
+	      start/4
+             ]).
+
 -record(state, {req_id,
                 from,
 		entity,
@@ -48,9 +63,9 @@ start(VNodeInfo, Op, User, Val) ->
       [ReqID, VNodeInfo, Op, self(), User, Val]
      ),
     receive
-	{ReqID, ok} -> 
+	{ReqID, ok} ->
 	    ok;
-        {ReqID, ok, Result} -> 
+        {ReqID, ok, Result} ->
 	    {ok, Result}
     after ?DEFAULT_TIMEOUT ->
 	    {error, timeout}
@@ -119,7 +134,6 @@ execute(timeout, SD0=#state{req_id=ReqId,
 		undefined ->
 		    VNode:Op(Prelist, ReqId, Entity);
 		_ ->
-		    
 		    VNode:Op(Prelist, ReqId, Entity, Val)
 	    end
     end,
@@ -132,7 +146,7 @@ waiting({{undefined,{_Partition, _Node} = IdxNode},
 	SD0=#state{num_r = NumR0, size=Size, from=From, replies=Replies0, r=R}) ->
     NumR = NumR0 + 1,
     Replies1 = case Replies0 of
-		   [] ->		      
+		   [] ->
 		       dict:new();
 		   _ ->
 		       Replies0
@@ -150,7 +164,7 @@ waiting({{undefined,{_Partition, _Node} = IdxNode},
 				      end, [], Replies),
 	    From ! {ReqID, ok, MergedReplies},
 	    {stop, normal, SD};
-        true -> 
+        true ->
 	    {next_state, waiting, SD}
     end.
 
@@ -172,5 +186,5 @@ terminate(_Reason, _SN, _SD) ->
 %%% Internal Functions
 %%%===================================================================
 
-mk_reqid() -> 
+mk_reqid() ->
     erlang:phash2(erlang:now()).

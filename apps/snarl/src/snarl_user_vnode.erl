@@ -36,6 +36,23 @@
 	 free_resource/4
 	]).
 
+-ignore_xref([start_vnode/1,
+	      get/3,
+	      list/2,
+	      add/3,
+	      delete/3,
+	      passwd/4,
+	      join/4,
+	      leave/4,
+	      grant/4,
+	      repair/3,
+	      revoke/4,
+	      set_resource/4,
+	      claim_resource/4,
+	      free_resource/4
+	     ]).
+
+
 -record(state, {partition, users=[], index=[], dbref, node}).
 
 -define(MASTER, snarl_user_vnode_master).
