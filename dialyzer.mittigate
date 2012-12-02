@@ -89,3 +89,5 @@
 ^snarl_group_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_token_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_user_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
+^snarl_zmq_handler.erl:127: Matching of pattern 
+^snarl_zmq_handler.erl:132: Matching of pattern 

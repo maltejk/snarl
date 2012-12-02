@@ -84,7 +84,7 @@ free_resource(Resource, ID, User) ->
     Resources0 = User#user.resources,
     {_, R0, Resources1} = lists:keytake(Resource, 2, Resources0),
     R1 = R0#resource{claims =  lists:keydelete(ID, 2, R0#resource.claims)},
-    User#user{resources =  ordsets:add_element(R1, Resources1)}.    
+    User#user{resources =  ordsets:add_element(R1, Resources1)}. 
 
 add(User, Users) ->
     ordsets:add_element(User, Users).
@@ -107,10 +107,10 @@ get_resource_stat(User) ->
 		       Reserved}
 	      end, User#user.resources).
 
-get_resource(Resource, User) -> 
+get_resource(Resource, User) ->
     lists:keyfind(Resource, 2, User#user.resources).
 
-get_free_resource(Resource, User) -> 
+get_free_resource(Resource, User) ->
     R = lists:keyfind(Resource, 2, User#user.resources),
     Used = lists:foldl(fun(#resource_claim{ammount=In}, Acc) ->
 			       Acc + In

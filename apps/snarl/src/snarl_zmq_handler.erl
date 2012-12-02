@@ -13,6 +13,8 @@ init([]) ->
 %%% User Functions
 %%%===================================================================
 
+-spec message(fifo:smarl_message(), term()) -> any().
+
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
@@ -114,19 +116,21 @@ message({group, list}, State) ->
     {reply, snarl_group:list(), State};
 
 message({group, get, Group}, State) ->
-    {reply, snarl_group:get(ensure_binary(Group)), State};
+    {reply, snarl_group:get(Group), State};
 
 message({group, add, Group}, State) ->
-    {reply, snarl_group:add(ensure_binary(Group)), State};
+    {reply, snarl_group:add(Group), State};
 
 message({group, delete, Group}, State) ->
-    {reply, snarl_group:delete(ensure_binary(Group)), State};
+    {reply, snarl_group:delete(Group), State};
 
-message({group, grant, Group, Permission}, State) ->
-    {reply, snarl_group:grant(ensure_binary(Group), Permission), State};
+message({group, grant, Group, Permission}, State) when
+      is_binary(Group),
+      is_list(Permission)->
+    {reply, snarl_group:grant(Group, Permission), State};
 
 message({group, revoke, Group, Permission}, State) ->
-    {reply, snarl_group:revoke(ensure_binary(Group), Permission), State};
+    {reply, snarl_group:revoke(Group, Permission), State};
 
 message(Message, State) ->
     io:format("Unsuppored 0MQ message: ~p", [Message]),
