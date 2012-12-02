@@ -8,35 +8,27 @@
 -define(DEFAULT_TIMEOUT, 10000).
 
 
--record(resource_claim, {id :: binary(),
+-record(resource_claim, {id :: fifo:uuid(),
 			 ammount :: number()}).
 
 
--record(resource, {name :: binary(),
+-record(resource, {name :: fifo:resource_id(),
 		   granted = 0:: number(),
-		   claims = [] :: [resource_claim()],
-		   reservations = [] :: [reservation()]}).
+		   claims = [] :: [fifo:resource_claim()],
+		   reservations = [] :: [fifo:reservation()]}).
 
--record(user, {name :: binary(),
+-record(user, {name :: fifo:user_id(),
 	       passwd :: binary(),
-	       permissions = [] :: [permission()],
-	       resources = [] :: [resource()],
-	       groups = [] :: [binary()]}).
+	       permissions = [] :: [fifo:permission()],
+	       resources = [] :: [fifo:resource()],
+	       groups = [] :: [fifo:group_id()]}).
 
--record(group, {name :: binary(),
-		permissions = [] :: [permission()],
-		users = [] :: [binary()]}).
+-record(group, {name :: fifo:group_id(),
+		permissions = [] :: [fifo:permission()],
+		users = [] :: [fifo:user_id()]}).
 
 -record(snarl_obj, {val    :: val(),
 		    vclock :: vclock:vclock()}).
-
--type reservation() :: {resource_claim(), integer()}.
-
--type resource() :: #resource{}.
-
--type permission() :: [binary() | atom()].
-
--type resource_claim() :: #resource_claim{}.
 
 -type val() ::  statebox:statebox().
 
