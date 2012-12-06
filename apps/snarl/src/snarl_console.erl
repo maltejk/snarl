@@ -98,7 +98,7 @@ grant_user([User | P ]) ->
 	    io:format("Granted.~n", []),
 	    ok;
 	not_found ->
-	    io:format("Group '~s' not found.~n", [User]),
+	    io:format("User '~s' not found.~n", [User]),
 	    error
     end.
 
@@ -108,7 +108,7 @@ revoke_user([User | P ]) ->
 	    io:format("Granted.~n", []),
 	    ok;
 	not_found ->
-	    io:format("Group '~s' not found.~n", [User]),
+	    io:format("User '~s' not found.~n", [User]),
 	    error
     end.
 
