@@ -28,11 +28,12 @@ case $2 in
 	chown -R snarl:snarl /var/log/snarl
 	;;
     POST-INSTALL)
-	if svcs svc:/network/snarl:default1 > /dev/null 2&>1
+	if svcs svc:/network/snarl:default > /dev/null 2&>1
+	then
+	    echo Service already existings ...
+	else
 	    echo Importing service ...
 	    svccfg import /opt/local/snarl/etc/snarl.xml
-	else
-	    echo Service already existings ...
 	fi
 
 	echo Trying to guess configuration ...
