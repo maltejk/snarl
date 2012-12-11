@@ -28,8 +28,13 @@ case $2 in
 	chown -R snarl:snarl /var/log/snarl
 	;;
     POST-INSTALL)
-	echo Importing service ...
-	svccfg import /opt/local/snarl/etc/snarl.xml
+	if svcs svc:/network/snarl:default1 > /dev/null 2&>1
+	    echo Importing service ...
+	    svccfg import /opt/local/snarl/etc/snarl.xml
+	else
+	    echo Service already existings ...
+	fi
+
 	echo Trying to guess configuration ...
 	IP=`ifconfig net0 | grep inet | awk -e '{print $2}'`
 	if [ ! -f /opt/local/snarl/etc/vm.args ]
