@@ -67,7 +67,7 @@ start_vnode(I) ->
 
 repair(IdxNode, User, Obj) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, undefined, User, Obj},
+                                   {repair, User, Obj},
                                    ignore,
                                    ?MASTER).
 
@@ -161,7 +161,7 @@ free_resource(Preflist, ReqID, User, [Resource, ID]) ->
 %%% VNode
 %%%===================================================================
 init([Partition]) ->
-    {ok, DBLoc} = application:get_env(snarl, db_path),
+    {ok, DBLoc} = application:get_env(snarl, db_dir),
     {ok, DBRef} = eleveldb:open(DBLoc ++ "/users/"++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     {Index, Users} = read_users(DBRef),
     {ok, #state {
@@ -175,7 +175,7 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, undefined, User, Obj}, _Sender, #state{users=Users0}=State) ->
+handle_command({repair, User, Obj}, _Sender, #state{users=Users0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
     Users1 = dict:store(User, Obj, Users0),
     {noreply, State#state{users=Users1}};
@@ -270,7 +270,7 @@ is_empty(State) ->
     end.
 
 delete(#state{dbref=DBRef} = State) ->
-    {ok, DBLoc} = application:get_env(snarl, db_path),
+    {ok, DBLoc} = application:get_env(snarl, db_dir),
     eleveldb:close(DBRef),
     eleveldb:destroy(DBLoc ++ "/users/"++integer_to_list(State#state.partition)++".ldb",[]),
     {ok, DBRef1} = eleveldb:open(DBLoc ++ "/users/"++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),

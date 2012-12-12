@@ -56,7 +56,7 @@ start_vnode(I) ->
 
 repair(IdxNode, Group, Obj) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, undefined, Group, Obj},
+                                   {repair, Group, Obj},
                                    ignore,
                                    ?MASTER).
 
@@ -111,7 +111,7 @@ revoke(Preflist, ReqID, Group, Val) ->
 %%% VNode
 %%%===================================================================
 init([Partition]) ->
-    {ok, DBLoc} = application:get_env(snarl, db_path),
+    {ok, DBLoc} = application:get_env(snarl, db_dir),
     {ok, DBRef} = eleveldb:open(DBLoc ++ "/groups/"++integer_to_list(Partition)++".ldb", [{create_if_missing, true}]),
     {Index, Groups} = read_groups(DBRef),
     {ok, #state {
@@ -125,7 +125,7 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, undefined, Group, Obj}, _Sender, #state{groups=Groups0}=State) ->
+handle_command({repair, Group, Obj}, _Sender, #state{groups=Groups0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
     Groups1 = dict:store(Group, Obj, Groups0),
     {noreply, State#state{groups=Groups1}};
@@ -206,7 +206,7 @@ is_empty(State) ->
     end.
 
 delete(#state{dbref=DBRef} = State) ->
-    {ok, DBLoc} = application:get_env(snarl, db_path),
+    {ok, DBLoc} = application:get_env(snarl, db_dir),
     eleveldb:close(DBRef),
     eleveldb:destroy(DBLoc ++ "/groups/"++integer_to_list(State#state.partition)++".ldb",[]),
     {ok, DBRef1} = eleveldb:open(DBLoc ++ "/groups/"++integer_to_list(State#state.partition)++".ldb", [{create_if_missing, true}]),

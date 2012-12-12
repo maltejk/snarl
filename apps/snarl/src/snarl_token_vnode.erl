@@ -60,7 +60,7 @@ start_vnode(I) ->
 
 repair(IdxNode, Token, Obj) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, undefined, Token, Obj},
+                                   {repair, Token, Obj},
                                    ignore,
                                    ?MASTER).
 
@@ -105,12 +105,17 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
+handle_command({repair, Group, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
+    lager:warning("repair performed ~p~n", [Obj]),
+    Tokens1 = dict:store(Group, Obj, Tokens0),
+    {noreply, State#state{tokens=Tokens1}};
+
 handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) ->
     ?PRINT({handle_command, get, ReqID, Token}),
     NodeIdx = {State#state.partition, State#state.node},
     {Tokens1, Res} = case dict:find(Token, Tokens0) of
 			 error ->
-			     {Tokens0, 
+			     {Tokens0,
 			      {ok, ReqID, NodeIdx, not_found}};
 			 {ok, {_, V}} ->
 			     {dict:update(Token, fun({_, User}) ->
