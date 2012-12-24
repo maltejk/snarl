@@ -1,0 +1,4 @@
+Project FiFo's Snarl is a Authentication Authorisation and accounting server.
+It provides RBAC like fine grained access controll over a TCP based itnerface.
+
+http://project-fifo.net/display/PF/Snarl

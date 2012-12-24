@@ -1,0 +1,18 @@
+{application, snarl,
+ [
+  {description, ""},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib,
+		  backyard,
+		  lager,
+		  redo,
+		  statsderl,
+		  vmstats,
+		  uuid
+                 ]},
+  {mod, { snarl_app, []}},
+  {env, []}
+ ]}.
