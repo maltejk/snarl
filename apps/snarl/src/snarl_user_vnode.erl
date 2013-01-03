@@ -305,8 +305,13 @@ read_users(DBRef) ->
             Index = binary_to_term(Bin),
             {Index,
              lists:foldl(fun (User, Users0) ->
-                                 {ok, GrBin} = eleveldb:get(DBRef, User, []),
-                                 dict:store(User, snarl_user_state:load(binary_to_term(GrBin)), Users0)
+                                 {ok, UserBin} = eleveldb:get(DBRef, User, []),
+                                 O = binary_to_term(UserBin),
+                                 #snarl_obj{val=User0} = O,
+                                 User1 = statebox:modify({fun snarl_user_state:load/1, []}, User0),
+                                 User2 = statebox:expire(?STATEBOX_EXPIRE, User1),
+                                 UserObj = snarl_obj:update(User2, snarl_user_vnode, O),
+                                 dict:store(User, UserObj, Users0)
                          end, dict:new(), Index)}
     end.
 
@@ -322,7 +327,7 @@ change_user_callback(User, Action, Vals, Coordinator, Users, DBRef) ->
     Users1.
 
 update_user(Coordinator, Vals, Action) ->
-    fun (#snarl_obj{val=User0}=O) ->
+    fun () ->
             User1 = statebox:modify({fun snarl_user_state:Action/2, Vals}, User0),
             User2 = statebox:expire(?STATEBOX_EXPIRE, User1),
             snarl_obj:update(User2, Coordinator, O)
