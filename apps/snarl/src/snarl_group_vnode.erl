@@ -19,27 +19,27 @@
          handle_coverage/4,
          handle_exit/3]).
 
-% Reads
+                                                % Reads
 -export([list/2,
-	 get/3]).
+         get/3]).
 
-% Writes
+                                                % Writes
 -export([add/3,
-	 delete/3,
-	 grant/4,
-	 repair/3,
-	 revoke/4]).
+         delete/3,
+         grant/4,
+         repair/3,
+         revoke/4]).
 
 -ignore_xref([
-	       start_vnode/1,
-	       list/2,
-	       get/3,
-	       add/3,
-	       delete/3,
-	       grant/4,
-	       repair/3,
-	       revoke/4
-	      ]).
+              start_vnode/1,
+              list/2,
+              get/3,
+              add/3,
+              delete/3,
+              grant/4,
+              repair/3,
+              revoke/4
+             ]).
 
 
 -record(state, {partition, groups=[], index=[], dbref, node}).
@@ -66,9 +66,9 @@ repair(IdxNode, Group, Obj) ->
 
 get(Preflist, ReqID, Group) ->
     riak_core_vnode_master:command(Preflist,
-				   {get, ReqID, Group},
-				   {fsm, undefined, self()},
-				   ?MASTER).
+                                   {get, ReqID, Group},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 list(Preflist, ReqID) ->
     riak_core_vnode_master:coverage(
@@ -85,26 +85,26 @@ list(Preflist, ReqID) ->
 
 add(Preflist, ReqID, Group) ->
     riak_core_vnode_master:command(Preflist,
-				   {add, ReqID, Group},
-				   {fsm, undefined, self()},
-				   ?MASTER).
+                                   {add, ReqID, Group},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 delete(Preflist, ReqID, Group) ->
     riak_core_vnode_master:command(Preflist,
                                    {delete, ReqID, Group},
-				   {fsm, undefined, self()},
+                                   {fsm, undefined, self()},
                                    ?MASTER).
 
 grant(Preflist, ReqID, Group, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {grant, ReqID, Group, Val},
-				   {fsm, undefined, self()},
+                                   {fsm, undefined, self()},
                                    ?MASTER).
 
 revoke(Preflist, ReqID, Group, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {revoke, ReqID, Group, Val},
-				   {fsm, undefined, self()},
+                                   {fsm, undefined, self()},
                                    ?MASTER).
 
 %%%===================================================================
@@ -132,7 +132,7 @@ handle_command({repair, Group, Obj}, _Sender, #state{groups=Groups0}=State) ->
 
 
 handle_command({add, {ReqID, Coordinator}, Group}, _Sender,
-	       #state{groups=Groups,  dbref=DBRef, index=Index0} = State) ->
+               #state{groups=Groups,  dbref=DBRef, index=Index0} = State) ->
     Group0 = statebox:new(fun snarl_group_state:new/0),
     Group1 = statebox:modify({snarl_group_state, name, [Group]}, Group0),
     Index1 = snarl_group_state:add(Group, Index0),
@@ -144,7 +144,7 @@ handle_command({add, {ReqID, Coordinator}, Group}, _Sender,
     {reply, {ok, ReqID}, State#state{groups=Groups1, index = Index1}};
 
 handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender,
-	       #state{groups=Groups, dbref=DBRef, index=Index0} = State) ->
+               #state{groups=Groups, dbref=DBRef, index=Index0} = State) ->
     Groups1 = dict:erase(Group, Groups),
     Index1 = snarl_group_state:delete(Group, Index0),
     eleveldb:put(DBRef, <<"#groups">>, term_to_binary(Index1), []),
@@ -153,15 +153,15 @@ handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender,
 
 handle_command({get, ReqID, Group}, _Sender, #state{groups=Groups, partition=Partition, node=Node} = State) ->
     Res = case dict:find(Group, Groups) of
-	      error ->
-		  {ok, ReqID, {Partition,Node}, not_found};
-	      {ok, V} ->
-		  {ok, ReqID, {Partition,Node}, V}
-	  end,
+              error ->
+                  {ok, ReqID, {Partition,Node}, not_found};
+              {ok, V} ->
+                  {ok, ReqID, {Partition,Node}, V}
+          end,
     {reply, Res, State};
 
 handle_command({Action, {ReqID, Coordinator}, Group, Passwd}, _Sender,
-	       #state{groups=Groups, dbref=DBRef} = State) ->
+               #state{groups=Groups, dbref=DBRef} = State) ->
     Groups1 = change_group_callback(Group, Action, Passwd, Coordinator, Groups, DBRef),
     {reply, {ok, ReqID}, State#state{groups=Groups1}};
 
@@ -199,10 +199,10 @@ encode_handoff_item(Group, Data) ->
 
 is_empty(State) ->
     case dict:size(State#state.groups) of
-	0 ->
-	    {true, State};
-	_ ->
-	    {true, State}
+        0 ->
+            {true, State};
+        _ ->
+            {true, State}
     end.
 
 delete(#state{dbref=DBRef} = State) ->
@@ -213,7 +213,7 @@ delete(#state{dbref=DBRef} = State) ->
     {ok, State#state{dbref=DBRef1, groups=dict:new(), index=[]}}.
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender,
-		#state{index=Index, partition=Partition, node=Node} = State) ->
+                #state{index=Index, partition=Partition, node=Node} = State) ->
     ?PRINT({handle_coverage, {list, ReqID}}),
     Res = {ok, ReqID, {Partition,Node}, Index},
     {reply, Res, State};
@@ -235,15 +235,20 @@ terminate(_Reason, #state{dbref=DBRef} = _State) ->
 
 read_groups(DBRef) ->
     case eleveldb:get(DBRef, <<"#groups">>, []) of
-	not_found ->
-	    {[], dict:new()};
-	{ok, Bin} ->
-	    Index = binary_to_term(Bin),
-	    {Index,
-	     lists:foldl(fun (Group, Groups0) ->
-				 {ok, GrBin} = eleveldb:get(DBRef, Group, []),
-				 dict:store(Group, snarl_group_state:load(binary_to_term(GrBin)), Groups0)
-			 end, dict:new(), Index)}
+        not_found ->
+            {[], dict:new()};
+        {ok, Bin} ->
+            Index = binary_to_term(Bin),
+            {Index,
+             lists:foldl(fun (Group, Groups0) ->
+                                 {ok, GrBin} = eleveldb:get(DBRef, Group, []),
+                                 O = binary_to_term(GrBin),
+                                 #snarl_obj{val=Group0} = O,
+                                 Group1 = statebox:modify({fun snarl_group_state:load/1, []}, Group0),
+                                 Group2 = statebox:expire(?STATEBOX_EXPIRE, Group1),
+                                 GroupObj = snarl_obj:update(Group2, snarl_group_vnode, O),
+                                 dict:store(Group, GroupObj, Groups0)
+                         end, dict:new(), Index)}
     end.
 
 add_group(Group, GroupData, Groups, DBRef) ->
@@ -259,7 +264,7 @@ change_group_callback(Group, Action, Val, Coordinator, Groups, DBRef) ->
 
 update_group(Coordinator, Val, Action) ->
     fun (#snarl_obj{val=Group0}=O) ->
-	    Group1 = statebox:modify({snarl_group_state, Action, [Val]}, Group0),
-	    Group2 = statebox:expire(?STATEBOX_EXPIRE, Group1),
-	    snarl_obj:update(Group2, Coordinator, O)
+            Group1 = statebox:modify({snarl_group_state, Action, [Val]}, Group0),
+            Group2 = statebox:expire(?STATEBOX_EXPIRE, Group1),
+            snarl_obj:update(Group2, Coordinator, O)
     end.
