@@ -242,7 +242,7 @@ read_groups(DBRef) ->
 	    {Index,
 	     lists:foldl(fun (Group, Groups0) ->
 				 {ok, GrBin} = eleveldb:get(DBRef, Group, []),
-				 dict:store(Group, binary_to_term(GrBin), Groups0)
+				 dict:store(Group, snarl_group_state:load(binary_to_term(GrBin)), Groups0)
 			 end, dict:new(), Index)}
     end.
 
