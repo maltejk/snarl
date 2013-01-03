@@ -327,7 +327,7 @@ change_user_callback(User, Action, Vals, Coordinator, Users, DBRef) ->
     Users1.
 
 update_user(Coordinator, Vals, Action) ->
-    fun () ->
+    fun (#snarl_obj{val=User0} = O) ->
             User1 = statebox:modify({fun snarl_user_state:Action/2, Vals}, User0),
             User2 = statebox:expire(?STATEBOX_EXPIRE, User1),
             snarl_obj:update(User2, Coordinator, O)
