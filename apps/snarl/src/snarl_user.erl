@@ -70,7 +70,7 @@ cache(User) ->
                    fun(Group, Permissions) ->
                            case snarl_group:get(Group) of
                                {ok, GroupObj} ->
-                                   {ok, GrPerms} = jsxd:get(<<"permissions">>, GroupObj),
+                                   {ok, GrPerms} = jsxd:get(<<"permissions">>, [], GroupObj),
                                    ordsets:union(Permissions, GrPerms);
                                _ ->
                                    Permissions

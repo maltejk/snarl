@@ -108,9 +108,9 @@ free_resource(Resource, ID, User) ->
 get_resource_stat(User) ->
     jsxd:map(fun(_ID, Res) ->
                      {ok, Granted} = jsxd:get(<<"granted">>, Res),
-                     Used = jsxd:reduce(fun(_, Ammount, Sum) ->
-                                                Ammount + Sum
-                                        end, 0, jsxd:get(<<"claims">>, [], Res)),
+                     Used = jsxd:fold(fun(_, Ammount, Sum) ->
+                                              Ammount + Sum
+                                      end, 0, jsxd:get(<<"claims">>, [], Res)),
                      [{<<"granted">>, Granted},
                       {<<"used">>, Used}]
              end, jsxd:get(<<"resources">>, [], User)).
@@ -121,9 +121,9 @@ get_resource(Resource, User) ->
 
 get_free_resource(Resource, User) ->
     {ok, Granted} = jsxd:get([<<"resources">>, Resource, <<"granted">>], User),
-    Used = jsxd:reduce(fun(_, Ammount, Sum) ->
-                               Ammount + Sum
-                       end, 0, jsxd:get([<<"resources">>, Resource, <<"claims">>], [], User)),
+    Used = jsxd:fold(fun(_, Ammount, Sum) ->
+                             Ammount + Sum
+                     end, 0, jsxd:get([<<"resources">>, Resource, <<"claims">>], [], User)),
     Granted - Used.
 
 -ifdef(TEST).
