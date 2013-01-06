@@ -80,7 +80,6 @@ cache(User) ->
                    jsxd:get(<<"groups">>, [], UserObj))}
     end.
 
-
 get(User) ->
     snarl_entity_read_fsm:start(
       {snarl_user_vnode, snarl_user},
