@@ -10,31 +10,46 @@
 -include("snarl.hrl").
 
 -export([
-	 new/0,
-	 name/2,
-	 grant/2,
-	 revoke/2,
-	 add/2,
-	 delete/2
-	]).
+         load/1,
+         new/0,
+         name/2,
+         grant/2,
+         revoke/2,
+         add/2,
+         delete/2
+        ]).
 
 -ignore_xref([
-	      name/2,
-	      grant/2,
-	      revoke/2
-	     ]).
+              name/2,
+              grant/2,
+              revoke/2
+             ]).
+
+
+load(#group{} = Group) ->
+    Group0 = jsxd:set(<<"version">>, <<"0.1.0">>, jsxd:new()),
+    jsxd:set(<<"permissions">>, Group#group.permissions, Group0);
+
+load(User) ->
+    User.
 
 new() ->
-    #group{}.
+    jsxd:new().
 
 name(Name, Group) ->
-    Group#group{name = Name}.
+    jsxd:set(<<"name">>, Name, Group).
 
 grant(Permission, Group) ->
-    Group#group{permissions = ordsets:add_element(Permission, Group#group.permissions)}.
+    jsxd:update(<<"permissions">>,
+                fun (Ps) ->
+                        ordsets:add_element(Permission, Ps)
+                end, [Permission], Group).
 
 revoke(Permission, Group) ->
-    Group#group{permissions = ordsets:del_element(Permission, Group#group.permissions)}.
+    jsxd:update(<<"permissions">>,
+                fun (Ps) ->
+                        ordsets:del_element(Permission, Ps)
+                end, [Permission], Group).
 
 add(Group, Groups) ->
     ordsets:add_element(Group, Groups).
