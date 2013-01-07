@@ -231,10 +231,10 @@ resource_stat_test() ->
     ?assertEqual([{<<"cookies">>,
                    [{<<"granted">>,10},{<<"used">>,2}]}],
                  get_resource_stat(User6)),
-    ?assertEqual([{<<"cookies">>,
-                   [{<<"granted">>,10},{<<"used">>,2}]},
-                  {<<"cake">>,
-                   [{<<"granted">>,5},{<<"used">>,1}]}],
+    ?assertEqual([{<<"cake">>,
+                   [{<<"granted">>,5},{<<"used">>,1}]},
+                  {<<"cookies">>,
+                   [{<<"granted">>,10},{<<"used">>,2}]}],
                  get_resource_stat(User8)).
 
 resource_claim_test() ->
