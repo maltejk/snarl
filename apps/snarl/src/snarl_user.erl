@@ -8,22 +8,22 @@
 
 -export([
          ping/0,
-	 list/0,
-	 auth/2,
-	 get/1,
-	 add/1,
-	 delete/1,
-	 passwd/2,
-	 join/2,
-	 leave/2,
-	 grant/2,
-	 revoke/2,
-	 allowed/2,
-	 set_resource/3,
-	 claim_resource/4,
-	 free_resource/3,
-	 get_resource_stat/1,
-	 cache/1
+         list/0,
+         auth/2,
+         get/1,
+         add/1,
+         delete/1,
+         passwd/2,
+         join/2,
+         leave/2,
+         grant/2,
+         revoke/2,
+         allowed/2,
+         set_resource/3,
+         claim_resource/4,
+         free_resource/3,
+         get_resource_stat/1,
+         cache/1
         ]).
 
 -ignore_xref([ping/0]).
@@ -41,45 +41,44 @@ ping() ->
 
 auth(User, Passwd) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, UserObj} ->
-	    CurrentHash = UserObj#user.passwd,
-	    case crypto:sha([User, Passwd]) of
-		CurrentHash ->
-		    true;
-		_ ->
-		    false
-	    end
-	end.
+        {ok, not_found} ->
+            not_found;
+        {ok, UserObj} ->
+            {ok, CurrentHash} = jsxd:get(<<"password">>, UserObj),
+            case crypto:sha([User, Passwd]) of
+                CurrentHash ->
+                    true;
+                _ ->
+                    false
+            end
+    end.
 
 allowed(User, Permission) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, UserObj} ->
-	    test_user(UserObj, Permission)
+        {ok, not_found} ->
+            not_found;
+        {ok, UserObj} ->
+            test_user(UserObj, Permission)
     end.
 
 cache(User) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, UserObj} ->
-	    {ok, lists:foldl(
-		   fun(Group, Permissions) ->
-			   case snarl_group:get(Group) of
-			       {ok, GroupObj} ->
-				   ordsets:union(Permissions,
-						 GroupObj#group.permissions);
-			       _ ->
-				   Permissions
-			   end
-		   end,
-		   ordsets:from_list(UserObj#user.permissions),
-		   UserObj#user.groups)}
+        {ok, not_found} ->
+            not_found;
+        {ok, UserObj} ->
+            {ok, lists:foldl(
+                   fun(Group, Permissions) ->
+                           case snarl_group:get(Group) of
+                               {ok, GroupObj} ->
+                                   {ok, GrPerms} = jsxd:get(<<"permissions">>, [], GroupObj),
+                                   ordsets:union(Permissions, GrPerms);
+                               _ ->
+                                   Permissions
+                           end
+                   end,
+                   jsxd:get(<<"permissions">>, [], UserObj),
+                   jsxd:get(<<"groups">>, [], UserObj))}
     end.
-
 
 get(User) ->
     snarl_entity_read_fsm:start(
@@ -95,10 +94,10 @@ list() ->
 
 add(User) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    do_write(User, add);
-	{ok, _UserObj} ->
-	    duplicate
+        {ok, not_found} ->
+            do_write(User, add);
+        {ok, _UserObj} ->
+            duplicate
     end.
 
 passwd(User, Passwd) ->
@@ -128,15 +127,15 @@ set_resource(User, Resource, Value) ->
 
 claim_resource(User, ID, Resource, Ammount) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, UserObj} ->
-	    case snarl_user_state:get_free_resource(UserObj, Resource) of
-		Free when Free >= Ammount ->
-		    do_write(User, claim_resource, [Resource, ID, Ammount]);
-		_ ->
-		    limit_reached
-	    end
+        {ok, not_found} ->
+            not_found;
+        {ok, UserObj} ->
+            case snarl_user_state:get_free_resource(UserObj, Resource) of
+                Free when Free >= Ammount ->
+                    do_write(User, claim_resource, [Resource, ID, Ammount]);
+                _ ->
+                    limit_reached
+            end
     end.
 
 free_resource(User, Resource, ID) ->
@@ -144,10 +143,10 @@ free_resource(User, Resource, ID) ->
 
 get_resource_stat(User) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, UserObj} ->
-	    snarl_user_state:get_resource_stat(UserObj)
+        {ok, not_found} ->
+            not_found;
+        {ok, UserObj} ->
+            snarl_user_state:get_resource_stat(UserObj)
     end.
 
 %%%===================================================================
@@ -157,18 +156,18 @@ get_resource_stat(User) ->
 
 do_update(User, Op) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, _UserObj} ->
-	    do_write(User, Op)
+        {ok, not_found} ->
+            not_found;
+        {ok, _UserObj} ->
+            do_write(User, Op)
     end.
 
 do_update(User, Op, Val) ->
     case snarl_user:get(User) of
-	{ok, not_found} ->
-	    not_found;
-	{ok, _UserObj} ->
-	    do_write(User, Op, Val)
+        {ok, not_found} ->
+            not_found;
+        {ok, _UserObj} ->
+            do_write(User, Op, Val)
     end.
 
 do_write(User, Op) ->
@@ -182,22 +181,21 @@ test_groups(_Permission, []) ->
 
 test_groups(Permission, [Group|Groups]) ->
     case snarl_group:get(Group) of
-	{ok, GroupObj} ->
-	    case libsnarlmatch:test_perms(Permission, GroupObj#group.permissions) of
-		true ->
-		    true;
-		false ->
-		    test_groups(Permission, Groups)
-	    end;
-	_ ->
-	    test_groups(Permission, Groups)
+        {ok, GroupObj} ->
+            case libsnarlmatch:test_perms(Permission, jsxd:get(<<"permissions">>, [], GroupObj)) of
+                true ->
+                    true;
+                false ->
+                    test_groups(Permission, Groups)
+            end;
+        _ ->
+            test_groups(Permission, Groups)
     end.
 
 test_user(UserObj, Permission) ->
-    case libsnarlmatch:test_perms(Permission, UserObj#user.permissions) of
-	true ->
-	    true;
-	false ->
-	    test_groups(Permission, UserObj#user.groups)
+    case libsnarlmatch:test_perms(Permission, jsxd:get(<<"permissions">>, [], UserObj)) of
+        true ->
+            true;
+        false ->
+            test_groups(Permission,jsxd:get(<<"groups">>, [], UserObj))
     end.
-

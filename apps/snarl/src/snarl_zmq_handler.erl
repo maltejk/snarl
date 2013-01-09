@@ -2,6 +2,8 @@
 
 -include("snarl.hrl").
 
+-include("snarl_version.hrl").
+
 -export([init/1, message/2]).
 
 -ignore_xref([init/1, message/2]).
@@ -15,9 +17,11 @@ init([]) ->
 
 -spec message(fifo:smarl_message(), term()) -> any().
 
+message(version, State) ->
+    {reply, ?VERSION, State};
+
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
-
 
 message({user, get, {token, Token}}, State) ->
     {ok, User} = snarl_token:get(Token),
