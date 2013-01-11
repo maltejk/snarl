@@ -296,7 +296,7 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
                                 end
                         end, false),
     {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, Res},
+     {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
      State};
 
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
@@ -311,7 +311,7 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
                                 end
                         end, not_found),
     {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, Res},
+     {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
      State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
