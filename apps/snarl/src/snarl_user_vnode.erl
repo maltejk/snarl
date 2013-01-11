@@ -287,7 +287,8 @@ delete(State) ->
 handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.partition,
                         <<"user">>,
-                        fun (_K, V, Res) ->
+                        fun (_K, #snarl_obj{val=SB}, Res) ->
+                                V = statebox:value(SB),
                                 case jsxd:get(<<"password">>, V) of
                                     {ok, Hash} ->
                                         true;
@@ -302,7 +303,8 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.partition,
                         <<"user">>,
-                        fun (_U, V, Res) ->
+                        fun (_U, #snarl_obj{val=SB}, Res) ->
+                                V = statebox:value(SB),
                                 case jsxd:get(<<"name">>, V) of
                                     {ok, Name} ->
                                         V;
