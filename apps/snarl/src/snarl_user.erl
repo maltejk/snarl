@@ -42,16 +42,26 @@ ping() ->
 
 auth(User, Passwd) ->
     Hash = crypto:sha([User, Passwd]),
-    snarl_entity_coverage_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      auth, Hash
-     ).
+    {ok, Res} = snarl_entity_coverage_fsm:start(
+                  {snarl_user_vnode, snarl_user},
+                  auth, Hash
+                 ),
+    Res1 = lists:foldl(fun (X, Acc) ->
+                               Acc orelse X
+                       end, false, Res),
+    {ok, Res1}.
 
 lookup(User) ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      lookup, User
-     ).
+    Res = snarl_entity_coverage_fsm:start(
+            {snarl_user_vnode, snarl_user},
+            lookup, User
+           ),
+    Res1 = lists:foldl(fun (not_found, Acc) ->
+                               Acc;
+                           (R, _) ->
+                               R
+                       end, not_found, Res),
+    {ok, Res1}.
 
 allowed(User, Permission) ->
     case snarl_user:get(User) of
