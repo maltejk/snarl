@@ -11,6 +11,7 @@
          list/0,
          auth/2,
          get/1,
+         lookup/1,
          add/1,
          delete/1,
          passwd/2,
@@ -44,6 +45,12 @@ auth(User, Passwd) ->
     snarl_entity_coverage_fsm:start(
       {snarl_user_vnode, snarl_user},
       auth, Hash
+     ).
+
+lookup(User) ->
+    snarl_entity_coverage_fsm:start(
+      {snarl_user_vnode, snarl_user},
+      lookup, User
      ).
 
 allowed(User, Permission) ->

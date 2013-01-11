@@ -36,6 +36,11 @@ message({user, get, User}, State) ->
      snarl_user:get(ensure_binary(User)),
      State};
 
+message({user, lookup, User}, State) when is_binary(User) ->
+    {reply,
+     snarl_user:lookup(User),
+     State};
+
 message({user, cache, User}, State) ->
     {reply,
      snarl_user:cache(ensure_binary(User)),
