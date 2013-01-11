@@ -52,7 +52,7 @@ auth(User, Passwd) ->
     {ok, Res1}.
 
 lookup(User) ->
-    Res = snarl_entity_coverage_fsm:start(
+    {ok, Res} = snarl_entity_coverage_fsm:start(
             {snarl_user_vnode, snarl_user},
             lookup, User
            ),
