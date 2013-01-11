@@ -193,10 +193,10 @@ handle_command({get, ReqID, User}, _Sender, State) ->
 handle_command({add, {ReqID, Coordinator}, UUID, User}, _Sender, State) ->
     User0 = statebox:new(fun snarl_user_state:new/0),
     User1 = statebox:modify({fun snarl_user_state:name/2, [User]}, User0),
-    User1 = statebox:modify({fun snarl_user_state:uuid/2, [UUID]}, User0),
+    User2 = statebox:modify({fun snarl_user_state:uuid/2, [UUID]}, User1),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    UserObj = #snarl_obj{val=User1, vclock=VC},
+    UserObj = #snarl_obj{val=User2, vclock=VC},
     snarl_db:put(State#state.partition, <<"user">>, UUID, UserObj),
     {reply, {ok, ReqID}, State};
 
