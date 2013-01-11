@@ -20,6 +20,8 @@
 
 %% Reads
 -export([list/2,
+         lookup/3,
+         auth/3,
          get/3]).
 
 %% Writes
@@ -37,6 +39,8 @@
         ]).
 
 -ignore_xref([start_vnode/1,
+              lookup/3,
+              auth/3,
               get/3,
               list/2,
               add/4,
@@ -89,6 +93,21 @@ list(Preflist, ReqID) ->
       {fsm, undefined, self()},
       ?MASTER).
 
+auth(Preflist, ReqID, Hash) ->
+    riak_core_vnode_master:coverage(
+      {auth, ReqID, Hash},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
+lookup(Preflist, ReqID, Name) ->
+    riak_core_vnode_master:coverage(
+      {lookup, ReqID, Name},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
 
 %%%===================================================================
 %%% API - writes
@@ -276,6 +295,21 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
                                         Res
                                 end
                         end, false),
+    {reply,
+     {ok, ReqID, {State#state.partition,State#state.node}, Res},
+     State};
+
+handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
+    Res = snarl_db:fold(State#state.partition,
+                        <<"user">>,
+                        fun (_U, V, Res) ->
+                                case jsxd:get(<<"name">>, V) of
+                                    {ok, Name} ->
+                                        V;
+                                    _ ->
+                                        Res
+                                end
+                        end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, Res},
      State};
