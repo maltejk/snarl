@@ -23,6 +23,7 @@
          revoke/2,
          join/2,
          leave/2,
+         uuid/2,
          set_resource/3,
          get_resource/2,
          claim_resource/4,
@@ -38,6 +39,7 @@
               set_resource/3,
               grant/2,
               join/2,
+              uuid/2,
               leave/2,
               passwd/2,
               revoke/2
@@ -51,6 +53,9 @@ new() ->
 
 name(Name, User) ->
     jsxd:set(<<"name">>, Name, User).
+
+uuid(Name, UUID) ->
+    jsxd:set(<<"uuid">>, Name, UUID).
 
 passwd(Passwd, User) ->
     {ok, Name} = jsxd:get(<<"name">>, User),

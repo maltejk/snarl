@@ -23,7 +23,7 @@
          get/3]).
 
 %% Writes
--export([add/3,
+-export([add/4,
          delete/3,
          passwd/4,
          join/4,
@@ -39,7 +39,7 @@
 -ignore_xref([start_vnode/1,
               get/3,
               list/2,
-              add/3,
+              add/4,
               delete/3,
               passwd/4,
               join/4,
@@ -94,9 +94,9 @@ list(Preflist, ReqID) ->
 %%% API - writes
 %%%===================================================================
 
-add(Preflist, ReqID, User) ->
+add(Preflist, ReqID, UUID, User) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, User},
+                                   {add, ReqID, UUID, User},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -190,13 +190,14 @@ handle_command({get, ReqID, User}, _Sender, State) ->
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
-handle_command({add, {ReqID, Coordinator}, User}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator}, UUID, User}, _Sender, State) ->
     User0 = statebox:new(fun snarl_user_state:new/0),
     User1 = statebox:modify({fun snarl_user_state:name/2, [User]}, User0),
+    User1 = statebox:modify({fun snarl_user_state:uuid/2, [UUID]}, User0),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User1, vclock=VC},
-    snarl_db:put(State#state.partition, <<"user">>, User, UserObj),
+    snarl_db:put(State#state.partition, <<"user">>, UUID, UserObj),
     {reply, {ok, ReqID}, State};
 
 handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, State) ->
@@ -262,6 +263,22 @@ delete(State) ->
                             snarl_db:delete(State#state.partition, <<"user">>, K)
                     end, ok),
     {ok, State}.
+
+
+handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
+    Res = snarl_db:fold(State#state.partition,
+                        <<"user">>,
+                        fun (_K, V, Res) ->
+                                case jsxd:get(<<"password">>, V) of
+                                    {ok, Hash} ->
+                                        true;
+                                    _ ->
+                                        Res
+                                end
+                        end, false),
+    {reply,
+     {ok, ReqID, {State#state.partition,State#state.node}, Res},
+     State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
     List = snarl_db:fold(State#state.partition,

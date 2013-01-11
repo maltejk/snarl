@@ -40,18 +40,11 @@ ping() ->
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
 auth(User, Passwd) ->
-    case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
-        {ok, UserObj} ->
-            {ok, CurrentHash} = jsxd:get(<<"password">>, UserObj),
-            case crypto:sha([User, Passwd]) of
-                CurrentHash ->
-                    true;
-                _ ->
-                    false
-            end
-    end.
+    Hash = crypto:sha([User, Passwd]),
+    snarl_entity_coverage_fsm:start(
+      {snarl_user_vnode, snarl_user},
+      auth, Hash
+     ).
 
 allowed(User, Permission) ->
     case snarl_user:get(User) of
@@ -93,9 +86,10 @@ list() ->
      ).
 
 add(User) ->
+    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
     case snarl_user:get(User) of
         {ok, not_found} ->
-            do_write(User, add);
+            do_write(UUID, add, User);
         {ok, _UserObj} ->
             duplicate
     end.
