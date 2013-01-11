@@ -45,14 +45,6 @@
               revoke/2
              ]).
 
-load(#user{} = User) ->
-    User0 = jsxd:new(),
-    User1 = jsxd:set(<<"version">>, <<"0.1.0">>, User0),
-    User2 = jsxd:set(<<"name">>, User#user.name, User1),
-    User3 = jsxd:set(<<"password">>, User#user.passwd, User2),
-    User4 = jsxd:set(<<"permissions">>, User#user.permissions, User3),
-    jsxd:set(<<"groups">>, User#user.groups, User4);
-
 load(User) ->
     User.
 
