@@ -35,7 +35,7 @@
 start(Partition) ->
     case global:whereis_name({db, node(), Partition}) of
         undefined ->
-            sniffle_db_sup:start_child(Partition);
+            snarl_db_sup:start_child(Partition);
         _ ->
             ok
     end.
@@ -79,7 +79,7 @@ start_link(Partition) ->
 %% @end
 %%--------------------------------------------------------------------
 init([Partition]) ->
-    {ok, DBLoc} = application:get_env(sniffle, db_path),
+    {ok, DBLoc} = application:get_env(snarl, db_path),
     {ok, Db} = hanoidb:open(DBLoc ++ "/" ++ integer_to_list(Partition)),
     {ok, #state{db = Db}}.
 

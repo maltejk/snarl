@@ -23,8 +23,6 @@
          revoke/2,
          join/2,
          leave/2,
-         add/2,
-         delete/2,
          set_resource/3,
          get_resource/2,
          claim_resource/4,
@@ -81,12 +79,6 @@ leave(Group, User) ->
                 fun (Gs) ->
                         ordsets:del_element(Group, Gs)
                 end, [], User).
-
-add(User, Users) ->
-    ordsets:add_element(User, Users).
-
-delete(User, Users) ->
-    ordsets:del_element(User, Users).
 
 set_resource(Resource, Granted, User) ->
     jsxd:set([<<"resources">>, Resource, <<"granted">>], Granted, User).

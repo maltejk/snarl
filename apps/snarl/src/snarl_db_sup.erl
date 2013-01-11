@@ -65,8 +65,8 @@ init([]) ->
     Shutdown = 2000,
     Type = worker,
 
-    AChild = {sniffle_db, {sniffle_db, start_link, []},
-              Restart, Shutdown, Type, [sniffle_db]},
+    AChild = {snarl_db, {snarl_db, start_link, []},
+              Restart, Shutdown, Type, [snarl_db]},
 
     {ok, {SupFlags, [AChild]}}.
 
