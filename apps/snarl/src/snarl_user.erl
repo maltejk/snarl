@@ -46,9 +46,11 @@ auth(User, Passwd) ->
                   {snarl_user_vnode, snarl_user},
                   auth, Hash
                  ),
-    Res1 = lists:foldl(fun (X, Acc) ->
-                               Acc orelse X
-                       end, false, Res),
+    Res1 = lists:foldl(fun (not_found, Acc) ->
+                               Acc;
+                           (R, _) ->
+                               R
+                       end, not_found, Res),
     {ok, Res1}.
 
 lookup(User) ->
@@ -104,7 +106,7 @@ list() ->
 
 add(User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    case snarl_user:get(User) of
+    case snarl_user:lookup(User) of
         {ok, not_found} ->
             do_write(UUID, add, User);
         {ok, _UserObj} ->

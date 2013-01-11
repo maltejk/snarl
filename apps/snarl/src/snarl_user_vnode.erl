@@ -291,7 +291,7 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
                                 V = statebox:value(SB),
                                 case jsxd:get(<<"password">>, V) of
                                     {ok, Hash} ->
-                                        true;
+                                        V;
                                     _ ->
                                         Res
                                 end
