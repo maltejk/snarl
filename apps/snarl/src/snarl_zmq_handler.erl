@@ -54,7 +54,7 @@ message({user, add, User}, State) ->
 message({user, auth, User, Pass}, State) ->
     UserB = ensure_binary(User),
     Res = case snarl_user:auth(UserB, ensure_binary(Pass)) of
-              {ok, not_found} ->
+              {ok, false} ->
                   {error, not_found};
               {ok, Obj}  ->
                   {ok, UUID} = jsxd:get(<<"uuid">>, Obj),
