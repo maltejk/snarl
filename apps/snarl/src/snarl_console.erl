@@ -217,11 +217,5 @@ ringready([]) ->
 
 
 build_permission(P) ->
-    lists:map(fun ("...") ->
-		      '...';
-		  ("_") ->
-		      '_';
-		  (E) ->
-		      list_to_binary(E)
-	      end, P).
+    lists:map(fun list_to_binary/1, P).
 
