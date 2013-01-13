@@ -24,12 +24,20 @@ message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
 message({user, get, {token, Token}}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    message({user, get, User}, State);
+    case snarl_token:get(Token) of
+        {ok, not_found} ->
+            {reply, not_found, State};
+        {ok, User} ->
+            message({user, get, User}, State)
+    end;
 
 message({user, cache, {token, Token}}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    message({user, cache, User}, State);
+    case snarl_token:get(Token) of
+        {ok, not_found} ->
+            {reply, not_found, State};
+        {ok, User} ->
+            message({user, cache, User}, State)
+    end;
 
 message({user, get, User}, State) ->
     {reply,
@@ -66,10 +74,14 @@ message({user, auth, User, Pass}, State) ->
      State};
 
 message({user, allowed, {token, Token}, Permission}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    {reply,
-     snarl_user:allowed(User, Permission),
-     State};
+    case snarl_token:get(Token) of
+        {ok, not_found} ->
+            {reply, false, State};
+        {ok, User} ->
+            {reply,
+             snarl_user:allowed(User, Permission),
+             State}
+    end;
 
 message({user, allowed, User, Permission}, State) ->
     {reply,
