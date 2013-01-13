@@ -14,9 +14,7 @@
          new/0,
          name/2,
          grant/2,
-         revoke/2,
-         add/2,
-         delete/2
+         revoke/2
         ]).
 
 -ignore_xref([
@@ -50,9 +48,3 @@ revoke(Permission, Group) ->
                 fun (Ps) ->
                         ordsets:del_element(Permission, Ps)
                 end, [Permission], Group).
-
-add(Group, Groups) ->
-    ordsets:add_element(Group, Groups).
-
-delete(Group, Groups) ->
-    ordsets:del_element(Group, Groups).

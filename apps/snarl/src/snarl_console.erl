@@ -52,35 +52,52 @@ add_group([Group]) ->
     end.
 
 join_group([User, Group]) ->
-    case snarl_user:join(list_to_binary(User), list_to_binary(Group)) of
-	{ok, joined} ->
-	    io:format("User '~s' added to group '~s'.~n", [User, Group]),
-	    ok;
-	not_found ->
-	    io:format("Either group or user does not exist.~n"),
-	    error
+    case snarl_user:lookup(list_to_binary(User)) of
+        {ok, UserObj} ->
+            case snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Group)) of
+                {ok, joined} ->
+                    io:format("User '~s' added to group '~s'.~n", [User, Group]),
+                    ok;
+                not_found ->
+                    io:format("Group does not exist.~n"),
+                    error
+            end;
+        _ ->
+            io:format("User does not exist.~n"),
+            error
     end.
 
 leave_group([User, Group]) ->
-    case snarl_user:leave(list_to_binary(User), list_to_binary(Group)) of
-	ok ->
-	    io:format("User '~s' removed from group '~s'.~n", [User, Group]),
-	    ok;
-	not_found ->
-	    io:format("Either group or user does not exist.~n"),
-	    error
+    case snarl_user:lookup(list_to_binary(User)) of
+        {ok, UserObj} ->
+            case snarl_user:leave(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Group)) of
+                ok ->
+                    io:format("User '~s' removed from group '~s'.~n", [User, Group]),
+                    ok;
+                not_found ->
+                    io:format("Group does not exist.~n"),
+                    error
+            end;
+        _ ->
+            io:format("User does not exist.~n"),
+            error
     end.
 
 passwd([User, Pass]) ->
-    case snarl_user:passwd(list_to_binary(User), list_to_binary(Pass)) of
-	ok ->
-	    io:format("Password successfully changed for user '~s'.~n", [User]),
-	    ok;
-	not_found ->
-	    io:format("User '~s' not found.~n", [User]),
-	    error
+    case snarl_user:lookup(list_to_binary(User)) of
+        {ok, UserObj} ->
+            case snarl_user:passwd(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Pass)) of
+                ok ->
+                    io:format("Password successfully changed for user '~s'.~n", [User]),
+                    ok;
+                not_found ->
+                    io:format("User '~s' not found.~n", [User]),
+                    error
+            end;
+        _ ->
+            io:format("User does not exist.~n"),
+            error
     end.
-
 
 grant_group([Group | P]) ->
     case snarl_group:grant(list_to_binary(Group), build_permission(P)) of
@@ -93,23 +110,35 @@ grant_group([Group | P]) ->
     end.
 
 grant_user([User | P ]) ->
-    case snarl_user:grant(list_to_binary(User), build_permission(P)) of
-	ok ->
-	    io:format("Granted.~n", []),
-	    ok;
-	not_found ->
-	    io:format("User '~s' not found.~n", [User]),
-	    error
+    case snarl_user:lookup(list_to_binary(User)) of
+        {ok, UserObj} ->
+            case snarl_user:grant(jsxd:get(<<"uuid">>, <<>>, UserObj), build_permission(P)) of
+                ok ->
+                    io:format("Granted.~n", []),
+                    ok;
+                not_found ->
+                    io:format("User '~s' not found.~n", [User]),
+                    error
+            end;
+        _ ->
+            io:format("User does not exist.~n"),
+            error
     end.
 
 revoke_user([User | P ]) ->
-    case snarl_user:revoke(list_to_binary(User), build_permission(P)) of
-	ok ->
-	    io:format("Granted.~n", []),
-	    ok;
-	not_found ->
-	    io:format("User '~s' not found.~n", [User]),
-	    error
+    case snarl_user:lookup(list_to_binary(User)) of
+        {ok, UserObj} ->
+            case snarl_user:revoke(jsxd:get(<<"uuid">>, <<>>, UserObj), build_permission(P)) of
+                ok ->
+                    io:format("Granted.~n", []),
+                    ok;
+                not_found ->
+                    io:format("User '~s' not found.~n", [User]),
+                    error
+            end;
+        _ ->
+            io:format("User does not exist.~n"),
+            error
     end.
 
 revoke_group([Group | P]) ->
@@ -188,11 +217,5 @@ ringready([]) ->
 
 
 build_permission(P) ->
-    lists:map(fun ("...") ->
-		      '...';
-		  ("_") ->
-		      '_';
-		  (E) ->
-		      list_to_binary(E)
-	      end, P).
+    lists:map(fun list_to_binary/1, P).
 

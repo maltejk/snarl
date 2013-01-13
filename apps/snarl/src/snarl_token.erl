@@ -8,8 +8,8 @@
 
 -export([
          ping/0,
-	 get/1,
-	 add/1
+         get/1,
+         add/1
         ]).
 
 -ignore_xref([ping/0]).
@@ -31,10 +31,10 @@ get(Token) ->
 add(User) ->
     Token = list_to_binary(uuid:to_string(uuid:uuid4())),
     case snarl_token:get(Token) of
-	{ok, not_found} ->
-	    do_write(Token, add, User);
-	{ok, _TokenObj} ->
-	    duplicate
+        {ok, not_found} ->
+            do_write(Token, add, User);
+        {ok, _TokenObj} ->
+            duplicate
     end.
 
 %%%===================================================================
