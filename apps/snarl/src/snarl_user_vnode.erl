@@ -295,7 +295,7 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
                                     _ ->
                                         Res
                                 end
-                        end, false),
+                        end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
      State};

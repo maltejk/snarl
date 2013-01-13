@@ -46,7 +46,7 @@ auth(User, Passwd) ->
                   {snarl_user_vnode, snarl_user},
                   auth, Hash
                  ),
-    Res1 = lists:foldl(fun (false, Acc) ->
+    Res1 = lists:foldl(fun (not_found, Acc) ->
                                Acc;
                            (R, _) ->
                                R
