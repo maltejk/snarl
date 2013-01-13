@@ -53,8 +53,8 @@ add_group([Group]) ->
 
 join_group([User, Group]) ->
     case snarl_user:lookup(list_to_binary(User)) of
-        {ok, UserUUID} ->
-            case snarl_user:join(UserUUID, list_to_binary(Group)) of
+        {ok, UserObj} ->
+            case snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Group)) of
                 {ok, joined} ->
                     io:format("User '~s' added to group '~s'.~n", [User, Group]),
                     ok;
@@ -69,8 +69,8 @@ join_group([User, Group]) ->
 
 leave_group([User, Group]) ->
     case snarl_user:lookup(list_to_binary(User)) of
-        {ok, UserUUID} ->
-            case snarl_user:leave(UserUUID, list_to_binary(Group)) of
+        {ok, UserObj} ->
+            case snarl_user:leave(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Group)) of
                 ok ->
                     io:format("User '~s' removed from group '~s'.~n", [User, Group]),
                     ok;
@@ -85,8 +85,8 @@ leave_group([User, Group]) ->
 
 passwd([User, Pass]) ->
     case snarl_user:lookup(list_to_binary(User)) of
-        {ok, UserUUID} ->
-            case snarl_user:passwd(UserUUID, list_to_binary(Pass)) of
+        {ok, UserObj} ->
+            case snarl_user:passwd(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Pass)) of
                 ok ->
                     io:format("Password successfully changed for user '~s'.~n", [User]),
                     ok;
@@ -111,8 +111,8 @@ grant_group([Group | P]) ->
 
 grant_user([User | P ]) ->
     case snarl_user:lookup(list_to_binary(User)) of
-        {ok, UserUUID} ->
-            case snarl_user:grant(UserUUID, build_permission(P)) of
+        {ok, UserObj} ->
+            case snarl_user:grant(jsxd:get(<<"uuid">>, <<>>, UserObj), build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
@@ -127,8 +127,8 @@ grant_user([User | P ]) ->
 
 revoke_user([User | P ]) ->
     case snarl_user:lookup(list_to_binary(User)) of
-        {ok, UserUUID} ->
-            case snarl_user:revoke(UserUUID, build_permission(P)) of
+        {ok, UserObj} ->
+            case snarl_user:revoke(jsxd:get(<<"uuid">>, <<>>, UserObj), build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
