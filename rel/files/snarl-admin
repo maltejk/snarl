@@ -229,7 +229,14 @@ case "$1" in
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
-        echo "                 ring_status | user | group}"
+        echo "                 ring_status}"
+        echo "               user list"
+        echo "               user add <user>"
+        echo "               user join <user> <group>"
+        echo "               user leave <user> <group>"
+        echo "               user passwd <user> <passwd>"
+        echo "               user grant <user> <permission>"
+        echo "               user revoke <user> <permission>"
         exit 1
         ;;
 esac
