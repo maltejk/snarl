@@ -87,6 +87,10 @@ case "$1" in
     user)
 	shift
 	case "$1" in
+	    list)
+		shift
+		run snarl_console list_user $@
+        ;;
 	    add)
 		shift
 		run snarl_console add_user $@
