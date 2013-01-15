@@ -5,50 +5,63 @@
          remove/1,
          ringready/1]).
 
+-export([add_group/1,
+         join_group/1,
+         leave_group/1,
+         grant_group/1,
+         revoke_group/1]).
+
 -export([add_user/1,
-	 add_group/1,
-	 join_group/1,
-	 leave_group/1,
-	 grant_group/1,
-	 grant_user/1,
-	 revoke_user/1,
-	 revoke_group/1,
-	 passwd/1]).
+         list_user/1,
+         grant_user/1,
+         revoke_user/1,
+         passwd/1]).
 
 -ignore_xref([
               join/1,
               leave/1,
               remove/1,
               ringready/1,
-	      add_user/1,
-	      add_group/1,
-	      join_group/1,
-	      leave_group/1,
-	      grant_group/1,
-	      grant_user/1,
-	      revoke_user/1,
-	      revoke_group/1,
-	      passwd/1
+              list_user/1,
+              add_user/1,
+              add_group/1,
+              join_group/1,
+              leave_group/1,
+              grant_group/1,
+              grant_user/1,
+              revoke_user/1,
+              revoke_group/1,
+              passwd/1
              ]).
+
+list_user([]) ->
+    {ok, Users} = snarl_user:list(),
+    io:format("UUID                                 Name~n"),
+    io:format("------------------------------------ ---------------~n", []),
+    lists:map(fun(UUID) ->
+                      {ok, User} = snarl_user:get(UUID),
+                      io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+              end, Users),
+    ok.
 
 add_user([User]) ->
     case snarl_user:add(list_to_binary(User)) of
-	ok ->
-	    io:format("User '~s' added.~n", [User]),
-	    ok;
-	duplicate ->
-	    io:format("User '~s' already exists.~n", [User]),
-	    error
+        ok ->
+            io:format("User '~s' added.~n", [User]),
+            ok;
+        duplicate ->
+            io:format("User '~s' already exists.~n", [User]),
+            error
     end.
 
 add_group([Group]) ->
     case snarl_group:add(list_to_binary(Group)) of
-	ok ->
-	    io:format("Group '~s' added.~n", [Group]),
-	    ok;
-	duplicate ->
-	    io:format("Group '~s' already exists.~n", [Group]),
-	    error
+        ok ->
+            io:format("Group '~s' added.~n", [Group]),
+            ok;
+        duplicate ->
+            io:format("Group '~s' already exists.~n", [Group]),
+            error
     end.
 
 join_group([User, Group]) ->
@@ -101,12 +114,12 @@ passwd([User, Pass]) ->
 
 grant_group([Group | P]) ->
     case snarl_group:grant(list_to_binary(Group), build_permission(P)) of
-	ok ->
-	    io:format("Granted.~n", []),
-	    ok;
-	not_found ->
-	    io:format("Group '~s' not found.~n", [Group]),
-	    error
+        ok ->
+            io:format("Granted.~n", []),
+            ok;
+        not_found ->
+            io:format("Group '~s' not found.~n", [Group]),
+            error
     end.
 
 grant_user([User | P ]) ->
@@ -143,12 +156,12 @@ revoke_user([User | P ]) ->
 
 revoke_group([Group | P]) ->
     case snarl_group:revoke(list_to_binary(Group), build_permission(P)) of
-	ok ->
-	    io:format("Granted.~n", []),
-	    ok;
-	not_found ->
-	    io:format("Group '~s' not found.~n", [Group]),
-	    error
+        ok ->
+            io:format("Granted.~n", []),
+            ok;
+        not_found ->
+            io:format("Group '~s' not found.~n", [Group]),
+            error
     end.
 
 join([NodeStr]) ->
@@ -218,4 +231,3 @@ ringready([]) ->
 
 build_permission(P) ->
     lists:map(fun list_to_binary/1, P).
-
