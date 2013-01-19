@@ -84,7 +84,7 @@ run()
 
 # Check the first argument for instructions
 case "$1" in
-    user)
+    users)
 	shift
 	case "$1" in
 	    list)
@@ -123,7 +123,7 @@ case "$1" in
 		;;
 	esac
 	;;
-    group)
+    groups)
 	shift
 	case "$1" in
 	    add)
