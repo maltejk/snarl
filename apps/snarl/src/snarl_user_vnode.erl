@@ -227,7 +227,7 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, Stat
     case snarl_group:get(Group) of
         {ok, not_found} ->
             {reply, {ok, ReqID, not_found}, State};
-        {ok, Group} ->
+        {ok, GroupObj} ->
             change_user(User, Action, [Group], Coordinator, State),
             {reply, {ok, ReqID, joined}, State}
     end;
