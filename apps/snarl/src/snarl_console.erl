@@ -46,8 +46,8 @@ list_user([]) ->
 
 add_user([User]) ->
     case snarl_user:add(list_to_binary(User)) of
-        ok ->
-            io:format("User '~s' added.~n", [User]),
+        {ok, UUID} ->
+            io:format("User '~s' added with id '~s'.~n", [User, UUID]),
             ok;
         duplicate ->
             io:format("User '~s' already exists.~n", [User]),
@@ -56,8 +56,8 @@ add_user([User]) ->
 
 add_group([Group]) ->
     case snarl_group:add(list_to_binary(Group)) of
-        ok ->
-            io:format("Group '~s' added.~n", [Group]),
+        {ok, UUID} ->
+            io:format("Group '~s' added with id '~s'.~n", [Group, UUID]),
             ok;
         duplicate ->
             io:format("Group '~s' already exists.~n", [Group]),
@@ -67,11 +67,13 @@ add_group([Group]) ->
 join_group([User, Group]) ->
     case snarl_user:lookup(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Group)) of
-                {ok, joined} ->
+            case snarl_group:lookup(list_to_binary(Group)) of
+                {ok, GroupObj} ->
+                    {ok, joined} = snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj),
+                                                   jsxd:get(<<"uuid">>, <<>>, GroupObj)),
                     io:format("User '~s' added to group '~s'.~n", [User, Group]),
                     ok;
-                not_found ->
+                _ ->
                     io:format("Group does not exist.~n"),
                     error
             end;
@@ -83,11 +85,13 @@ join_group([User, Group]) ->
 leave_group([User, Group]) ->
     case snarl_user:lookup(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:leave(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Group)) of
-                ok ->
+            case snarl_group:lookup(list_to_binary(Group)) of
+                {ok, GroupObj} ->
+                    ok = snarl_user:leave(jsxd:get(<<"uuid">>, <<>>, UserObj),
+                                          jsxd:get(<<"uuid">>, <<>>, GroupObj)),
                     io:format("User '~s' removed from group '~s'.~n", [User, Group]),
                     ok;
-                not_found ->
+                _ ->
                     io:format("Group does not exist.~n"),
                     error
             end;
@@ -113,10 +117,16 @@ passwd([User, Pass]) ->
     end.
 
 grant_group([Group | P]) ->
-    case snarl_group:grant(list_to_binary(Group), build_permission(P)) of
-        ok ->
-            io:format("Granted.~n", []),
-            ok;
+    case snarl_group:lookup(list_to_binary(Group)) of
+        {ok, GroupObj} ->
+            case snarl_group:grant(jsxd:get(<<"uuid">>, <<>>, GroupObj), build_permission(P)) of
+                ok ->
+                    io:format("Granted.~n", []),
+                    ok;
+                _ ->
+                    io:format("Failed.~n", []),
+                    error
+            end;
         not_found ->
             io:format("Group '~s' not found.~n", [Group]),
             error
@@ -155,10 +165,16 @@ revoke_user([User | P ]) ->
     end.
 
 revoke_group([Group | P]) ->
-    case snarl_group:revoke(list_to_binary(Group), build_permission(P)) of
-        ok ->
-            io:format("Granted.~n", []),
-            ok;
+    case snarl_group:lookup(list_to_binary(Group)) of
+        {ok, GroupObj} ->
+            case snarl_group:revoke(jsxd:get(<<"uuid">>, <<>>, GroupObj), build_permission(P)) of
+                ok ->
+                    io:format("Revoked.~n", []),
+                    ok;
+                _ ->
+                    io:format("Failed.~n", []),
+                    error
+            end;
         not_found ->
             io:format("Group '~s' not found.~n", [Group]),
             error
