@@ -108,7 +108,8 @@ add(User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
     case snarl_user:lookup(User) of
         {ok, not_found} ->
-            do_write(UUID, add, User);
+            ok = do_write(UUID, add, User),
+            {ok, UUID};
         {ok, _UserObj} ->
             duplicate
     end.
