@@ -55,9 +55,9 @@ auth(User, Passwd) ->
 
 lookup(User) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
-            {snarl_user_vnode, snarl_user},
-            lookup, User
-           ),
+                  {snarl_user_vnode, snarl_user},
+                  lookup, User
+                 ),
     Res1 = lists:foldl(fun (not_found, Acc) ->
                                Acc;
                            (R, _) ->
@@ -82,7 +82,7 @@ cache(User) ->
                    fun(Group, Permissions) ->
                            case snarl_group:get(Group) of
                                {ok, GroupObj} ->
-                                   {ok, GrPerms} = jsxd:get(<<"permissions">>, [], GroupObj),
+                                   GrPerms = jsxd:get(<<"permissions">>, [], GroupObj),
                                    ordsets:union(Permissions, GrPerms);
                                _ ->
                                    Permissions
