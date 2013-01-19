@@ -21,10 +21,11 @@
 
 %% Reads
 -export([list/2,
+         lookup/3,
          get/3]).
 
 %% Writes
--export([add/3,
+-export([add/4,
          delete/3,
          grant/4,
          repair/4,
@@ -32,9 +33,10 @@
 
 -ignore_xref([
               start_vnode/1,
+              lookup/3,
               list/2,
               get/3,
-              add/3,
+              add/4,
               delete/3,
               grant/4,
               repair/4,
@@ -78,14 +80,22 @@ list(Preflist, ReqID) ->
       {fsm, undefined, self()},
       ?MASTER).
 
+lookup(Preflist, ReqID, Name) ->
+    riak_core_vnode_master:coverage(
+      {lookup, ReqID, Name},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
 
 %%%===================================================================
 %%% API - writes
 %%%===================================================================
 
-add(Preflist, ReqID, Group) ->
+add(Preflist, ReqID, UUID, Group) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, Group},
+                                   {add, ReqID, UUID, Group},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -141,13 +151,14 @@ handle_command({get, ReqID, Group}, _Sender, State) ->
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
-handle_command({add, {ReqID, Coordinator}, Group}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator}, UUID, Group}, _Sender, State) ->
     Group0 = statebox:new(fun snarl_group_state:new/0),
-    Group1 = statebox:modify({snarl_group_state, name, [Group]}, Group0),
+    Group1 = statebox:modify({snarl_group_state, uuid, [UUID]}, Group0),
+    Group2 = statebox:modify({snarl_group_state, name, [Group]}, Group1),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    GroupObj = #snarl_obj{val=Group1, vclock=VC},
-    snarl_db:put(State#state.partition, <<"group">>, Group, GroupObj),
+    GroupObj = #snarl_obj{val=Group2, vclock=VC},
+    snarl_db:put(State#state.partition, <<"group">>, UUID, GroupObj),
     {reply, {ok, ReqID}, State};
 
 handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender, State) ->
@@ -200,6 +211,22 @@ delete(State) ->
                             snarl_db:delete(State#state.partition, <<"group">>, K)
                     end, ok),
     {ok, State}.
+
+handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
+    Res = snarl_db:fold(State#state.partition,
+                        <<"group">>,
+                        fun (_U, #snarl_obj{val=SB}, Res) ->
+                                V = statebox:value(SB),
+                                case jsxd:get(<<"name">>, V) of
+                                    {ok, Name} ->
+                                        V;
+                                    _ ->
+                                        Res
+                                end
+                        end, not_found),
+    {reply,
+     {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
+     State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
     List = snarl_db:fold(State#state.partition,
