@@ -173,7 +173,8 @@ handle_command({Action, {ReqID, Coordinator}, Group, Param1}, _Sender, State) ->
     change_group(Group, Action, [Param1], Coordinator, State),
     {reply, {ok, ReqID}, State};
 
-handle_command(_Message, _Sender, State) ->
+handle_command(Message, _Sender, State) ->
+    lager:error("[group] Unknown message: ~p", [Message]),
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
