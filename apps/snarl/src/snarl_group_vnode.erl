@@ -169,6 +169,10 @@ handle_command({Action, {ReqID, Coordinator}, Group, Param1, Param2}, _Sender, S
     change_group(Group, Action, [Param1, Param2], Coordinator, State),
     {reply, {ok, ReqID}, State};
 
+handle_command({Action, {ReqID, Coordinator}, Group, Param1}, _Sender, State) ->
+    change_group(Group, Action, [Param1], Coordinator, State),
+    {reply, {ok, ReqID}, State};
+
 handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
