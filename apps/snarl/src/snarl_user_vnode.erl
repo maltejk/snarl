@@ -240,7 +240,8 @@ handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender, State) ->
     change_user(User, Action, [Param], Coordinator, State),
     {reply, {ok, ReqID}, State};
 
-handle_command(_Message, _Sender, State) ->
+handle_command(Message, _Sender, State) ->
+    lager:error("[user] Unknown message: ~p", [Message]),
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
