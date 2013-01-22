@@ -217,7 +217,7 @@ delete(State) ->
                             fun (K,_, A) ->
                                     [{delete, K} | A]
                             end, []),
-    sanarl_db:transact(State#state.db, Trans),
+    snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
