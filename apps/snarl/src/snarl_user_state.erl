@@ -21,6 +21,7 @@
          passwd/2,
          grant/2,
          revoke/2,
+         remove_all/2,
          join/2,
          leave/2,
          uuid/2,
@@ -83,6 +84,19 @@ leave(Group, User) ->
     jsxd:update(<<"groups">>,
                 fun (Gs) ->
                         ordsets:del_element(Group, Gs)
+                end, [], User).
+
+remove_all(Perm, User) ->
+    jsxd:update(<<"permissions">>,
+                fun(Ps) ->
+                        lists:fold(fun (P, Acc) ->
+                                           case lists:prefix(Perm, P) of
+                                               true ->
+                                                   Acc;
+                                               _ ->
+                                                   [P, Acc]
+                                           end
+                                   end, [], Ps)
                 end, [], User).
 
 set_resource(Resource, Granted, User) ->

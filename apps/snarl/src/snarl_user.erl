@@ -17,6 +17,7 @@
          passwd/2,
          join/2,
          leave/2,
+         revoke_all/2,
          grant/2,
          revoke/2,
          allowed/2,
@@ -64,6 +65,12 @@ lookup(User) ->
                                R
                        end, not_found, Res),
     {ok, Res1}.
+
+
+revoke_all(User, Perm) ->
+    snarl_entity_coverage_fsm:start(
+      {snarl_user_vnode, snarl_user},
+      revoke_all, User, Perm).
 
 allowed(User, Permission) ->
     case snarl_user:get(User) of

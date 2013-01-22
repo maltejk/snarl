@@ -110,6 +110,9 @@ message({user, grant, User, Permission}, State) ->
 message({user, revoke, User, Permission}, State) ->
     {reply, snarl_user:revoke(ensure_binary(User), Permission), State};
 
+message({user, revoke_all, User, Permission}, State) ->
+    {reply, snarl_user:revoke_all(ensure_binary(User), Permission), State};
+
 %%%===================================================================
 %%% Resource Functions
 %%%===================================================================

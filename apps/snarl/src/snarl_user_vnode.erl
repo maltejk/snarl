@@ -32,6 +32,7 @@
          leave/4,
          grant/4,
          repair/4,
+         revoke_all/3,
          revoke/4,
          set_resource/4,
          claim_resource/4,
@@ -45,6 +46,7 @@
               list/2,
               add/4,
               delete/3,
+              revoke_all/3,
               passwd/4,
               join/4,
               leave/4,
@@ -57,7 +59,7 @@
              ]).
 
 
--record(state, {partition, node}).
+-record(state, {db, partition, node}).
 
 -define(MASTER, snarl_user_vnode_master).
 
@@ -104,6 +106,14 @@ auth(Preflist, ReqID, Hash) ->
 lookup(Preflist, ReqID, Name) ->
     riak_core_vnode_master:coverage(
       {lookup, ReqID, Name},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
+revoke_all(Preflist, ReqID, Perm) ->
+    riak_core_vnode_master:coverage(
+      {revoke, ReqID, Perm},
       Preflist,
       all,
       {fsm, undefined, self()},
@@ -180,19 +190,20 @@ free_resource(Preflist, ReqID, User, [Resource, ID]) ->
 %%% VNode
 %%%===================================================================
 init([Partition]) ->
-    snarl_db:start(Partition),
-    {ok, #state {node = node(), partition = Partition}}.
+    DB = list_to_atom(integer_to_list(Partition)),
+    snarl_db:start(DB),
+    {ok, #state {db = DB, node = node(), partition = Partition}}.
 
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
 handle_command({repair, User, VClock, Obj}, _Sender, State) ->
-    case snarl_db:get(State#state.partition, <<"user">>, User) of
+    case snarl_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
-            snarl_db:put(State#state.partition, <<"user">>, User, Obj);
+            snarl_db:put(State#state.db, <<"user">>, User, Obj);
         not_found ->
-            snarl_db:put(State#state.partition, <<"user">>, User, Obj);
+            snarl_db:put(State#state.db, <<"user">>, User, Obj);
         _ ->
             lager:error("[users] Read repair failed, data was updated too recent.")
     end,
@@ -200,7 +211,7 @@ handle_command({repair, User, VClock, Obj}, _Sender, State) ->
 
 
 handle_command({get, ReqID, User}, _Sender, State) ->
-    Res = case snarl_db:get(State#state.partition, <<"user">>, User) of
+    Res = case snarl_db:get(State#state.db, <<"user">>, User) of
               {ok, R} ->
                   R;
               not_found ->
@@ -216,11 +227,11 @@ handle_command({add, {ReqID, Coordinator}, UUID, User}, _Sender, State) ->
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User2, vclock=VC},
-    snarl_db:put(State#state.partition, <<"user">>, UUID, UserObj),
+    snarl_db:put(State#state.db, <<"user">>, UUID, UserObj),
     {reply, {ok, ReqID}, State};
 
 handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, State) ->
-    snarl_db:delete(State#state.partition, <<"user">>, User),
+    snarl_db:delete(State#state.db, <<"user">>, User),
     {reply, {ok, ReqID}, State};
 
 handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, State) ->
@@ -245,7 +256,7 @@ handle_command(Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = snarl_db:fold(State#state.partition, <<"user">>, Fun, Acc0),
+    Acc = snarl_db:fold(State#state.db, <<"user">>, Fun, Acc0),
     {reply, Acc, State};
 
 handle_handoff_command(_Message, _Sender, State) ->
@@ -263,30 +274,31 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, State) ->
     {User, HObject} = binary_to_term(Data),
-    snarl_db:put(State#state.partition, <<"user">>, User, HObject),
+    snarl_db:put(State#state.db, <<"user">>, User, HObject),
     {reply, ok, State}.
 
 encode_handoff_item(User, Data) ->
     term_to_binary({User, Data}).
 
 is_empty(State) ->
-    snarl_db:fold(State#state.partition,
+    snarl_db:fold(State#state.db,
                     <<"user">>,
                     fun (_,_, _) ->
-                            {true, State}
-                    end, {false, State}).
+                            {false, State}
+                    end, {true, State}).
 
 delete(State) ->
-    snarl_db:fold(State#state.partition,
-                    <<"user">>,
-                    fun (K,_, _) ->
-                            snarl_db:delete(State#state.partition, <<"user">>, K)
-                    end, ok),
+    Trans = snarl_db:fold(State#state.db,
+                            <<"user">>,
+                            fun (K,_, A) ->
+                                    [{delete, K} | A]
+                            end, []),
+    snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
 
 handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
-    Res = snarl_db:fold(State#state.partition,
+    Res = snarl_db:fold(State#state.db,
                         <<"user">>,
                         fun (_K, #snarl_obj{val=SB}, Res) ->
                                 V = statebox:value(SB),
@@ -298,11 +310,11 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
                                 end
                         end, not_found),
     {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
+     {ok, ReqID, {State#state.db,State#state.node}, [Res]},
      State};
 
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
-    Res = snarl_db:fold(State#state.partition,
+    Res = snarl_db:fold(State#state.db,
                         <<"user">>,
                         fun (_U, #snarl_obj{val=SB}, Res) ->
                                 V = statebox:value(SB),
@@ -317,8 +329,22 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
      {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
      State};
 
+handle_coverage({revoke, ReqID, Perm}, _KeySpaces, _Sender, State) ->
+    Trans = snarl_db:fold(State#state.db,
+                          <<"user">>,
+                          fun (K, #snarl_obj{val=H0} = O, Res) ->
+                                  H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
+                                  H2 = statebox:modify({fun snarl_user_state:remove_all/2, [Perm]}, H1),
+                                  H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
+                                  [{put, K, snarl_obj:update(H3, snarl_user_vnode, O)} | Res]
+                          end, []),
+    snarl_db:transact(State#state.db, Trans),
+    {reply,
+     {ok, ReqID, {State#state.partition,State#state.node}, []},
+     State};
+
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
-    List = snarl_db:fold(State#state.partition,
+    List = snarl_db:fold(State#state.db,
                           <<"user">>,
                            fun (K, _, L) ->
                                    [K|L]
@@ -337,12 +363,12 @@ terminate(_Reason, _State) ->
     ok.
 
 change_user(User, Action, Vals, Coordinator, State) ->
-    case snarl_db:get(State#state.partition, <<"user">>, User) of
+    case snarl_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val=H0} = O} ->
             H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
             H2 = statebox:modify({fun snarl_user_state:Action/2, Vals}, H1),
             H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
-            snarl_db:put(State#state.partition, <<"user">>, User,
+            snarl_db:put(State#state.db, <<"user">>, User,
                          snarl_obj:update(H3, Coordinator, O));
         R ->
             lager:error("[users] tried to write to a non existing user: ~p", [R])

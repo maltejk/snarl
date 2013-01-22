@@ -44,7 +44,7 @@
              ]).
 
 
--record(state, {partition, node}).
+-record(state, {db, partition, node}).
 
 -define(MASTER, snarl_group_vnode_master).
 
@@ -121,8 +121,10 @@ revoke(Preflist, ReqID, Group, Val) ->
 %%% VNode
 %%%===================================================================
 init([Partition]) ->
-    snarl_db:start(Partition),
+    DB = list_to_atom(integer_to_list(Partition)),
+    snarl_db:start(DB),
     {ok, #state {
+       db = DB,
        node = node(),
        partition = Partition}}.
 
@@ -131,18 +133,18 @@ handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
 handle_command({repair, Group, VClock, Obj}, _Sender, State) ->
-    case snarl_db:get(State#state.partition, <<"group">>, Group) of
+    case snarl_db:get(State#state.db, <<"group">>, Group) of
         {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
-            snarl_db:put(State#state.partition, <<"group">>, Group, Obj);
+            snarl_db:put(State#state.db, <<"group">>, Group, Obj);
         not_found ->
-            snarl_db:put(State#state.partition, <<"group">>, Group, Obj);
+            snarl_db:put(State#state.db, <<"group">>, Group, Obj);
         _ ->
             lager:error("[groups] Read repair failed, data was updated too recent.")
     end,
     {noreply, State};
 
 handle_command({get, ReqID, Group}, _Sender, State) ->
-    Res = case snarl_db:get(State#state.partition, <<"group">>, Group) of
+    Res = case snarl_db:get(State#state.db, <<"group">>, Group) of
               {ok, R} ->
                   R;
               not_found ->
@@ -158,11 +160,11 @@ handle_command({add, {ReqID, Coordinator}, UUID, Group}, _Sender, State) ->
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     GroupObj = #snarl_obj{val=Group2, vclock=VC},
-    snarl_db:put(State#state.partition, <<"group">>, UUID, GroupObj),
+    snarl_db:put(State#state.db, <<"group">>, UUID, GroupObj),
     {reply, {ok, ReqID}, State};
 
 handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender, State) ->
-    snarl_db:delete(State#state.partition, <<"group">>, Group),
+    snarl_db:delete(State#state.db, <<"group">>, Group),
     {reply, {ok, ReqID}, State};
 
 handle_command({Action, {ReqID, Coordinator}, Group, Param1, Param2}, _Sender, State) ->
@@ -178,7 +180,7 @@ handle_command(Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = snarl_db:fold(State#state.partition, <<"group">>, Fun, Acc0),
+    Acc = snarl_db:fold(State#state.db, <<"group">>, Fun, Acc0),
     {reply, Acc, State};
 
 handle_handoff_command(_Message, _Sender, State) ->
@@ -196,29 +198,30 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, State) ->
     {Group, HObject} = binary_to_term(Data),
-    snarl_db:put(State#state.partition, <<"group">>, Group, HObject),
+    snarl_db:put(State#state.db, <<"group">>, Group, HObject),
     {reply, ok, State}.
 
 encode_handoff_item(Group, Data) ->
     term_to_binary({Group, Data}).
 
 is_empty(State) ->
-    snarl_db:fold(State#state.partition,
+    snarl_db:fold(State#state.db,
                     <<"group">>,
                     fun (_,_, _) ->
-                            {true, State}
-                    end, {false, State}).
+                            {false, State}
+                    end, {true, State}).
 
 delete(State) ->
-    snarl_db:fold(State#state.partition,
-                    <<"group">>,
-                    fun (K,_, _) ->
-                            snarl_db:delete(State#state.partition, <<"group">>, K)
-                    end, ok),
+    Trans = snarl_db:fold(State#state.db,
+                            <<"group">>,
+                            fun (K,_, A) ->
+                                    [{delete, K} | A]
+                            end, []),
+    sanarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
-    Res = snarl_db:fold(State#state.partition,
+    Res = snarl_db:fold(State#state.db,
                         <<"group">>,
                         fun (_U, #snarl_obj{val=SB}, Res) ->
                                 V = statebox:value(SB),
@@ -234,7 +237,7 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
      State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
-    List = snarl_db:fold(State#state.partition,
+    List = snarl_db:fold(State#state.db,
                          <<"group">>,
                          fun (K, _, L) ->
                                  [K|L]
@@ -255,12 +258,12 @@ terminate(_Reason, _State) ->
     ok.
 
 change_group(Group, Action, Vals, Coordinator, State) ->
-    case snarl_db:get(State#state.partition, <<"group">>, Group) of
+    case snarl_db:get(State#state.db, <<"group">>, Group) of
         {ok, #snarl_obj{val=H0} = O} ->
             H1 = statebox:modify({fun snarl_group_state:load/1,[]}, H0),
             H2 = statebox:modify({fun snarl_group_state:Action/2, Vals}, H1),
             H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
-            snarl_db:put(State#state.partition, <<"group">>, Group,
+            snarl_db:put(State#state.db, <<"group">>, Group,
                          snarl_obj:update(H3, Coordinator, O));
         R ->
             lager:error("[groups] tried to write to a non existing group: ~p", [R])
