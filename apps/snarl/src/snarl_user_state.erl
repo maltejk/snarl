@@ -89,7 +89,7 @@ leave(Group, User) ->
 remove_all(Perm, User) ->
     jsxd:update(<<"permissions">>,
                 fun(Ps) ->
-                        lists:fold(fun (P, Acc) ->
+                        lists:foldl(fun (P, Acc) ->
                                            case lists:prefix(Perm, P) of
                                                true ->
                                                    Acc;
