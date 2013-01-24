@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+/opt/local/snarl/bin/snarl-admin $@

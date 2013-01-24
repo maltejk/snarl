@@ -14,12 +14,12 @@
          new/0,
          name/2,
          grant/2,
-         revoke/2,
-         add/2,
-         delete/2
+         uuid/2,
+         revoke/2
         ]).
 
 -ignore_xref([
+              uuid/2,
               name/2,
               grant/2,
               revoke/2
@@ -39,6 +39,9 @@ new() ->
 name(Name, Group) ->
     jsxd:set(<<"name">>, Name, Group).
 
+uuid(UUID, Group) ->
+    jsxd:set(<<"uuid">>, UUID, Group).
+
 grant(Permission, Group) ->
     jsxd:update(<<"permissions">>,
                 fun (Ps) ->
@@ -50,9 +53,3 @@ revoke(Permission, Group) ->
                 fun (Ps) ->
                         ordsets:del_element(Permission, Ps)
                 end, [Permission], Group).
-
-add(Group, Groups) ->
-    ordsets:add_element(Group, Groups).
-
-delete(Group, Groups) ->
-    ordsets:del_element(Group, Groups).

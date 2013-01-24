@@ -48,5 +48,6 @@ case $2 in
 	    cp /opt/local/snarl/etc/app.config.example /opt/local/snarl/etc/app.config
 	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/snarl/etc/app.config
 	fi
+	cp /opt/local/snarl/bin/snaadm /opt/local/sbin
 	;;
 esac

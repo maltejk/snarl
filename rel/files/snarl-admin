@@ -84,9 +84,13 @@ run()
 
 # Check the first argument for instructions
 case "$1" in
-    user)
+    users)
 	shift
 	case "$1" in
+	    list)
+		shift
+		run snarl_console list_user $@
+        ;;
 	    add)
 		shift
 		run snarl_console add_user $@
@@ -113,13 +117,13 @@ case "$1" in
 		;;
 
 	    *)
-		echo "Usage: snarl-admin user { add | passwd | join | leave "
-		echo "                          grant | revoke }."
+		echo "Usage: snarl-admin users { add | passwd | join | leave "
+		echo "                           grant | revoke }."
 		exit 1
 		;;
 	esac
 	;;
-    group)
+    groups)
 	shift
 	case "$1" in
 	    add)
@@ -136,7 +140,7 @@ case "$1" in
 		;;
 
 	    *)
-		echo "Usage: snarl-admin group { add | grant | revoke }."
+		echo "Usage: snarl-admin groups { add | grant | revoke }."
 		exit 1
 		;;
 	esac
@@ -225,7 +229,17 @@ case "$1" in
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
-        echo "                 ring_status | user | group}"
+        echo "                 ring_status }"
+        echo "               users list                           - list users."
+        echo "               users add <user>                     - adds a new user."
+        echo "               users passwd <user> <passwd>         - sets user password."
+        echo "               users grant <user> <permission>      - grants a permission."
+        echo "               users revoke <user> <permission>     - revokes a permission"
+        echo "               users join <user> <group>            - adds user to a group."
+        echo "               users leave <user> <group>           - removes user from a group."
+        echo "               groups add <group>                   - adds a group."
+        echo "               groups grant <group> <permission>    - grants a permission."
+        echo "               groups revoke <group> <permission>   - revokes a permission."
         exit 1
         ;;
 esac

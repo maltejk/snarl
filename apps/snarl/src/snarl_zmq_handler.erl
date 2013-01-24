@@ -24,16 +24,29 @@ message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
 message({user, get, {token, Token}}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    message({user, get, User}, State);
+    case snarl_token:get(Token) of
+        {ok, not_found} ->
+            {reply, not_found, State};
+        {ok, User} ->
+            message({user, get, User}, State)
+    end;
 
 message({user, cache, {token, Token}}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    message({user, cache, User}, State);
+    case snarl_token:get(Token) of
+        {ok, not_found} ->
+            {reply, not_found, State};
+        {ok, User} ->
+            message({user, cache, User}, State)
+    end;
 
 message({user, get, User}, State) ->
     {reply,
      snarl_user:get(ensure_binary(User)),
+     State};
+
+message({user, lookup, User}, State) when is_binary(User) ->
+    {reply,
+     snarl_user:lookup(User),
      State};
 
 message({user, cache, User}, State) ->
@@ -49,21 +62,26 @@ message({user, add, User}, State) ->
 message({user, auth, User, Pass}, State) ->
     UserB = ensure_binary(User),
     Res = case snarl_user:auth(UserB, ensure_binary(Pass)) of
-	      true ->
-		  {ok, Token} = snarl_token:add(UserB),
-		  {ok, {token, Token}};
-	      Other ->
-		  {error, Other}
-	  end,
+              {ok, not_found} ->
+                  {error, not_found};
+              {ok, Obj}  ->
+                  {ok, UUID} = jsxd:get(<<"uuid">>, Obj),
+                  {ok, Token} = snarl_token:add(UUID),
+                  {ok, {token, Token}}
+          end,
     {reply,
      Res,
      State};
 
 message({user, allowed, {token, Token}, Permission}, State) ->
-    {ok, User} = snarl_token:get(Token),
-    {reply,
-     snarl_user:allowed(User, Permission),
-     State};
+    case snarl_token:get(Token) of
+        {ok, not_found} ->
+            {reply, false, State};
+        {ok, User} ->
+            {reply,
+             snarl_user:allowed(User, Permission),
+             State}
+    end;
 
 message({user, allowed, User, Permission}, State) ->
     {reply,
@@ -92,6 +110,9 @@ message({user, grant, User, Permission}, State) ->
 message({user, revoke, User, Permission}, State) ->
     {reply, snarl_user:revoke(ensure_binary(User), Permission), State};
 
+message({user, revoke_all, User, Permission}, State) ->
+    {reply, snarl_user:revoke_all(ensure_binary(User), Permission), State};
+
 %%%===================================================================
 %%% Resource Functions
 %%%===================================================================
@@ -99,8 +120,8 @@ message({user, revoke, User, Permission}, State) ->
 message({user, set_resource, User, Resource, Value}, State) ->
     {reply, snarl_user:set_resource(ensure_binary(User), Resource, Value), State};
 
-%message({user, get_resource, User, Resource}, State) ->
-%    {reply, snarl_user:get_resource(ensure_binary(User), Resource), State};
+                                                %message({user, get_resource, User, Resource}, State) ->
+                                                %    {reply, snarl_user:get_resource(ensure_binary(User), Resource), State};
 
 message({user, claim_resource, User, Resource, Ammount}, State) ->
     ID = uuid:uuid4(),

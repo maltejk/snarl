@@ -21,10 +21,10 @@
          passwd/2,
          grant/2,
          revoke/2,
+         remove_all/2,
          join/2,
          leave/2,
-         add/2,
-         delete/2,
+         uuid/2,
          set_resource/3,
          get_resource/2,
          claim_resource/4,
@@ -40,18 +40,11 @@
               set_resource/3,
               grant/2,
               join/2,
+              uuid/2,
               leave/2,
               passwd/2,
               revoke/2
              ]).
-
-load(#user{} = User) ->
-    User0 = jsxd:new(),
-    User1 = jsxd:set(<<"version">>, <<"0.1.0">>, User0),
-    User2 = jsxd:set(<<"name">>, User#user.name, User1),
-    User3 = jsxd:set(<<"password">>, User#user.passwd, User2),
-    User4 = jsxd:set(<<"permissions">>, User#user.permissions, User3),
-    jsxd:set(<<"groups">>, User#user.groups, User4);
 
 load(User) ->
     User.
@@ -61,6 +54,9 @@ new() ->
 
 name(Name, User) ->
     jsxd:set(<<"name">>, Name, User).
+
+uuid(Name, UUID) ->
+    jsxd:set(<<"uuid">>, Name, UUID).
 
 passwd(Passwd, User) ->
     {ok, Name} = jsxd:get(<<"name">>, User),
@@ -90,11 +86,18 @@ leave(Group, User) ->
                         ordsets:del_element(Group, Gs)
                 end, [], User).
 
-add(User, Users) ->
-    ordsets:add_element(User, Users).
-
-delete(User, Users) ->
-    ordsets:del_element(User, Users).
+remove_all(Perm, User) ->
+    jsxd:update(<<"permissions">>,
+                fun(Ps) ->
+                        lists:foldl(fun (P, Acc) ->
+                                           case lists:prefix(Perm, P) of
+                                               true ->
+                                                   Acc;
+                                               _ ->
+                                                   [P, Acc]
+                                           end
+                                   end, [], Ps)
+                end, [], User).
 
 set_resource(Resource, Granted, User) ->
     jsxd:set([<<"resources">>, Resource, <<"granted">>], Granted, User).

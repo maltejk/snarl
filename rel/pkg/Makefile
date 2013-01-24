@@ -1,4 +1,4 @@
-VERSION=0.3.1
+VERSION=0.3.2
 COMPONENT=snarl
 
 .PHONY: build_info package package_list
