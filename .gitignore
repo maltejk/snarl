@@ -1,3 +1,4 @@
+*.version
 apps/snarl/src/snarl_version.hrl
 rel/pkg/packlist
 rel/pkg/*.tgz

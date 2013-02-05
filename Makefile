@@ -5,7 +5,8 @@ REBAR = $(shell pwd)/rebar
 all: deps compile
 
 version:
-	echo "-define(VERSION, <<\"$(shell git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(shell git log --pretty=format:'%h, %ad' -1)\">>)." > apps/snarl/src/snarl_version.hrl
+	echo "$(shell git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(shell git log --pretty=format:'%h, %ad' -1)" > snarl.version
+	echo "-define(VERSION, <<\"$(shell cat snarl.version)\">>)." > apps/snarl/src/snarl_version.hrl
 
 compile: version
 	$(REBAR) compile
