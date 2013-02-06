@@ -21,6 +21,8 @@
          grant/2,
          revoke/2,
          allowed/2,
+         set/2,
+         set/3,
          set_resource/3,
          claim_resource/4,
          free_resource/3,
@@ -121,30 +123,37 @@ add(User) ->
             duplicate
     end.
 
+
+set(User, Attribute, Value) ->
+    set(User, [{Attribute, Value}]).
+
+set(User, Attributes) ->
+    do_write(User, set, Attributes).
+
 passwd(User, Passwd) ->
-    do_update(User, passwd, Passwd).
+    do_write(User, passwd, Passwd).
 
 join(User, Group) ->
-    do_update(User, join, Group).
+    do_write(User, join, Group).
 
 leave(User, Group) ->
-    do_update(User, leave, Group).
+    do_write(User, leave, Group).
 
 delete(User) ->
-    do_update(User, delete).
+    do_write(User, delete).
 
 grant(User, Permission) ->
-    do_update(User, grant, Permission).
+    do_write(User, grant, Permission).
 
 revoke(User, Permission) ->
-    do_update(User, revoke, Permission).
+    do_write(User, revoke, Permission).
 
 %%%===================================================================
 %%% Resource Functions
 %%%===================================================================
 
 set_resource(User, Resource, Value) ->
-    do_update(User, set_resource, [Resource, Value]).
+    do_write(User, set_resource, [Resource, Value]).
 
 claim_resource(User, ID, Resource, Ammount) ->
     case snarl_user:get(User) of
@@ -160,7 +169,7 @@ claim_resource(User, ID, Resource, Ammount) ->
     end.
 
 free_resource(User, Resource, ID) ->
-    do_update(User, free_resource, [Resource, ID]).
+    do_write(User, free_resource, [Resource, ID]).
 
 get_resource_stat(User) ->
     case snarl_user:get(User) of
@@ -174,22 +183,6 @@ get_resource_stat(User) ->
 %%% Internal Functions
 %%%===================================================================
 
-
-do_update(User, Op) ->
-    case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
-        {ok, _UserObj} ->
-            do_write(User, Op)
-    end.
-
-do_update(User, Op, Val) ->
-    case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
-        {ok, _UserObj} ->
-            do_write(User, Op, Val)
-    end.
 
 do_write(User, Op) ->
     snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op).
