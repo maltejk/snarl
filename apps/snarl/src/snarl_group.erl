@@ -10,7 +10,9 @@
          add/1,
          delete/1,
          grant/2,
-         revoke/2
+         revoke/2,
+         set/2,
+         set/3
         ]).
 
 -ignore_xref([ping/0]).
@@ -79,7 +81,7 @@ add(Group) ->
                     {error, timeout}.
 
 delete(Group) ->
-    do_update(Group, delete).
+    do_write(Group, delete).
 
 -spec grant(Group::fifo:group_id(), fifo:permission()) ->
                    ok |
@@ -87,7 +89,7 @@ delete(Group) ->
                    {error, timeout}.
 
 grant(Group, Permission) ->
-    do_update(Group, grant, Permission).
+    do_write(Group, grant, Permission).
 
 -spec revoke(Group::fifo:group_id(), fifo:permission()) ->
                     ok |
@@ -95,29 +97,18 @@ grant(Group, Permission) ->
                     {error, timeout}.
 
 revoke(Group, Permission) ->
-    do_update(Group, revoke, Permission).
+    do_write(Group, revoke, Permission).
 
+set(Group, Attribute, Value) ->
+    set(Group, set, [{Attribute, Value}]).
+
+set(Group, Attributes) ->
+    do_write(Group, set, Attributes).
 
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
-do_update(Group, Op) ->
-    case snarl_group:get(Group) of
-        {ok, not_found} ->
-            not_found;
-        {ok, _GroupObj} ->
-            do_write(Group, Op)
-    end.
-
-do_update(Group, Op, Val) ->
-    case snarl_group:get(Group) of
-        {ok, not_found} ->
-            not_found;
-        {ok, _GroupObj} ->
-            do_write(Group, Op, Val)
-    end.
 
 do_write(Group, Op) ->
     snarl_entity_write_fsm:write({snarl_group_vnode, snarl_group}, Group, Op).

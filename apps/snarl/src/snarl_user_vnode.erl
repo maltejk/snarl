@@ -34,6 +34,7 @@
          repair/4,
          revoke_all/3,
          revoke/4,
+         set/4,
          set_resource/4,
          claim_resource/4,
          free_resource/4
@@ -52,6 +53,7 @@
               leave/4,
               grant/4,
               repair/4,
+              set/4,
               revoke/4,
               set_resource/4,
               claim_resource/4,
@@ -126,6 +128,12 @@ revoke_all(Preflist, ReqID, Perm) ->
 add(Preflist, ReqID, UUID, User) ->
     riak_core_vnode_master:command(Preflist,
                                    {add, ReqID, UUID, User},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+set(Preflist, ReqID, UUID, Attributes) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {set, ReqID, UUID, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -239,17 +247,33 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, Stat
         {ok, not_found} ->
             {reply, {ok, ReqID, not_found}, State};
         {ok, _GroupObj} ->
-            change_user(User, Action, [Group], Coordinator, State),
-            {reply, {ok, ReqID, joined}, State}
+            change_user(User, Action, [Group], Coordinator, State, ReqID)
+    end;
+
+handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
+    case snarl_db:get(State#state.db, <<"user">>, User) of
+        {ok, #snarl_obj{val=H0} = O} ->
+            H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
+            H2 = lists:foldr(
+                   fun ({Attribute, Value}, H) ->
+                           statebox:modify(
+                             {fun snarl_user_state:set/3,
+                              [Attribute, Value]}, H)
+                   end, H1, Attributes),
+            H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
+            snarl_db:put(State#state.db, <<"user">>, User,
+                         snarl_obj:update(H3, Coordinator, O)),
+            {reply, {ok, ReqID}, State};
+        R ->
+            lager:error("[users] tried to write to a non existing user: ~p", [R]),
+            {reply, {ok, ReqID, not_found}, State}
     end;
 
 handle_command({Action, {ReqID, Coordinator}, User, Param1, Param2}, _Sender, State) ->
-    change_user(User, Action, [Param1, Param2], Coordinator, State),
-    {reply, {ok, ReqID}, State};
+    change_user(User, Action, [Param1, Param2], Coordinator, State, ReqID);
 
 handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender, State) ->
-    change_user(User, Action, [Param], Coordinator, State),
-    {reply, {ok, ReqID}, State};
+    change_user(User, Action, [Param], Coordinator, State, ReqID);
 
 handle_command(Message, _Sender, State) ->
     lager:error("[user] Unknown message: ~p", [Message]),
@@ -362,14 +386,16 @@ handle_exit(_Pid, _Reason, State) ->
 terminate(_Reason, _State) ->
     ok.
 
-change_user(User, Action, Vals, Coordinator, State) ->
+change_user(User, Action, Vals, Coordinator, State, ReqID) ->
     case snarl_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val=H0} = O} ->
             H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
             H2 = statebox:modify({fun snarl_user_state:Action/2, Vals}, H1),
             H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
             snarl_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H3, Coordinator, O));
+                         snarl_obj:update(H3, Coordinator, O)),
+            {reply, {ok, ReqID}, State};
         R ->
-            lager:error("[users] tried to write to a non existing user: ~p", [R])
+            lager:error("[users] tried to write to a non existing user: ~p", [R]),
+            {reply, {ok, ReqID, not_found}, State}
     end.
