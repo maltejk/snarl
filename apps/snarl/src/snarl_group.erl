@@ -100,7 +100,7 @@ revoke(Group, Permission) ->
     do_write(Group, revoke, Permission).
 
 set(Group, Attribute, Value) ->
-    set(Group, set, [{Attribute, Value}]).
+    set(Group, [{Attribute, Value}]).
 
 set(Group, Attributes) ->
     do_write(Group, set, Attributes).

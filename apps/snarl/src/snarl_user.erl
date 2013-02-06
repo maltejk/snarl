@@ -125,7 +125,7 @@ add(User) ->
 
 
 set(User, Attribute, Value) ->
-    set(User, set, [{Attribute, Value}]).
+    set(User, [{Attribute, Value}]).
 
 set(User, Attributes) ->
     do_write(User, set, Attributes).
