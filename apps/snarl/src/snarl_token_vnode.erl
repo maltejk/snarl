@@ -4,10 +4,11 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
-	 repair/3,
-	 get/3,
-	 add/4
-	]).
+         repair/3,
+         get/3,
+         delete/3,
+         add/4
+        ]).
 
 -export([start_vnode/1,
          init/1,
@@ -25,11 +26,12 @@
          handle_exit/3]).
 
 -ignore_xref([
-	      start_vnode/1,
-	      repair/3,
-	      get/3,
-	      add/4
-	     ]).
+              start_vnode/1,
+              repair/3,
+              get/3,
+              delete/3,
+              add/4
+             ]).
 
 
 -define(TIMEOUT, 43200000).
@@ -39,15 +41,15 @@
 -define(TIMEOUT_CYCLE, 100).
 
 -record(state, {
-	  tokens,
-	  partition,
-	  node,
-	  cnt = 0,
-	  access_cnt = 0,
-	  timeout,
-	  timeout_limit,
-	  timeout_cycle
-	 }).
+          tokens,
+          partition,
+          node,
+          cnt = 0,
+          access_cnt = 0,
+          timeout,
+          timeout_limit,
+          timeout_cycle
+         }).
 
 -define(MASTER, snarl_token_vnode_master).
 
@@ -71,9 +73,9 @@ repair(IdxNode, Token, Obj) ->
 get(Preflist, ReqID, Token) ->
     ?PRINT({get, Preflist, ReqID, Token}),
     riak_core_vnode_master:command(Preflist,
-				   {get, ReqID, Token},
-				   {fsm, undefined, self()},
-				   ?MASTER).
+                                   {get, ReqID, Token},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 %%%===================================================================
 %%% API - writes
@@ -81,9 +83,15 @@ get(Preflist, ReqID, Token) ->
 
 add(Preflist, ReqID, Token, User) ->
     riak_core_vnode_master:command(Preflist,
-				   {add, ReqID, Token, User},
-				   {fsm, undefined, self()},
-				   ?MASTER).
+                                   {add, ReqID, Token, User},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+delete(Preflist, ReqID, Token) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {delete, ReqID, Token},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 %%%===================================================================
 %%% VNode
@@ -114,35 +122,41 @@ handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) -
     ?PRINT({handle_command, get, ReqID, Token}),
     NodeIdx = {State#state.partition, State#state.node},
     {Tokens1, Res} = case dict:find(Token, Tokens0) of
-			 error ->
-			     {Tokens0,
-			      {ok, ReqID, NodeIdx, not_found}};
-			 {ok, {_, V}} ->
-			     {dict:update(Token, fun({_, User}) ->
-							 {now(), User}
-						 end, Tokens0),
-			      
-			      {ok, ReqID, NodeIdx, V}}
-		     end,
-    {reply, 
+                         error ->
+                             {Tokens0,
+                              {ok, ReqID, NodeIdx, not_found}};
+                         {ok, {_, V}} ->
+                             {dict:update(Token, fun({_, User}) ->
+                                                         {now(), User}
+                                                 end, Tokens0),
+
+                              {ok, ReqID, NodeIdx, V}}
+                     end,
+    {reply,
      Res,
      State#state{tokens = Tokens1}};
+
+handle_command({delete, {ReqID, _Coordinator}, Token}, _Sender, State) ->
+    {reply, {ok, ReqID},
+     State#state{
+       tokens = dict:erase(Token, State#state.tokens)
+      }};
 
 handle_command({add, {ReqID, Coordinator}, Token, User}, _Sender, State) ->
     T0 = statebox:new(fun snarl_token_state:new/0),
     T1 = statebox:modify({fun snarl_token_state:user/2, [User]}, T0),
-    
+
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     TObject = #snarl_obj{val=T1, vclock=VC},
     State1 = expire(State),
     Ts0 = dict:store(Token, {now(), TObject}, State1#state.tokens),
-    
+
     {reply, {ok, ReqID, Token}, State1#state{
-			   tokens = Ts0,
-			   access_cnt = State1#state.access_cnt + 1,
-			   cnt = State1#state.cnt + 1
-			  }};
+                                  tokens = Ts0,
+                                  access_cnt = State1#state.access_cnt + 1,
+                                  cnt = State1#state.cnt + 1
+                                 }};
 
 handle_command(Message, _Sender, State) ->
     ?PRINT({unhandled_command, Message}),
@@ -171,17 +185,17 @@ encode_handoff_item(Token, {_, Data}) ->
 
 is_empty(State) ->
     case dict:size(State#state.tokens) of
-	0 ->
-	    {true, State};
-	_ ->
-	    {true, State}
+        0 ->
+            {true, State};
+        _ ->
+            {true, State}
     end.
 
 delete(State) ->
     {ok, State#state{tokens = dict:new()}}.
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
-    {reply, 
+    {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, dict:fetch_keys(State#state.tokens)},
      State};
 
@@ -201,10 +215,10 @@ terminate(_Reason, _State) ->
 
 dflt_env(N, D) ->
     case application:get_env(N) of
-	undefined ->
-	    D;
-	{ok, V} ->
-	    V
+        undefined ->
+            D;
+        {ok, V} ->
+            V
     end.
 
 expire(#state{cnt = Cnt, timeout_limit = Limit} = State) when Limit < Cnt ->
@@ -214,8 +228,8 @@ expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State) when Cycle < Cnt
 
 expire(#state{tokens = Tokens, timeout = Timeout} = State) ->
     Tokens1 = dict:filter(fun(_K, {Timer, _V}) ->
-				  timer:now_diff(Timer, now()) =< Timeout
-			  end, Tokens),
+                                  timer:now_diff(Timer, now()) =< Timeout
+                          end, Tokens),
     State#state{
       access_cnt = 0,
       tokens = Tokens1,

@@ -1,4 +1,4 @@
--module(snarl_zmq_handler).
+-module(snarl_tcp_handler).
 
 -include("snarl.hrl").
 
@@ -125,6 +125,11 @@ message({user, revoke, User, Permission}, State) ->
 
 message({user, revoke_all, User, Permission}, State) ->
     {reply, snarl_user:revoke_all(ensure_binary(User), Permission), State};
+
+message({token, delete, Token}, State) when
+      is_binary(Token) ->
+    {reply, snarl_token:delete(Token), State};
+
 
 %%%===================================================================
 %%% Resource Functions
