@@ -9,7 +9,8 @@
 -export([
          ping/0,
          get/1,
-         add/1
+         add/1,
+         delete/1
         ]).
 
 -ignore_xref([ping/0]).
@@ -37,9 +38,16 @@ add(User) ->
             duplicate
     end.
 
+delete(Token) ->
+    do_write(Token, delete).
+
+
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
+do_write(User, Op) ->
+    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token}, User, Op).
 
 do_write(Token, Op, Val) ->
     snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token}, Token, Op, Val).
