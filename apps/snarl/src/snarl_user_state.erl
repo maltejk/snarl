@@ -25,6 +25,7 @@
          join/2,
          leave/2,
          uuid/2,
+         set/3,
          set_resource/3,
          get_resource/2,
          claim_resource/4,
@@ -98,6 +99,13 @@ remove_all(Perm, User) ->
                                            end
                                    end, [], Ps)
                 end, [], User).
+
+set(Attribute, delete, User) ->
+    jsxd:delete(Attribute, User);
+
+set(Attribute, Value, User) ->
+    jsxd:set(Attribute, Value, User).
+
 
 set_resource(Resource, Granted, User) ->
     jsxd:set([<<"resources">>, Resource, <<"granted">>], Granted, User).

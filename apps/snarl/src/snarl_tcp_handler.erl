@@ -1,4 +1,4 @@
--module(snarl_zmq_handler).
+-module(snarl_tcp_handler).
 
 -include("snarl.hrl").
 
@@ -39,9 +39,22 @@ message({user, cache, {token, Token}}, State) ->
             message({user, cache, User}, State)
     end;
 
-message({user, get, User}, State) ->
+message({user, get, User}, State) when
+      is_binary(User) ->
     {reply,
-     snarl_user:get(ensure_binary(User)),
+     snarl_user:get(User),
+     State};
+
+message({user, set, User, Attribute, Value}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:set(User, Attribute, Value),
+     State};
+
+message({user, set, User, Attributes}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:set(User, Attributes),
      State};
 
 message({user, lookup, User}, State) when is_binary(User) ->
@@ -113,6 +126,11 @@ message({user, revoke, User, Permission}, State) ->
 message({user, revoke_all, User, Permission}, State) ->
     {reply, snarl_user:revoke_all(ensure_binary(User), Permission), State};
 
+message({token, delete, Token}, State) when
+      is_binary(Token) ->
+    {reply, snarl_token:delete(Token), State};
+
+
 %%%===================================================================
 %%% Resource Functions
 %%%===================================================================
@@ -142,6 +160,18 @@ message({group, list}, State) ->
 
 message({group, get, Group}, State) ->
     {reply, snarl_group:get(Group), State};
+
+message({group, set, Group, Attribute, Value}, State) when
+      is_binary(Group) ->
+    {reply,
+     snarl_group:set(Group, Attribute, Value),
+     State};
+
+message({group, set, Group, Attributes}, State) when
+      is_binary(Group) ->
+    {reply,
+     snarl_group:set(Group, Attributes),
+     State};
 
 message({group, add, Group}, State) ->
     {reply, snarl_group:add(Group), State};

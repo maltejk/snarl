@@ -15,6 +15,7 @@
          name/2,
          grant/2,
          uuid/2,
+         set/3,
          revoke/2
         ]).
 
@@ -53,3 +54,9 @@ revoke(Permission, Group) ->
                 fun (Ps) ->
                         ordsets:del_element(Permission, Ps)
                 end, [Permission], Group).
+
+set(Attribute, delete, Group) ->
+    jsxd:delete(Attribute, Group);
+
+set(Attribute, Value, Group) ->
+    jsxd:set(Attribute, Value, Group).
