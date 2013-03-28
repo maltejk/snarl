@@ -5,6 +5,8 @@
 -behavior(gen_fsm).
 -include("snarl.hrl").
 
+-include("snarl_dtrace.hrl").
+
 %% API
 -export([start_link/6, start/2, start/3, start/4]).
 
@@ -42,16 +44,16 @@
 
 -record(state, {req_id,
                 from,
-		entity,
-		op,
-		r=?R,
+                entity,
+                op,
+                r=?R,
                 preflist,
                 num_r=0,
-		size,
-		timeout=?DEFAULT_TIMEOUT,
-		val,
-		vnode,
-		system,
+                size,
+                timeout=?DEFAULT_TIMEOUT,
+                val,
+                vnode,
+                system,
                 replies=[]}).
 
 %%%===================================================================
@@ -73,12 +75,12 @@ start(VNodeInfo, Op, User, Val) ->
       [ReqID, VNodeInfo, Op, self(), User, Val]
      ),
     receive
-	{ReqID, ok} ->
-	    ok;
+        {ReqID, ok} ->
+            ok;
         {ReqID, ok, Result} ->
-	    {ok, Result}
+            {ok, Result}
     after ?DEFAULT_TIMEOUT ->
-	    {error, timeout}
+            {error, timeout}
     end.
 
 %%%===================================================================
@@ -87,38 +89,39 @@ start(VNodeInfo, Op, User, Val) ->
 
 %% Intiailize state data.
 init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
-    ?PRINT({init, [Op, ReqId, From, Entity, Val]}),
+    ?DT_READ_ENTRY(Entity, Op),
     SD = #state{req_id=ReqId,
                 from=From,
-		op=Op,
-		val=Val,
-		vnode=VNode,
-		system=System,
+                op=Op,
+                val=Val,
+                vnode=VNode,
+                system=System,
                 entity=Entity},
     {ok, prepare, SD, 0};
 
 init([ReqId, {VNode, System}, Op, From, Entity]) ->
-    ?PRINT({init, [Op, ReqId, From, Entity]}),
+    ?DT_READ_ENTRY(Entity, Op),
     SD = #state{req_id=ReqId,
                 from=From,
-		op=Op,
-		vnode=VNode,
-		system=System,
+                op=Op,
+                vnode=VNode,
+                system=System,
                 entity=Entity},
     {ok, prepare, SD, 0};
 
 init([ReqId, {VNode, System}, Op, From]) ->
+    ?DT_READ_ENTRY("undefined", Op),
     ?PRINT({init, [Op, ReqId, From]}),
     SD = #state{req_id=ReqId,
                 from=From,
-		vnode=VNode,
-		system=System,
-		op=Op},
+                vnode=VNode,
+                system=System,
+                op=Op},
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
 prepare(timeout, SD0=#state{entity=Entity,
-			    system=System}) ->
+                            system=System}) ->
     Bucket = list_to_binary(atom_to_list(System)),
     DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
     Prelist = riak_core_apl:get_apl(DocIdx, ?N, System),
@@ -128,21 +131,21 @@ prepare(timeout, SD0=#state{entity=Entity,
 %% @doc Execute the get reqs.
 execute(timeout, SD0=#state{req_id=ReqId,
                             entity=Entity,
-			    op=Op,
-			    val=Val,
-			    vnode=VNode,
+                            op=Op,
+                            val=Val,
+                            vnode=VNode,
                             preflist=Prelist}) ->
     ?PRINT({execute, Entity, Val}),
     case Entity of
-	undefined ->
-	    VNode:Op(Prelist, ReqId);
-	_ ->
-	    case Val of
-		undefined ->
-		    VNode:Op(Prelist, ReqId, Entity);
-		_ ->
-		    VNode:Op(Prelist, ReqId, Entity, Val)
-	    end
+        undefined ->
+            VNode:Op(Prelist, ReqId);
+        _ ->
+            case Val of
+                undefined ->
+                    VNode:Op(Prelist, ReqId, Entity);
+                _ ->
+                    VNode:Op(Prelist, ReqId, Entity, Val)
+            end
     end,
     {next_state, waiting, SD0}.
 
@@ -158,30 +161,32 @@ waiting({ok, ReqID, IdxNode, Obj},
     SD = SD0#state{num_r=NumR,replies=Replies},
     if
         NumR =:= R ->
-	    case merge(Replies) of
-		not_found ->
-		    From ! {ReqID, ok, not_found};
-		Merged ->
-		    Reply = snarl_obj:val(Merged),
-		    From ! {ReqID, ok, statebox:value(Reply)}
-	    end,
-	    if
-		NumR =:= ?N ->
-		    {next_state, finalize, SD, 0};
-	       true ->
-		    {next_state, wait_for_n, SD, Timeout}
-	    end;
+            case merge(Replies) of
+                not_found ->
+                    ?DT_READ_NOT_FOUND_RETURN(SD0#state.entity, SD0#state.op),
+                    From ! {ReqID, ok, not_found};
+                Merged ->
+                    Reply = snarl_obj:val(Merged),
+                    ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
+                    From ! {ReqID, ok, statebox:value(Reply)}
+            end,
+            if
+                NumR =:= ?N ->
+                    {next_state, finalize, SD, 0};
+                true ->
+                    {next_state, wait_for_n, SD, Timeout}
+            end;
         true ->
-	    {next_state, waiting, SD}
+            {next_state, waiting, SD}
     end.
 
 wait_for_n({ok, _ReqID, IdxNode, Obj},
-             SD0=#state{num_r=?N - 1, replies=Replies0}) ->
+           SD0=#state{num_r=?N - 1, replies=Replies0}) ->
     Replies = [{IdxNode, Obj}|Replies0],
     {next_state, finalize, SD0#state{num_r=?N, replies=Replies}, 0};
 
 wait_for_n({ok, _ReqID, IdxNode, Obj},
-             SD0=#state{num_r=NumR0, replies=Replies0, timeout=Timeout}) ->
+           SD0=#state{num_r=NumR0, replies=Replies0, timeout=Timeout}) ->
     NumR = NumR0 + 1,
     Replies = [{IdxNode, Obj}|Replies0],
     {next_state, wait_for_n, SD0#state{num_r=NumR, replies=Replies}, Timeout};
@@ -191,16 +196,16 @@ wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
 finalize(timeout, SD=#state{
-		    vnode=VNode,
-		    replies=Replies,
-		    entity=Entity}) ->
+                    vnode=VNode,
+                    replies=Replies,
+                    entity=Entity}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
-	true ->
-	    repair(VNode, Entity, MObj, Replies),
-	    {stop, normal, SD};
-	false ->
-	    {stop, normal, SD}
+        true ->
+            repair(VNode, Entity, MObj, Replies),
+            {stop, normal, SD};
+        false ->
+            {stop, normal, SD}
     end.
 
 handle_info(_Info, _StateName, StateData) ->
