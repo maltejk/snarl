@@ -263,9 +263,15 @@ repair(_, _, _, []) -> io;
 
 repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
     case snarl_obj:equal(MObj, Obj) of
-        true -> repair(VNode, StatName, MObj, T);
+        true ->
+            repair(VNode, StatName, MObj, T);
         false ->
-            VNode:repair(IdxNode, StatName, Obj#snarl_obj.vclock, MObj),
+            case Obj of
+                not_found ->
+                    VNode:repair(IdxNode, StatName, not_found, MObj);
+                _ ->
+                    VNode:repair(IdxNode, StatName, Obj#snarl_obj.vclock, MObj)
+            end,
             repair(VNode, StatName, MObj, T)
     end.
 
