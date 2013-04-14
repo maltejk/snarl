@@ -28,27 +28,36 @@ ping() ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_group_vnode_master).
 
-lookup(Group) ->
+-spec lookup(GroupName::binary()) ->
+                    not_found |
+                    {error, timeout} |
+                    {ok, Group::fifo:group()}.
+
+lookup(GroupName) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_group_vnode, snarl_group},
-                  lookup, Group
+                  lookup, GroupName
                  ),
-    Res1 = lists:foldl(fun (not_found, Acc) ->
+    lists:foldl(fun (not_found, Acc) ->
                                Acc;
                            (R, _) ->
-                               R
-                       end, not_found, Res),
-    {ok, Res1}.
+                               {ok, R}
+                       end, not_found, Res).
 
 -spec get(Group::fifo:group_id()) ->
                  {ok, fifo:group()} |
                  not_found |
                  {error, timeout}.
 get(Group) ->
-    snarl_entity_read_fsm:start(
-      {snarl_group_vnode, snarl_group},
-      get, Group
-     ).
+    case snarl_entity_read_fsm:start(
+           {snarl_group_vnode, snarl_group},
+           get, Group
+          ) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
 
 -spec list() -> {ok, [fifo:group_id()]} |
                 not_found |
@@ -60,15 +69,15 @@ list() ->
       list
      ).
 
--spec add(Group::fifo:group_id()) ->
-                 {ok, binary()} |
+-spec add(Group::binary()) ->
+                 {ok, UUID::fifo:group_id()} |
                  douplicate |
                  {error, timeout}.
 
 add(Group) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
     case snarl_group:lookup(Group) of
-        {ok, not_found} ->
+        not_found ->
             ok = do_write(UUID, add, Group),
             {ok, UUID};
         {ok, _GroupObj} ->
@@ -99,9 +108,17 @@ grant(Group, Permission) ->
 revoke(Group, Permission) ->
     do_write(Group, revoke, Permission).
 
+-spec set(Group::fifo:group_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
+                 not_found |
+                 {error, timeout} |
+                 ok.
 set(Group, Attribute, Value) ->
     set(Group, [{Attribute, Value}]).
 
+-spec set(User::fifo:user_id(), Attirbutes::fifo:attr_list()) ->
+                 not_found |
+                 {error, timeout} |
+                 ok.
 set(Group, Attributes) ->
     do_write(Group, set, Attributes).
 

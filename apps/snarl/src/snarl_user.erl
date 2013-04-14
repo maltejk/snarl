@@ -43,49 +43,66 @@ ping() ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
+
+-spec auth(User::binary(), Passwd::binary()) ->
+                  not_found |
+                  {error, timeout} |
+                  {ok, User::fifo:user()}.
 auth(User, Passwd) ->
     Hash = crypto:sha([User, Passwd]),
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_user_vnode, snarl_user},
                   auth, Hash
                  ),
-    Res1 = lists:foldl(fun (not_found, Acc) ->
-                               Acc;
-                           (R, _) ->
-                               R
-                       end, not_found, Res),
-    {ok, Res1}.
+    lists:foldl(fun (not_found, Acc) ->
+                        Acc;
+                    (R, _) ->
+                        {ok, R}
+                end, not_found, Res).
 
+-spec lookup(User::binary()) ->
+                    not_found |
+                    {error, timeout} |
+                    {ok, User::fifo:user()}.
 lookup(User) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_user_vnode, snarl_user},
-                  lookup, User
-                 ),
-    Res1 = lists:foldl(fun (not_found, Acc) ->
-                               Acc;
-                           (R, _) ->
-                               R
-                       end, not_found, Res),
-    {ok, Res1}.
+                  lookup, User),
+    lists:foldl(fun (not_found, Acc) ->
+                        Acc;
+                    (R, _) ->
+                        {ok, R}
+                end, not_found, Res).
 
-
+-spec revoke_all(User::fifo:user_id(),
+                 Perm::fifo:permission()) ->
+                        not_found |
+                        {error, timeout} |
+                        ok.
 revoke_all(User, Perm) ->
     snarl_entity_coverage_fsm:start(
       {snarl_user_vnode, snarl_user},
       revoke_all, User, Perm).
 
+-spec allowed(User::fifo:uuid(),
+              Permission::fifo:permission()) ->
+                     not_found |
+                     {error, timeout} |
+                     true | false.
 allowed(User, Permission) ->
     case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
         {ok, UserObj} ->
-            test_user(UserObj, Permission)
+            test_user(UserObj, Permission);
+        E ->
+            E
     end.
 
+-spec cache(User::fifo:user_id()) ->
+                   not_found |
+                   {error, timeout} |
+                   {ok, Perms::[fifo:permission()]}.
 cache(User) ->
     case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
         {ok, UserObj} ->
             {ok, lists:foldl(
                    fun(Group, Permissions) ->
@@ -98,53 +115,104 @@ cache(User) ->
                            end
                    end,
                    jsxd:get(<<"permissions">>, [], UserObj),
-                   jsxd:get(<<"groups">>, [], UserObj))}
+                   jsxd:get(<<"groups">>, [], UserObj))};
+        E ->
+            E
     end.
 
+-spec get(User::fifo:user_id()) ->
+                 not_found |
+                 {error, timeout} |
+                 {ok, User::fifo:user()}.
 get(User) ->
-    snarl_entity_read_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      get, User
-     ).
+    case snarl_entity_read_fsm:start(
+           {snarl_user_vnode, snarl_user},
+           get, User
+          ) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
 
+-spec list() ->
+                  {error, timeout} |
+                  {ok, Users::[fifo:user_id()]}.
 list() ->
     snarl_entity_coverage_fsm:start(
       {snarl_user_vnode, snarl_user},
       list
      ).
 
+-spec add(UserName::binary()) ->
+                 duplicate |
+                 {error, timeout} |
+                 {ok, UUID::fifo:user_id()}.
 add(User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
     case snarl_user:lookup(User) of
-        {ok, not_found} ->
+        not_found ->
             ok = do_write(UUID, add, User),
             {ok, UUID};
         {ok, _UserObj} ->
             duplicate
     end.
 
-
+-spec set(User::fifo:user_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
+                 not_found |
+                 {error, timeout} |
+                 ok.
 set(User, Attribute, Value) ->
     set(User, [{Attribute, Value}]).
 
+-spec set(User::fifo:user_id(), Attirbutes::fifo:attr_list()) ->
+                 not_found |
+                 {error, timeout} |
+                 ok.
 set(User, Attributes) ->
     do_write(User, set, Attributes).
 
+-spec passwd(User::fifo:user_id(), Passwd::binary()) ->
+                    not_found |
+                    {error, timeout} |
+                    ok.
 passwd(User, Passwd) ->
     do_write(User, passwd, Passwd).
 
+-spec join(User::fifo:user_id(), Group::fifo:group_id()) ->
+                  not_found |
+                  {error, timeout} |
+                  ok.
 join(User, Group) ->
     do_write(User, join, Group).
 
+-spec leave(User::fifo:user_id(), Group::fifo:group_id()) ->
+                   not_found |
+                   {error, timeout} |
+                   ok.
 leave(User, Group) ->
     do_write(User, leave, Group).
 
+-spec delete(User::fifo:user_id()) ->
+                    not_found |
+                    {error, timeout} |
+                    ok.
 delete(User) ->
     do_write(User, delete).
 
+-spec grant(User::fifo:user_id(),
+            Permission::fifo:permission()) ->
+                   not_found |
+                   {error, timeout} |
+                   ok.
 grant(User, Permission) ->
     do_write(User, grant, Permission).
 
+-spec revoke(User::fifo:user_id(),
+             Permission::fifo:permission()) ->
+                    not_found |
+                    {error, timeout} |
+                    ok.
 revoke(User, Permission) ->
     do_write(User, revoke, Permission).
 
@@ -157,15 +225,15 @@ set_resource(User, Resource, Value) ->
 
 claim_resource(User, ID, Resource, Ammount) ->
     case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
         {ok, UserObj} ->
-            case snarl_user_state:get_free_resource(UserObj, Resource) of
+            case snarl_user_state:get_free_resource(Resource, UserObj) of
                 Free when Free >= Ammount ->
                     do_write(User, claim_resource, [Resource, ID, Ammount]);
                 _ ->
                     limit_reached
-            end
+            end;
+        E ->
+            E
     end.
 
 free_resource(User, Resource, ID) ->
@@ -173,10 +241,10 @@ free_resource(User, Resource, ID) ->
 
 get_resource_stat(User) ->
     case snarl_user:get(User) of
-        {ok, not_found} ->
-            not_found;
         {ok, UserObj} ->
-            snarl_user_state:get_resource_stat(UserObj)
+            snarl_user_state:get_resource_stat(UserObj);
+        E ->
+            E
     end.
 
 %%%===================================================================
@@ -185,10 +253,20 @@ get_resource_stat(User) ->
 
 
 do_write(User, Op) ->
-    snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op).
+    case snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
 
 do_write(User, Op, Val) ->
-    snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op, Val).
+    case snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op, Val) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
 
 test_groups(_Permission, []) ->
     false;
