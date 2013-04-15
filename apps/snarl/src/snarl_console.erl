@@ -75,8 +75,8 @@ join_group([User, Group]) ->
         {ok, UserObj} ->
             case snarl_group:lookup(list_to_binary(Group)) of
                 {ok, GroupObj} ->
-                    {ok, joined} = snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj),
-                                                   jsxd:get(<<"uuid">>, <<>>, GroupObj)),
+                    ok = snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj),
+                                         jsxd:get(<<"uuid">>, <<>>, GroupObj)),
                     io:format("User '~s' added to group '~s'.~n", [User, Group]),
                     ok;
                 _ ->
