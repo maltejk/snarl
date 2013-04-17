@@ -12,6 +12,7 @@
          join_group/1,
          leave_group/1,
          grant_group/1,
+         list_group/1,
          revoke_group/1]).
 
 -export([add_user/1,
@@ -29,6 +30,7 @@
               staged_join/1,
               ringready/1,
               list_user/1,
+              list_group/1,
               add_user/1,
               add_group/1,
               join_group/1,
@@ -46,6 +48,15 @@ list_user([]) ->
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_user:get(UUID),
+                      io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+              end, Users),
+    ok.
+list_group([]) ->
+    {ok, Users} = snarl_group:list(),
+    io:format("UUID                                 Name~n"),
+    io:format("------------------------------------ ---------------~n", []),
+    lists:map(fun(UUID) ->
+                      {ok, User} = snarl_group:get(UUID),
                       io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
@@ -321,11 +332,11 @@ reip([OldNode, NewNode]) ->
         NewRing = riak_core_ring:rename_node(Ring, OldNode, NewNode),
         riak_core_ring_manager:do_write_ringfile(NewRing),
         io:format("New ring file written to ~p~n",
-            [element(2, riak_core_ring_manager:find_latest_ringfile())])
+                  [element(2, riak_core_ring_manager:find_latest_ringfile())])
     catch
         Exception:Reason ->
             lager:error("Reip failed ~p:~p", [Exception,
-                    Reason]),
+                                              Reason]),
             io:format("Reip failed, see log for details~n"),
             error
     end.
