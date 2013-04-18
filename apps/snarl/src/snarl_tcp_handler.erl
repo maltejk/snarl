@@ -20,7 +20,7 @@ init(Prot, []) ->
 -spec message(fifo:snarl_message(), term()) -> any().
 
 message(version, State) ->
-    {stop, normal, ?VERSION, State};
+    {stop, normal, {ok, ?VERSION}, State};
 
 message({user, list}, State) ->
     {stop, normal, snarl_user:list(), State};
