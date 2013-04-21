@@ -35,6 +35,7 @@
                 entity,
                 op,
                 r=?R,
+                n,
                 preflist,
                 num_r=0,
                 size,
@@ -76,34 +77,29 @@ start(VNodeInfo, Op, User, Val) ->
 %%%===================================================================
 
 %% Intiailize state data.
+init([ReqId, {VNode, System}, Op, From]) ->
+    init([ReqId, {VNode, System}, Op, From, undefined, undefined]);
+
+init([ReqId, {VNode, System}, Op, From, Entity]) ->
+    init([ReqId, {VNode, System}, Op, From, Entity, undefined]);
+
 init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
     ?PRINT({init, [Op, ReqId, From, Entity, Val]}),
+    {N, R, _W} = case application:get_key(System) of
+                     {ok, Res} ->
+                         Res;
+                     undefined ->
+                         {?N, ?R, ?W}
+                 end,
     SD = #state{req_id=ReqId,
                 from=From,
                 op=Op,
+                r = R,
+                n = N,
                 val=Val,
                 vnode=VNode,
                 system=System,
                 entity=Entity},
-    {ok, prepare, SD, 0};
-
-init([ReqId, {VNode, System}, Op, From, Entity]) ->
-    ?PRINT({init, [Op, ReqId, From, Entity]}),
-    SD = #state{req_id=ReqId,
-                from=From,
-                op=Op,
-                vnode=VNode,
-                system=System,
-                entity=Entity},
-    {ok, prepare, SD, 0};
-
-init([ReqId, {VNode, System}, Op, From]) ->
-    ?PRINT({init, [Op, ReqId, From]}),
-    SD = #state{req_id=ReqId,
-                from=From,
-                vnode=VNode,
-                system=System,
-                op=Op},
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
@@ -112,7 +108,7 @@ prepare(timeout, SD0=#state{system=System,
     PVC = ?N,
     {Nodes, _Other} =
         riak_core_coverage_plan:create_plan(
-          all, ?N, PVC, ReqId, System),
+          allup, ?N, PVC, ReqId, System),
     {ok, CHash} = riak_core_ring_manager:get_my_ring(),
     {Num, _} = riak_core_ring:chash(CHash),
     SD = SD0#state{preflist=Nodes, size=Num},
@@ -125,7 +121,6 @@ execute(timeout, SD0=#state{req_id=ReqId,
                             val=Val,
                             vnode=VNode,
                             preflist=Prelist}) ->
-    ?PRINT({execute, Entity, Val}),
     case Entity of
         undefined ->
             VNode:Op(Prelist, ReqId);
