@@ -30,7 +30,8 @@
          delete/3,
          grant/4,
          repair/4,
-         revoke/4]).
+         revoke/4,
+         revoke_prefix/4]).
 
 -ignore_xref([
               start_vnode/1,
@@ -42,7 +43,8 @@
               grant/4,
               set/4,
               repair/4,
-              revoke/4
+              revoke/4,
+              revoke_prefix/4
              ]).
 
 
@@ -125,6 +127,11 @@ revoke(Preflist, ReqID, Group, Val) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
+revoke_prefix(Preflist, ReqID, Group, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {revoke_prefix, ReqID, Group, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 %%%===================================================================
 %%% VNode
 %%%===================================================================

@@ -139,9 +139,9 @@ message({user, revoke, User, Permission}, State) when
       is_binary(User) ->
     {stop, normal, snarl_user:revoke(User, Permission), State};
 
-message({user, revoke_all, User, Permission}, State) when
+message({user, revoke_prefix, User, Prefix}, State) when
       is_binary(User) ->
-    {stop, normal, snarl_user:revoke_all(User, Permission), State};
+    {stop, normal, snarl_user:revoke_prefix(User, Prefix), State};
 
 message({token, delete, Token}, State) when
       is_binary(Token) ->
@@ -216,6 +216,9 @@ message({group, grant, Group, Permission}, State) when
 message({group, revoke, Group, Permission}, State) ->
     {stop, normal, snarl_group:revoke(Group, Permission), State};
 
+message({group, revoke_prefix, Group, Prefix}, State) ->
+    {stop, normal, snarl_group:revoke_prefix(Group, Prefix), State};
+
 message(Message, State) ->
-    io:format("Unsuppored 0MQ message: ~p", [Message]),
+    io:format("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
