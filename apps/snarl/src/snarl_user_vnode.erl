@@ -32,7 +32,7 @@
          leave/4,
          grant/4,
          repair/4,
-         revoke_all/3,
+         revoke_prefix/4,
          revoke/4,
          set/4,
          set_resource/4,
@@ -47,7 +47,7 @@
               list/2,
               add/4,
               delete/3,
-              revoke_all/3,
+              revoke_prefix/4,
               passwd/4,
               join/4,
               leave/4,
@@ -113,14 +113,6 @@ lookup(Preflist, ReqID, Name) ->
       {fsm, undefined, self()},
       ?MASTER).
 
-revoke_all(Preflist, ReqID, Perm) ->
-    riak_core_vnode_master:coverage(
-      {revoke, ReqID, Perm},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
 %%%===================================================================
 %%% API - writes
 %%%===================================================================
@@ -171,6 +163,12 @@ grant(Preflist, ReqID, User, Val) ->
 revoke(Preflist, ReqID, User, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {revoke, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+revoke_prefix(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {revoke_prefix, ReqID, User, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -352,20 +350,6 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
                         end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
-     State};
-
-handle_coverage({revoke, ReqID, Perm}, _KeySpaces, _Sender, State) ->
-    Trans = snarl_db:fold(State#state.db,
-                          <<"user">>,
-                          fun (K, #snarl_obj{val=H0} = O, Res) ->
-                                  H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
-                                  H2 = statebox:modify({fun snarl_user_state:remove_all/2, [Perm]}, H1),
-                                  H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
-                                  [{put, K, snarl_obj:update(H3, snarl_user_vnode, O)} | Res]
-                          end, []),
-    snarl_db:transact(State#state.db, Trans),
-    {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, []},
      State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->

@@ -12,7 +12,8 @@
          grant/2,
          revoke/2,
          set/2,
-         set/3
+         set/3,
+         revoke_prefix/2
         ]).
 
 -ignore_xref([ping/0]).
@@ -107,6 +108,16 @@ grant(Group, Permission) ->
 
 revoke(Group, Permission) ->
     do_write(Group, revoke, Permission).
+
+-spec revoke_prefix(Group::fifo:group_id(),
+                 Perm::fifo:permission()) ->
+                        not_found |
+                        {error, timeout} |
+                        ok.
+revoke_prefix(Group, Perm) ->
+    snarl_entity_coverage_fsm:start(
+      {snarl_group_vnode, snarl_group},
+      revoke_prefix, Group, Perm).
 
 -spec set(Group::fifo:group_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
                  not_found |

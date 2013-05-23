@@ -21,7 +21,6 @@
          passwd/2,
          grant/2,
          revoke/2,
-         remove_all/2,
          join/2,
          leave/2,
          uuid/2,
@@ -31,7 +30,8 @@
          claim_resource/4,
          free_resource/3,
          get_free_resource/2,
-         get_resource_stat/1
+         get_resource_stat/1,
+         revoke_prefix/2
         ]).
 
 -ignore_xref([
@@ -44,7 +44,8 @@
               uuid/2,
               leave/2,
               passwd/2,
-              revoke/2
+              revoke/2,
+              revoke_prefix/2
              ]).
 
 load(User) ->
@@ -66,15 +67,20 @@ passwd(Passwd, User) ->
 grant(Permission, User) ->
     jsxd:update(<<"permissions">>,
                 fun (Ps) ->
-                        ordsets:add_element(Permission, Ps)
+                        snarl_permission:grant(Permission, Ps)
                 end, [Permission], User).
 
 revoke(Permission, User) ->
     jsxd:update(<<"permissions">>,
                 fun (Ps) ->
-                        ordsets:del_element(Permission, Ps)
+                        snarl_permission:revoke(Permission, Ps)
                 end, [], User).
 
+revoke_prefix(Prefix, User) ->
+    jsxd:update(<<"permissions">>,
+                fun (Ps) ->
+                        snarl_permission:revoke_prefix(Prefix, Ps)
+                end, [], User).
 join(Group, User) ->
     jsxd:update(<<"groups">>,
                 fun (Gs) ->
@@ -85,19 +91,6 @@ leave(Group, User) ->
     jsxd:update(<<"groups">>,
                 fun (Gs) ->
                         ordsets:del_element(Group, Gs)
-                end, [], User).
-
-remove_all(Perm, User) ->
-    jsxd:update(<<"permissions">>,
-                fun(Ps) ->
-                        lists:foldl(fun (P, Acc) ->
-                                           case lists:prefix(Perm, P) of
-                                               true ->
-                                                   Acc;
-                                               _ ->
-                                                   [P, Acc]
-                                           end
-                                   end, [], Ps)
                 end, [], User).
 
 set(Attribute, delete, User) ->
