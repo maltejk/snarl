@@ -109,15 +109,13 @@ grant(Group, Permission) ->
 revoke(Group, Permission) ->
     do_write(Group, revoke, Permission).
 
--spec revoke_prefix(Group::fifo:group_id(),
-                 Perm::fifo:permission()) ->
-                        not_found |
-                        {error, timeout} |
-                        ok.
-revoke_prefix(Group, Perm) ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_group_vnode, snarl_group},
-      revoke_prefix, Group, Perm).
+-spec revoke_prefix(Group::fifo:group_id(), fifo:permission()) ->
+                           ok |
+                           not_found|
+                           {error, timeout}.
+
+revoke_prefix(Group, Prefix) ->
+    do_write(Group, revoke_prefix, Prefix).
 
 -spec set(Group::fifo:group_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
                  not_found |

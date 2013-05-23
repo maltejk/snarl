@@ -75,14 +75,12 @@ lookup(User) ->
                 end, not_found, Res).
 
 -spec revoke_prefix(User::fifo:user_id(),
-                 Perm::fifo:permission()) ->
-                        not_found |
-                        {error, timeout} |
-                        ok.
-revoke_prefix(User, Perm) ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      revoke_prefix, User, Perm).
+                    Prefix::fifo:permission()) ->
+                    not_found |
+                    {error, timeout} |
+                    ok.
+revoke_prefix(User, Prefix) ->
+    do_write(User, revoke_prefix, Prefix).
 
 -spec allowed(User::fifo:uuid(),
               Permission::fifo:permission()) ->
