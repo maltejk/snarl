@@ -104,7 +104,8 @@ import_user([File]) ->
                                  snarl_user:add(Name)
                          end,
             As = jsxd:thread([{delete, [<<"name">>]},
-                             {delete, [<<"uuid">>]}],
+                              {delete, [<<"uuid">>]},
+                              {update, [<<"password">>],  fun base64:decode/1}],
                              JSX),
             ok = snarl_user:set(UUID, As),
             ok

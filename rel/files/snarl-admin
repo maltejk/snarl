@@ -121,7 +121,7 @@ case "$1" in
                 ;;
             "import")
                 shift
-                run snarl_console export_user $@
+                run snarl_console import_user $@
                 ;;
             *)
                 echo "Usage: snarl-admin users { add | passwd | join | leave "
