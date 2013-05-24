@@ -15,6 +15,7 @@
         ]).
 
 -export([add_group/1,
+         delete_group/1,
          join_group/1,
          leave_group/1,
          grant_group/1,
@@ -22,6 +23,7 @@
          revoke_group/1]).
 
 -export([add_user/1,
+         delete_user/1,
          list_user/1,
          grant_user/1,
          revoke_user/1,
@@ -30,6 +32,8 @@
 -ignore_xref([
               join/1,
               leave/1,
+              delete_user/1,
+              delete_group/1,
               remove/1,
               export_user/1,
               import_user/1,
@@ -71,6 +75,14 @@ list_group([]) ->
                       io:format("~36s ~-15s~n",
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
+    ok.
+
+delete_user([User]) ->
+    snarl_user:delete(list_to_binary(User)),
+    ok.
+
+delete_group([User]) ->
+    snarl_user:delete(list_to_binary(User)),
     ok.
 
 add_user([User]) ->

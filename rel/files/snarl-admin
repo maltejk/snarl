@@ -115,6 +115,10 @@ case "$1" in
                 shift
                 run snarl_console revoke_user $@
                 ;;
+            "delete")
+                shift
+                run snarl_console delete_user $@
+                ;;
             "export")
                 shift
                 run snarl_console export_user $@
@@ -148,6 +152,10 @@ case "$1" in
             revoke)
                 shift
                 run snarl_console revoke_group $@
+                ;;
+            "delete")
+                shift
+                run snarl_console delete_group $@
                 ;;
             "export")
                 shift
