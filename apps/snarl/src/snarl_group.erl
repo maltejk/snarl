@@ -13,6 +13,7 @@
          revoke/2,
          set/2,
          set/3,
+         create/2,
          revoke_prefix/2
         ]).
 
@@ -77,6 +78,9 @@ list() ->
 
 add(Group) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    create(UUID, Group).
+
+create(UUID, Group) ->
     case snarl_group:lookup(Group) of
         not_found ->
             ok = do_write(UUID, add, Group),

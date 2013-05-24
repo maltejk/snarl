@@ -149,6 +149,15 @@ case "$1" in
                 shift
                 run snarl_console revoke_group $@
                 ;;
+            "export")
+                shift
+                run snarl_console export_group $@
+                ;;
+            "import")
+                shift
+                run snarl_console import_group $@
+                ;;
+
             *)
                 echo "Usage: snarl-admin groups { list | add | grant | revoke }."
                 exit 1

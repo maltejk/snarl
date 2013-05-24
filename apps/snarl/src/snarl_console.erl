@@ -8,13 +8,17 @@
          staged_join/1,
          ringready/1]).
 
--export([export_user/1]).
+-export([export_user/1,
+         import_user/1,
+         export_group/1,
+         import_group/1
+        ]).
+
 -export([add_group/1,
          join_group/1,
          leave_group/1,
          grant_group/1,
          list_group/1,
-         import_user/1,
          revoke_group/1]).
 
 -export([add_user/1,
@@ -29,6 +33,8 @@
               remove/1,
               export_user/1,
               import_user/1,
+              export_group/1,
+              import_group/1,
               down/1,
               reip/1,
               staged_join/1,
@@ -111,6 +117,39 @@ import_user([File]) ->
             ok
     end.
 
+
+export_group([UUID]) ->
+    case snarl_group:get(list_to_binary(UUID)) of
+        {ok, GroupObj} ->
+            io:format("~s~n", [jsx:encode(GroupObj)]),
+            ok;
+        _ ->
+            error
+    end.
+
+import_group([File]) ->
+    case file:read_file(File) of
+        {error,enoent} ->
+            io:format("That file does not exist or is not an absolute path.~n"),
+            error;
+        {ok, B} ->
+            JSON = jsx:decode(B),
+            JSX = jsxd:from_list(JSON),
+            {ok, Name} = jsxd:get([<<"name">>], JSX),
+            {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
+                             {ok, U} ->
+                                 snarl_group:delete(U),
+                                 snarl_group:create(U, Name),
+                                 {ok, U};
+                             undefined ->
+                                 snarl_group:add(Name)
+                         end,
+            As = jsxd:thread([{delete, [<<"name">>]},
+                              {delete, [<<"uuid">>]}],
+                             JSX),
+            ok = snarl_group:set(UUID, As),
+            ok
+    end.
 
 add_group([Group]) ->
     case snarl_group:add(list_to_binary(Group)) of
