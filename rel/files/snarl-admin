@@ -115,7 +115,10 @@ case "$1" in
                 shift
                 run snarl_console revoke_user $@
                 ;;
-
+            "export")
+                shift
+                run snarl_console export_user $@
+                ;;
             *)
                 echo "Usage: snarl-admin users { add | passwd | join | leave "
                 echo "                           grant | revoke }."

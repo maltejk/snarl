@@ -8,6 +8,7 @@
          staged_join/1,
          ringready/1]).
 
+-export([export_user/1]).
 -export([add_group/1,
          join_group/1,
          leave_group/1,
@@ -25,6 +26,7 @@
               join/1,
               leave/1,
               remove/1,
+              export_user/1,
               down/1,
               reip/1,
               staged_join/1,
@@ -48,7 +50,8 @@ list_user([]) ->
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_user:get(UUID),
-                      io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+                      io:format("~36s ~-15s~n",
+                                [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
 list_group([]) ->
@@ -57,7 +60,8 @@ list_group([]) ->
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_group:get(UUID),
-                      io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+                      io:format("~36s ~-15s~n",
+                                [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
 
@@ -71,6 +75,14 @@ add_user([User]) ->
             error
     end.
 
+export_user([UUID]) ->
+    case snarl_user:get(list_to_binary(UUID)) of
+        {ok, UserObj} ->
+            io:format("~p~n", [jsx:encode(UserObj)]),
+            ok;
+        _ ->
+            error
+    end.
 add_group([Group]) ->
     case snarl_group:add(list_to_binary(Group)) of
         {ok, UUID} ->
