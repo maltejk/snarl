@@ -27,7 +27,8 @@
          claim_resource/4,
          free_resource/3,
          get_resource_stat/1,
-         cache/1
+         cache/1,
+         create/2
         ]).
 
 -ignore_xref([ping/0]).
@@ -148,7 +149,10 @@ list() ->
                  {ok, UUID::fifo:user_id()}.
 add(User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    case snarl_user:lookup(User) of
+    create(UUID, User).
+
+create(UUID, User) ->
+        case snarl_user:lookup(User) of
         not_found ->
             ok = do_write(UUID, add, User),
             {ok, UUID};

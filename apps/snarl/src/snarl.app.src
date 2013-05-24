@@ -12,6 +12,7 @@
                   mdns_server_lib,
                   lager,
                   libsnarlmatch,
+                  jsx,
                   uuid
                  ]},
   {mod, { snarl_app, []}},

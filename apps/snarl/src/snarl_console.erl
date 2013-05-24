@@ -8,7 +8,14 @@
          staged_join/1,
          ringready/1]).
 
+-export([export_user/1,
+         import_user/1,
+         export_group/1,
+         import_group/1
+        ]).
+
 -export([add_group/1,
+         delete_group/1,
          join_group/1,
          leave_group/1,
          grant_group/1,
@@ -16,6 +23,7 @@
          revoke_group/1]).
 
 -export([add_user/1,
+         delete_user/1,
          list_user/1,
          grant_user/1,
          revoke_user/1,
@@ -24,7 +32,13 @@
 -ignore_xref([
               join/1,
               leave/1,
+              delete_user/1,
+              delete_group/1,
               remove/1,
+              export_user/1,
+              import_user/1,
+              export_group/1,
+              import_group/1,
               down/1,
               reip/1,
               staged_join/1,
@@ -48,7 +62,8 @@ list_user([]) ->
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_user:get(UUID),
-                      io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+                      io:format("~36s ~-15s~n",
+                                [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
 list_group([]) ->
@@ -57,8 +72,17 @@ list_group([]) ->
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_group:get(UUID),
-                      io:format("~36s ~-15s~n", [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+                      io:format("~36s ~-15s~n",
+                                [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
+    ok.
+
+delete_user([User]) ->
+    snarl_user:delete(list_to_binary(User)),
+    ok.
+
+delete_group([User]) ->
+    snarl_user:delete(list_to_binary(User)),
     ok.
 
 add_user([User]) ->
@@ -69,6 +93,74 @@ add_user([User]) ->
         duplicate ->
             io:format("User '~s' already exists.~n", [User]),
             error
+    end.
+
+export_user([UUID]) ->
+    case snarl_user:get(list_to_binary(UUID)) of
+        {ok, UserObj} ->
+            io:format("~s~n", [jsx:encode(jsxd:update(<<"password">>, fun base64:encode/1, UserObj))]),
+            ok;
+        _ ->
+            error
+    end.
+
+import_user([File]) ->
+    case file:read_file(File) of
+        {error,enoent} ->
+            io:format("That file does not exist or is not an absolute path.~n"),
+            error;
+        {ok, B} ->
+            JSON = jsx:decode(B),
+            JSX = jsxd:from_list(JSON),
+            {ok, Name} = jsxd:get([<<"name">>], JSX),
+            {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
+                             {ok, U} ->
+                                 snarl_user:delete(U),
+                                 snarl_user:create(U, Name),
+                                 {ok, U};
+                             undefined ->
+                                 snarl_user:add(Name)
+                         end,
+            As = jsxd:thread([{delete, [<<"name">>]},
+                              {delete, [<<"uuid">>]},
+                              {update, [<<"password">>],  fun base64:decode/1}],
+                             JSX),
+            ok = snarl_user:set(UUID, As),
+            ok
+    end.
+
+
+export_group([UUID]) ->
+    case snarl_group:get(list_to_binary(UUID)) of
+        {ok, GroupObj} ->
+            io:format("~s~n", [jsx:encode(GroupObj)]),
+            ok;
+        _ ->
+            error
+    end.
+
+import_group([File]) ->
+    case file:read_file(File) of
+        {error,enoent} ->
+            io:format("That file does not exist or is not an absolute path.~n"),
+            error;
+        {ok, B} ->
+            JSON = jsx:decode(B),
+            JSX = jsxd:from_list(JSON),
+            {ok, Name} = jsxd:get([<<"name">>], JSX),
+            {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
+                             {ok, U} ->
+                                 snarl_group:delete(U),
+                                 snarl_group:create(U, Name),
+                                 {ok, U};
+                             undefined ->
+                                 snarl_group:add(Name)
+                         end,
+            As = jsxd:thread([{delete, [<<"name">>]},
+                              {delete, [<<"uuid">>]}],
+                             JSX),
+            ok = snarl_group:set(UUID, As),
+            ok
     end.
 
 add_group([Group]) ->
