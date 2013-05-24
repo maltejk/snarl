@@ -14,6 +14,7 @@
          leave_group/1,
          grant_group/1,
          list_group/1,
+         import_user/1,
          revoke_group/1]).
 
 -export([add_user/1,
@@ -27,6 +28,7 @@
               leave/1,
               remove/1,
               export_user/1,
+              import_user/1,
               down/1,
               reip/1,
               staged_join/1,
@@ -78,11 +80,37 @@ add_user([User]) ->
 export_user([UUID]) ->
     case snarl_user:get(list_to_binary(UUID)) of
         {ok, UserObj} ->
-            io:format("~p~n", [jsx:encode(UserObj)]),
+            io:format("~p~n", [jsx:encode(jsxd:update(<<"password">>, fun base64:encode/1, UserObj))]),
             ok;
         _ ->
             error
     end.
+
+import_user([File]) ->
+    case file:read_file(File) of
+        {error,enoent} ->
+            io:format("That file does not exist or is not an absolute path.~n"),
+            error;
+        {ok, B} ->
+            JSON = jsx:decode(B),
+            JSX = jsxd:from_list(JSON),
+            {ok, Name} = jsxd:get([<<"name">>], JSX),
+            {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
+                             {ok, U} ->
+                                 snarl_user:delete(U),
+                                 snarl_user:create(U, Name),
+                                 {ok, U};
+                             undefined ->
+                                 snarl_user:add(Name)
+                         end,
+            As = jsxd:thread([{delete, [<<"name">>]},
+                             {delete, [<<"uuid">>]}],
+                             JSX),
+            ok = snarl_user:set(UUID, As),
+            ok
+    end.
+
+
 add_group([Group]) ->
     case snarl_group:add(list_to_binary(Group)) of
         {ok, UUID} ->
