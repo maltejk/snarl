@@ -259,14 +259,20 @@ case "$1" in
         echo "                 ring_status }"
         echo "               users list                           - list users."
         echo "               users add <user>                     - adds a new user."
+        echo "               users delete <uuid>                  - deletes a user."
         echo "               users passwd <user> <passwd>         - sets user password."
         echo "               users grant <user> <permission>      - grants a permission."
         echo "               users revoke <user> <permission>     - revokes a permission"
         echo "               users join <user> <group>            - adds user to a group."
         echo "               users leave <user> <group>           - removes user from a group."
+        echo "               users export <uuid>                  - Exports a user to a json file."
+        echo "               users import <file>                  - imports a user json file."
         echo "               groups add <group>                   - adds a group."
+        echo "               groups delete <uuid>                 - deletes a group."
         echo "               groups grant <group> <permission>    - grants a permission."
         echo "               groups revoke <group> <permission>   - revokes a permission."
+        echo "               groups export <uuid>                 - Exports a group to a json file."
+        echo "               gorups import <file>                 - imports a group json file."
         exit 1
         ;;
 esac
