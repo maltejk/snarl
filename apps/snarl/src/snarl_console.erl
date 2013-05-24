@@ -80,7 +80,7 @@ add_user([User]) ->
 export_user([UUID]) ->
     case snarl_user:get(list_to_binary(UUID)) of
         {ok, UserObj} ->
-            io:format("~p~n", [jsx:encode(jsxd:update(<<"password">>, fun base64:encode/1, UserObj))]),
+            io:format("~s~n", [jsx:encode(jsxd:update(<<"password">>, fun base64:encode/1, UserObj))]),
             ok;
         _ ->
             error
