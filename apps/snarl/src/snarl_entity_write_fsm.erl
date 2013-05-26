@@ -140,7 +140,7 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     if
         NumW =:= ?W ->
             statman_histogram:record_value(
-              {list_to_atom(atom_to_list(SD0#state.entity) ++ "/write"), total},
+              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
               SD0#state.start),
             From ! {ReqID, ok},
             {stop, normal, SD};
@@ -154,7 +154,7 @@ waiting({ok, ReqID, Reply}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     if
         NumW =:= ?W ->
             statman_histogram:record_value(
-              {list_to_atom(atom_to_list(SD0#state.entity) ++ "/write"), total},
+              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
               SD0#state.start),
             From ! {ReqID, ok, Reply},
             {stop, normal, SD};
@@ -179,3 +179,10 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
+
+stat_name(snarl_user_vnode) ->
+    "user";
+stat_name(snarl_group_vnode) ->
+    "group";
+stat_name(snarl_token_vnode) ->
+    "token".
