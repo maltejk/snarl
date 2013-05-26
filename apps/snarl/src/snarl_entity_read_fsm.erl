@@ -45,6 +45,7 @@
 -record(state, {req_id,
                 from,
                 entity,
+                start,
                 op,
                 r=?R,
                 preflist,
@@ -94,6 +95,7 @@ init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
                 from=From,
                 op=Op,
                 val=Val,
+                start=now(),
                 vnode=VNode,
                 system=System,
                 entity=Entity},
@@ -104,6 +106,7 @@ init([ReqId, {VNode, System}, Op, From, Entity]) ->
     SD = #state{req_id=ReqId,
                 from=From,
                 op=Op,
+                start=now(),
                 vnode=VNode,
                 system=System,
                 entity=Entity},
@@ -115,6 +118,7 @@ init([ReqId, {VNode, System}, Op, From]) ->
     SD = #state{req_id=ReqId,
                 from=From,
                 vnode=VNode,
+                start=now(),
                 system=System,
                 op=Op},
     {ok, prepare, SD, 0}.
@@ -164,10 +168,16 @@ waiting({ok, ReqID, IdxNode, Obj},
             case merge(Replies) of
                 not_found ->
                     ?DT_READ_NOT_FOUND_RETURN(SD0#state.entity, SD0#state.op),
+                    statman_histogram:record_value(
+                      {list_to_atom(atom_to_list(SD0#state.entity) ++ "/read"), total},
+                      SD0#state.start),
                     From ! {ReqID, ok, not_found};
                 Merged ->
                     Reply = snarl_obj:val(Merged),
                     ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
+                    statman_histogram:record_value(
+                      {list_to_atom(atom_to_list(SD0#state.entity) ++ "/read"), total},
+                      SD0#state.start),
                     From ! {ReqID, ok, statebox:value(Reply)}
             end,
             if
@@ -202,7 +212,12 @@ finalize(timeout, SD=#state{
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
+            Start = now(),
+            lager:error("[read] performing read repair on '~p'.", [Entity]),
             repair(VNode, Entity, MObj, Replies),
+            statman_histogram:record_value(
+              {list_to_atom(atom_to_list(Entity) ++ "/repair"), total},
+              Start),
             {stop, normal, SD};
         false ->
             {stop, normal, SD}

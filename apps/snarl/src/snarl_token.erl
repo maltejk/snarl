@@ -22,7 +22,8 @@ ping() ->
     DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_token),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_token_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(
+      IndexNode, ping, snarl_token_vnode_master).
 
 get(Token) ->
     snarl_entity_read_fsm:start(
@@ -41,7 +42,6 @@ add(User) ->
 delete(Token) ->
     do_write(Token, delete).
 
-
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
@@ -50,4 +50,5 @@ do_write(User, Op) ->
     snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token}, User, Op).
 
 do_write(Token, Op, Val) ->
-    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token}, Token, Op, Val).
+    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token},
+                                 Token, Op, Val).

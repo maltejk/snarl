@@ -55,5 +55,9 @@ init(_Args) ->
     {ok,
      {{one_for_one, 5, 10},
       [VMaster,
+       {statman_server, {statman_server, start_link, [1000]},
+        permanent, 5000, worker, []},
+       {statman_aggregator, {statman_aggregator, start_link, []},
+        permanent, 5000, worker, []},
        GroupVMaster, UserVMaster, TokebVMaster,
        ReadFSMs, WriteFSMs, CoverageFSMs, DB]}}.
