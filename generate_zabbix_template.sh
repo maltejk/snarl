@@ -1,4 +1,4 @@
-cat <<EOF > sniffle_template.xml
+cat <<EOF > snarl_template.xml
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>2.0</version>
@@ -10,8 +10,8 @@ cat <<EOF > sniffle_template.xml
     </groups>
     <templates>
         <template>
-            <template>FiFo Sniffle</template>
-            <name>FiFo Sniffle</name>
+            <template>FiFo Snarl</template>
+            <name>FiFo Snarl</name>
             <groups>
                 <group>
                     <name>Templates</name>
@@ -24,16 +24,16 @@ cat <<EOF > sniffle_template.xml
             </applications>
             <items>
 EOF
-cat apps/sniffle/include/SNIFFLE-MIB.hrl | grep instance | sed 's/-define(//' | sed 's/_instance, ./ /' | sed 's/]).//' | sed 's/,/./g' | while read param oid
+cat apps/snarl/include/SNARL-MIB.hrl | grep instance | sed 's/-define(//' | sed 's/_instance, ./ /' | sed 's/]).//' | sed 's/,/./g' | while read param oid
 do
-    cat <<EOF >> sniffle_template.xml
+    cat <<EOF >> snarl_template.xml
                 <item>
                     <name>$param</name>
                     <type>4</type>
                     <snmp_community>public</snmp_community>
                     <multiplier>0</multiplier>
                     <snmp_oid>$oid</snmp_oid>
-                    <key>fifo.sniffle.$param</key>
+                    <key>fifo.snarl.$param</key>
                     <delay>30</delay>
                     <history>90</history>
                     <trends>365</trends>
@@ -43,18 +43,18 @@ do
 EOF
     if echo $param | grep Count
     then
-        cat <<EOF >> sniffle_template.xml
+        cat <<EOF >> snarl_template.xml
                     <units>requests</units>
                     <formula>1</formula>
 EOF
     else
-        cat <<EOF >> sniffle_template.xml
+        cat <<EOF >> snarl_template.xml
                     <units>nanoseconds</units>
                     <formula>0.001</formula>
 EOF
     fi
 
-    cat <<EOF >> sniffle_template.xml
+    cat <<EOF >> snarl_template.xml
 
                     <delta>0</delta>
                     <snmpv3_securityname/>
@@ -78,7 +78,7 @@ EOF
                 </item>
 EOF
 done
-cat <<EOF >> sniffle_template.xml
+cat <<EOF >> snarl_template.xml
             </items>
             <discovery_rules/>
             <macros/>
