@@ -27,7 +27,7 @@ test: all
 	$(REBAR) skip_deps=true xref
 	$(REBAR) skip_deps=true eunit
 
-rel: all
+rel: all zabbix
 	$(REBAR) generate
 
 relclean:
@@ -37,6 +37,9 @@ devrel: dev1 dev2 dev3 dev4
 
 package: rel
 	make -C rel/pkg package
+
+zabbix:
+	sh generate_zabbix_template.sh
 
 ###
 ### Docs

@@ -1,0 +1,1024 @@
+-- 1.3.6.1.4.1
+SNARL-MIB DEFINITIONS ::= BEGIN
+
+    IMPORTS
+        experimental   FROM RFC1155-SMI
+        RowStatus      FROM STANDARD-MIB
+        DisplayString  FROM RFC1213-MIB
+        OBJECT-TYPE    FROM RFC-1212
+        enterprises    FROM SNMPv2-SMI
+        ;
+
+    fifo         OBJECT IDENTIFIER ::= { enterprises 41822 }
+-- Group section
+    snarl        OBJECT IDENTIFIER ::= { fifo 3 }
+
+    group   OBJECT IDENTIFIER ::= { snarl  4 }
+    user       OBJECT IDENTIFIER ::= { snarl  5 }
+    token           OBJECT IDENTIFIER ::= { snarl  6 }
+
+-- General section.
+    name OBJECT-TYPE
+        SYNTAX  DisplayString (SIZE (0..255))
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "My own name"
+        ::= { snarl 1 }
+
+    version OBJECT-TYPE
+        SYNTAX  DisplayString (SIZE (0..255))
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "snarl version"
+        ::= { snarl 2 }
+
+    ringStatus OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "ring status"
+        ::= { snarl 3 }
+
+-- group Section
+    groupCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "key count"
+        ::= { group 41 }
+
+    groupReadP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { group 1 }
+
+    groupReadP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { group 2 }
+
+    groupReadP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { group 3 }
+
+    groupReadP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { group 4 }
+
+    groupReadP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { group 5 }
+
+    groupReadCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 6 }
+
+    groupReadMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 7 }
+
+    groupReadMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 8 }
+
+    groupReadMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 9 }
+
+    groupReadMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 10 }
+
+    groupWriteP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { group 11 }
+
+    groupWriteP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { group 12 }
+
+    groupWriteP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { group 13 }
+
+    groupWriteP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { group 14 }
+
+    groupWriteP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { group 15 }
+
+    groupWriteCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 16 }
+
+    groupWriteMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 17 }
+
+    groupWriteMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 18 }
+
+    groupWriteMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 19 }
+
+    groupWriteMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 20 }
+
+    groupListP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { group 21 }
+
+    groupListP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { group 22 }
+
+    groupListP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { group 23 }
+
+    groupListP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { group 24 }
+
+    groupListP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { group 25 }
+
+    groupListCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 26 }
+
+    groupListMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 27 }
+
+    groupListMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 28 }
+
+    groupListMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 29 }
+
+    groupListMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 30 }
+
+    groupRepairP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { group 31 }
+
+    groupRepairP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { group 32 }
+
+    groupRepairP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { group 33 }
+
+    groupRepairP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { group 34 }
+
+    groupRepairP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { group 35 }
+
+    groupRepairCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 36 }
+
+    groupRepairMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 37 }
+
+    groupRepairMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 38 }
+
+    groupRepairMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 39 }
+
+    groupRepairMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { group 40 }
+
+-- user Section
+    userCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "key count"
+        ::= { user 41 }
+
+    userReadP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { user 1 }
+
+    userReadP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { user 2 }
+
+    userReadP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { user 3 }
+
+    userReadP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { user 4 }
+
+    userReadP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { user 5 }
+
+    userReadCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 6 }
+
+    userReadMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 7 }
+
+    userReadMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 8 }
+
+    userReadMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 9 }
+
+    userReadMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 10 }
+
+    userWriteP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { user 11 }
+
+    userWriteP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { user 12 }
+
+    userWriteP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { user 13 }
+
+    userWriteP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { user 14 }
+
+    userWriteP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { user 15 }
+
+    userWriteCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 16 }
+
+    userWriteMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 17 }
+
+    userWriteMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 18 }
+
+    userWriteMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 19 }
+
+    userWriteMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 20 }
+
+    userListP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { user 21 }
+
+    userListP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { user 22 }
+
+    userListP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { user 23 }
+
+    userListP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { user 24 }
+
+    userListP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { user 25 }
+
+    userListCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 26 }
+
+    userListMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 27 }
+
+    userListMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 28 }
+
+    userListMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 29 }
+
+    userListMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 30 }
+
+    userRepairP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { user 31 }
+
+    userRepairP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { user 32 }
+
+    userRepairP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { user 33 }
+
+    userRepairP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { user 34 }
+
+    userRepairP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { user 35 }
+
+    userRepairCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 36 }
+
+    userRepairMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 37 }
+
+    userRepairMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 38 }
+
+    userRepairMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 39 }
+
+    userRepairMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { user 40 }
+
+-- token Section
+
+    tokenReadP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { token 1 }
+
+    tokenReadP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { token 2 }
+
+    tokenReadP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { token 3 }
+
+    tokenReadP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { token 4 }
+
+    tokenReadP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { token 5 }
+
+    tokenReadCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 6 }
+
+    tokenReadMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 7 }
+
+    tokenReadMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 8 }
+
+    tokenReadMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 9 }
+
+    tokenReadMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 10 }
+
+    tokenWriteP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { token 11 }
+
+    tokenWriteP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { token 12 }
+
+    tokenWriteP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { token 13 }
+
+    tokenWriteP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { token 14 }
+
+    tokenWriteP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { token 15 }
+
+    tokenWriteCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 16 }
+
+    tokenWriteMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 17 }
+
+    tokenWriteMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 18 }
+
+    tokenWriteMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 19 }
+
+    tokenWriteMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 20 }
+
+    tokenListP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { token 21 }
+
+    tokenListP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { token 22 }
+
+    tokenListP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { token 23 }
+
+    tokenListP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { token 24 }
+
+    tokenListP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { token 25 }
+
+    tokenListCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 26 }
+
+    tokenListMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 27 }
+
+    tokenListMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 28 }
+
+    tokenListMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 29 }
+
+    tokenListMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 30 }
+
+    tokenRepairP999 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99.9 percertile"
+        ::= { token 31 }
+
+    tokenRepairP99 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "99 percertile"
+        ::= { token 32 }
+
+    tokenRepairP95 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "95 percertile"
+        ::= { token 33 }
+
+    tokenRepairP75 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "75 percertile"
+        ::= { token 34 }
+
+    tokenRepairP25 OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "25 percertile"
+        ::= { token 35 }
+
+    tokenRepairCount OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 36 }
+
+    tokenRepairMin OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 37 }
+
+    tokenRepairMedian OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 38 }
+
+    tokenRepairMean OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 39 }
+
+    tokenRepairMax OBJECT-TYPE
+        SYNTAX  INTEGER
+        ACCESS  read-only
+        STATUS  mandatory
+        DESCRIPTION
+            "number of events"
+        ::= { token 40 }
+END
