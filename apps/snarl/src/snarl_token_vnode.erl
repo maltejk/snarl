@@ -4,7 +4,7 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
-         repair/3,
+         repair/4,
          get/3,
          delete/3,
          add/4
@@ -27,7 +27,7 @@
 
 -ignore_xref([
               start_vnode/1,
-              repair/3,
+              repair/4,
               get/3,
               delete/3,
               add/4
@@ -60,9 +60,9 @@
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
-repair(IdxNode, Token, Obj) ->
+repair(IdxNode, Token, VClock, Obj) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, Token, Obj},
+                                   {repair, Token, VClock, Obj},
                                    ignore,
                                    ?MASTER).
 
@@ -113,7 +113,7 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, Group, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
+handle_command({repair, Group, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
     Tokens1 = dict:store(Group, Obj, Tokens0),
     {noreply, State#state{tokens=Tokens1}};
