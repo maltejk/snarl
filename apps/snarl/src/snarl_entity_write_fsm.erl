@@ -46,10 +46,11 @@
 %% num_w: The number of successful write replies.
 -record(state, {req_id :: pos_integer(),
                 from :: pid(),
-		entity :: string(),
+                entity :: string(),
                 op :: atom(),
-		vnode,
-		system,
+                vnode,
+                start,
+                system,
                 cordinator :: node(),
                 val = undefined :: term() | undefined,
                 preflist :: riak_core_apl:preflist2(),
@@ -72,14 +73,14 @@ write({VNode, System}, User, Op, Val) ->
     ReqID = mk_reqid(),
     snarl_entity_write_fsm_sup:start_write_fsm([{VNode, System}, ReqID, self(), User, Op, Val]),
     receive
-	{ReqID, ok} ->
-	    ok;
+        {ReqID, ok} ->
+            ok;
         {ReqID, ok, Result} ->
-	    {ok, Result};
-	Other ->
-	    ?PRINT({yuck, Other})
+            {ok, Result};
+        Other ->
+            ?PRINT({yuck, Other})
     after ?DEFAULT_TIMEOUT ->
-	    {error, timeout}
+            {error, timeout}
     end.
 
 mk_reqid() ->
@@ -96,17 +97,18 @@ init([{VNode, System}, ReqID, From, Entity, Op, Val]) ->
                 from=From,
                 entity=Entity,
                 op=Op,
-		vnode=VNode,
-		system=System,
+                vnode=VNode,
+                start=now(),
+                system=System,
                 cordinator=node(),
                 val=Val},
     {ok, prepare, SD, 0}.
 
 %% @doc Prepare the write by calculating the _preference list_.
 prepare(timeout, SD0=#state{
-		   entity=Entity,
-		   system=System
-		  }) ->
+                        entity=Entity,
+                        system=System
+                       }) ->
     Bucket = list_to_binary(atom_to_list(System)),
     DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
     Preflist = riak_core_apl:get_apl(DocIdx, ?N, System),
@@ -119,7 +121,7 @@ execute(timeout, SD0=#state{req_id=ReqID,
                             entity=Entity,
                             op=Op,
                             val=Val,
-			    vnode=VNode,
+                            vnode=VNode,
                             cordinator=Cordinator,
                             preflist=Preflist}) ->
     case Val of
@@ -137,6 +139,9 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     lager:warning("Write(~p) ok", [NumW]),
     if
         NumW =:= ?W ->
+            statman_histogram:record_value(
+              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
+              SD0#state.start),
             From ! {ReqID, ok},
             {stop, normal, SD};
         true -> {next_state, waiting, SD}
@@ -148,6 +153,9 @@ waiting({ok, ReqID, Reply}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
     lager:warning("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= ?W ->
+            statman_histogram:record_value(
+              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
+              SD0#state.start),
             From ! {ReqID, ok, Reply},
             {stop, normal, SD};
         true -> {next_state, waiting, SD}
@@ -172,3 +180,9 @@ terminate(_Reason, _SN, _SD) ->
 %%% Internal Functions
 %%%===================================================================
 
+stat_name(snarl_user_vnode) ->
+    "user";
+stat_name(snarl_group_vnode) ->
+    "group";
+stat_name(snarl_token_vnode) ->
+    "token".

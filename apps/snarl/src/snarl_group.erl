@@ -12,7 +12,9 @@
          grant/2,
          revoke/2,
          set/2,
-         set/3
+         set/3,
+         create/2,
+         revoke_prefix/2
         ]).
 
 -ignore_xref([ping/0]).
@@ -76,6 +78,9 @@ list() ->
 
 add(Group) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    create(UUID, Group).
+
+create(UUID, Group) ->
     case snarl_group:lookup(Group) of
         not_found ->
             ok = do_write(UUID, add, Group),
@@ -107,6 +112,14 @@ grant(Group, Permission) ->
 
 revoke(Group, Permission) ->
     do_write(Group, revoke, Permission).
+
+-spec revoke_prefix(Group::fifo:group_id(), fifo:permission()) ->
+                           ok |
+                           not_found|
+                           {error, timeout}.
+
+revoke_prefix(Group, Prefix) ->
+    do_write(Group, revoke_prefix, Prefix).
 
 -spec set(Group::fifo:group_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
                  not_found |

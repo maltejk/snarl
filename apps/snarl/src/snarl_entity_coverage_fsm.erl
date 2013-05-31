@@ -39,6 +39,7 @@
                 preflist,
                 num_r=0,
                 size,
+                start,
                 timeout=?DEFAULT_TIMEOUT,
                 val,
                 vnode,
@@ -96,6 +97,7 @@ init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
                 op=Op,
                 r = R,
                 n = N,
+                start=now(),
                 val=Val,
                 vnode=VNode,
                 system=System,
@@ -157,6 +159,9 @@ waiting({{undefined,{_Partition, _Node} = IdxNode},
                                          (Key, _Count, Keys) ->
                                               [Key | Keys]
                                       end, [], Replies),
+            statman_histogram:record_value(
+              {list_to_binary(stat_name(SD0#state.vnode) ++ "/list"), total},
+              SD0#state.start),
             From ! {ReqID, ok, MergedReplies},
             {stop, normal, SD};
         true ->
@@ -183,3 +188,10 @@ terminate(_Reason, _SN, _SD) ->
 
 mk_reqid() ->
     erlang:phash2(erlang:now()).
+
+stat_name(snarl_user_vnode) ->
+    "user";
+stat_name(snarl_group_vnode) ->
+    "group";
+stat_name(snarl_token_vnode) ->
+    "token".

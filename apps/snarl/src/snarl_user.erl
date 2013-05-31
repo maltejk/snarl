@@ -17,7 +17,7 @@
          passwd/2,
          join/2,
          leave/2,
-         revoke_all/2,
+         revoke_prefix/2,
          grant/2,
          revoke/2,
          allowed/2,
@@ -27,7 +27,8 @@
          claim_resource/4,
          free_resource/3,
          get_resource_stat/1,
-         cache/1
+         cache/1,
+         create/2
         ]).
 
 -ignore_xref([ping/0]).
@@ -74,15 +75,13 @@ lookup(User) ->
                         {ok, R}
                 end, not_found, Res).
 
--spec revoke_all(User::fifo:user_id(),
-                 Perm::fifo:permission()) ->
-                        not_found |
-                        {error, timeout} |
-                        ok.
-revoke_all(User, Perm) ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      revoke_all, User, Perm).
+-spec revoke_prefix(User::fifo:user_id(),
+                    Prefix::fifo:permission()) ->
+                    not_found |
+                    {error, timeout} |
+                    ok.
+revoke_prefix(User, Prefix) ->
+    do_write(User, revoke_prefix, Prefix).
 
 -spec allowed(User::fifo:uuid(),
               Permission::fifo:permission()) ->
@@ -150,7 +149,10 @@ list() ->
                  {ok, UUID::fifo:user_id()}.
 add(User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    case snarl_user:lookup(User) of
+    create(UUID, User).
+
+create(UUID, User) ->
+        case snarl_user:lookup(User) of
         not_found ->
             ok = do_write(UUID, add, User),
             {ok, UUID};
