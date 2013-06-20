@@ -26,11 +26,6 @@
               revoke/2
              ]).
 
-
-load(#group{} = Group) ->
-    Group0 = jsxd:set(<<"version">>, <<"0.1.0">>, jsxd:new()),
-    jsxd:set(<<"permissions">>, Group#group.permissions, Group0);
-
 load(User) ->
     User.
 

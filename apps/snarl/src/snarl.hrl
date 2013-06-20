@@ -17,16 +17,6 @@
 		   claims = [] :: [fifo:resource_claim()],
 		   reservations = [] :: [fifo:reservation()]}).
 
--record(user, {name :: fifo:user_id(),
-	       passwd :: binary(),
-	       permissions = [] :: [fifo:permission()],
-	       resources = [] :: [fifo:resource()],
-	       groups = [] :: [fifo:group_id()]}).
-
--record(group, {name :: fifo:group_id(),
-		permissions = [] :: [fifo:permission()],
-		users = [] :: [fifo:user_id()]}).
-
 -record(snarl_obj, {val    :: val(),
 		    vclock :: vclock:vclock()}).
 
