@@ -19,5 +19,11 @@
                   uuid
                  ]},
   {mod, { snarl_app, []}},
-  {env, []}
+  {env,
+   [{r, 2},
+    {n, 3},
+    {w, 3},
+    {snarl_user, {3, 2, 3}},
+    {snarl_group, {3, 2, 3}}
+   ]}
  ]}.

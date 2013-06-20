@@ -51,6 +51,8 @@
                 vnode,
                 start,
                 system,
+                w,
+                n,
                 cordinator :: node(),
                 val = undefined :: term() | undefined,
                 preflist :: riak_core_apl:preflist2(),
@@ -78,7 +80,7 @@ write({VNode, System}, User, Op, Val) ->
         {ReqID, ok, Result} ->
             {ok, Result};
         Other ->
-            ?PRINT({yuck, Other})
+            lager:error("Unknown write reply: ~p", [Other])
     after ?DEFAULT_TIMEOUT ->
             {error, timeout}
     end.
@@ -92,13 +94,15 @@ mk_reqid() ->
 
 %% @doc Initialize the state data.
 init([{VNode, System}, ReqID, From, Entity, Op, Val]) ->
-    ?PRINT({init, {VNode, System}, ReqID}),
+    {N, _R, W} = ?NRW(System),
     SD = #state{req_id=ReqID,
                 from=From,
                 entity=Entity,
                 op=Op,
                 vnode=VNode,
                 start=now(),
+                w = W,
+                n = N,
                 system=System,
                 cordinator=node(),
                 val=Val},
@@ -106,12 +110,13 @@ init([{VNode, System}, ReqID, From, Entity, Op, Val]) ->
 
 %% @doc Prepare the write by calculating the _preference list_.
 prepare(timeout, SD0=#state{
-                        entity=Entity,
-                        system=System
+                        entity = Entity,
+                        n = N,
+                        system = System
                        }) ->
     Bucket = list_to_binary(atom_to_list(System)),
     DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
-    Preflist = riak_core_apl:get_apl(DocIdx, ?N, System),
+    Preflist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Preflist},
     {next_state, execute, SD, 0}.
 
@@ -133,12 +138,12 @@ execute(timeout, SD0=#state{req_id=ReqID,
     {next_state, waiting, SD0}.
 
 %% @doc Wait for W write reqs to respond.
-waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
+waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
     lager:warning("Write(~p) ok", [NumW]),
     if
-        NumW =:= ?W ->
+        NumW =:= W ->
             statman_histogram:record_value(
               {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
               SD0#state.start),
@@ -147,12 +152,13 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
         true -> {next_state, waiting, SD}
     end;
 
-waiting({ok, ReqID, Reply}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID}) ->
+waiting({ok, ReqID, Reply},
+        SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
     lager:warning("Write(~p) reply: ~p", [NumW, Reply]),
     if
-        NumW =:= ?W ->
+        NumW =:= W ->
             statman_histogram:record_value(
               {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
               SD0#state.start),

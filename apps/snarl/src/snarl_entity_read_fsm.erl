@@ -47,7 +47,8 @@
                 entity,
                 start,
                 op,
-                r=?R,
+                r,
+                n,
                 preflist,
                 num_r=0,
                 size,
@@ -91,9 +92,12 @@ start(VNodeInfo, Op, User, Val) ->
 %% Intiailize state data.
 init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
     ?DT_READ_ENTRY(Entity, Op),
+    {N, R, _W} = ?NRW(System),
     SD = #state{req_id=ReqId,
                 from=From,
                 op=Op,
+                n = N,
+                r = R,
                 val=Val,
                 start=now(),
                 vnode=VNode,
@@ -114,7 +118,6 @@ init([ReqId, {VNode, System}, Op, From, Entity]) ->
 
 init([ReqId, {VNode, System}, Op, From]) ->
     ?DT_READ_ENTRY("undefined", Op),
-    ?PRINT({init, [Op, ReqId, From]}),
     SD = #state{req_id=ReqId,
                 from=From,
                 vnode=VNode,
@@ -125,10 +128,11 @@ init([ReqId, {VNode, System}, Op, From]) ->
 
 %% @doc Calculate the Preflist.
 prepare(timeout, SD0=#state{entity=Entity,
+                            n = N,
                             system=System}) ->
     Bucket = list_to_binary(atom_to_list(System)),
     DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
-    Prelist = riak_core_apl:get_apl(DocIdx, ?N, System),
+    Prelist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Prelist},
     {next_state, execute, SD, 0}.
 
@@ -139,7 +143,6 @@ execute(timeout, SD0=#state{req_id=ReqId,
                             val=Val,
                             vnode=VNode,
                             preflist=Prelist}) ->
-    ?PRINT({execute, Entity, Val}),
     case Entity of
         undefined ->
             VNode:Op(Prelist, ReqId);
@@ -159,7 +162,7 @@ execute(timeout, SD0=#state{req_id=ReqId,
 
 waiting({ok, ReqID, IdxNode, Obj},
         SD0=#state{from=From, num_r=NumR0, replies=Replies0,
-                   r=R, timeout=Timeout}) ->
+                   r=R, n = N, timeout=Timeout}) ->
     NumR = NumR0 + 1,
     Replies = [{IdxNode, Obj}|Replies0],
     SD = SD0#state{num_r=NumR,replies=Replies},
@@ -181,7 +184,7 @@ waiting({ok, ReqID, IdxNode, Obj},
                     From ! {ReqID, ok, statebox:value(Reply)}
             end,
             if
-                NumR =:= ?N ->
+                NumR =:= N ->
                     {next_state, finalize, SD, 0};
                 true ->
                     {next_state, wait_for_n, SD, Timeout}
@@ -191,9 +194,10 @@ waiting({ok, ReqID, IdxNode, Obj},
     end.
 
 wait_for_n({ok, _ReqID, IdxNode, Obj},
-           SD0=#state{num_r=?N - 1, replies=Replies0}) ->
+           SD0=#state{n = N, num_r=NumR, replies=Replies0})
+  when NumR =:= N - 1 ->
     Replies = [{IdxNode, Obj}|Replies0],
-    {next_state, finalize, SD0#state{num_r=?N, replies=Replies}, 0};
+    {next_state, finalize, SD0#state{num_r=N, replies=Replies}, 0};
 
 wait_for_n({ok, _ReqID, IdxNode, Obj},
            SD0=#state{num_r=NumR0, replies=Replies0, timeout=Timeout}) ->
