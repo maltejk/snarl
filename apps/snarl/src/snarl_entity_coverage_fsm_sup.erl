@@ -13,7 +13,6 @@
 	      start_link/0]).
 
 start_read_fsm(Args) ->
-    ?PRINT({start_coverage_fsm, Args}),
     supervisor:start_child(?MODULE, Args).
 
 start_link() ->

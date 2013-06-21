@@ -19,3 +19,6 @@
 ^snarl_tcp_handler.erl:199: Matching of pattern 
 ^snarl_tcp_handler.erl:211: Matching of pattern
 ^snarl_tcp_handler.erl:216: Matching of pattern
+^jsx_parser.erl
+^lhttpc
+^newrelic
