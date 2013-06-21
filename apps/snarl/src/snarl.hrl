@@ -1,6 +1,3 @@
-%-define(PRINT(Var), io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
--define(PRINT(Var), 1 == 1 orelse io:format("DEBUG: ~p:~p - ~p~n~n ~p~n~n", [?MODULE, ?LINE, ??Var, Var])).
-
 -define(ENV(K, D),
         (case application:get_env(snarl, K) of
              undefined ->
@@ -22,18 +19,18 @@
 -define(STATEBOX_EXPIRE, 60000).
 -define(DEFAULT_TIMEOUT, 10000).
 
+-record(resource_claim,
+        {id :: fifo:uuid(),
+         ammount :: number()}).
 
--record(resource_claim, {id :: fifo:uuid(),
-			 ammount :: number()}).
-
-
--record(resource, {name :: fifo:resource_id(),
-		   granted = 0:: number(),
-		   claims = [] :: [fifo:resource_claim()],
-		   reservations = [] :: [fifo:reservation()]}).
+-record(resource,
+        {name :: fifo:resource_id(),
+         granted = 0:: number(),
+         claims = [] :: [fifo:resource_claim()],
+         reservations = [] :: [fifo:reservation()]}).
 
 -record(snarl_obj, {val    :: val(),
-		    vclock :: vclock:vclock()}).
+                    vclock :: vclock:vclock()}).
 
 -type val() ::  statebox:statebox().
 
