@@ -219,8 +219,8 @@ handle_command({repair, User, _VClock, #snarl_obj{val = V} = Obj},
 
 handle_command({get, ReqID, User}, _Sender, State) ->
     Res = case snarl_db:get(State#state.db, <<"user">>, User) of
-              {ok, R} ->
-                  snarl_user_state:load(R);
+              {ok, #snarl_obj{val = V0} = R} ->
+                  R#snarl_obj{val = snarl_user_state:load(V0)};
               not_found ->
                   not_found
           end,

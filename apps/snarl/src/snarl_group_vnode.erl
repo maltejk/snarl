@@ -161,8 +161,8 @@ handle_command({repair, Group, _VClock, #snarl_obj{val = V} = Obj},
 
 handle_command({get, ReqID, Group}, _Sender, State) ->
     Res = case snarl_db:get(State#state.db, <<"group">>, Group) of
-              {ok, R} ->
-                  snarl_group_state:load(R);
+              {ok, #snarl_obj{val = V0} = R} ->
+                  R#snarl_obj{val = snarl_group_state:load(V0)};
               not_found ->
                   not_found
           end,
