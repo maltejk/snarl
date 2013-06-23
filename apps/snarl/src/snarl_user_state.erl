@@ -44,14 +44,15 @@
 load(#?USER{} = User) ->
     User;
 
-load(User) ->
+load(UserSB) ->
+    User = statebox:value(UserSB),
     {ok, Name} = jsxd:get([<<"name">>], User),
     {ok, UUID} = jsxd:get([<<"uuid">>], User),
-    {ok, Password} = jsxd:get([<<"password">>], User),
+    Password = jsxd:get([<<"password">>], <<>>, User),
     ID0 = {{0,0,0}, load},
-    {ok, Groups0} = jsxd:get([<<"groups">>], User),
-    {ok, Permissions0} = jsxd:get([<<"permissions">>], User),
-    {ok, Metadata} = jsxd:get([<<"metadata">>], User),
+    Groups0 = jsxd:get([<<"groups">>], [], User),
+    Permissions0 = jsxd:get([<<"permissions">>], [], User),
+    Metadata = jsxd:get([<<"metadata">>], [], User),
     Groups = lists:foldl(
                fun (G, Acc) ->
                        vorsetg:add(ID0, G, Acc)
@@ -66,7 +67,7 @@ load(User) ->
         password = vlwwregister:new(Password),
         groups = Groups,
         permissions = Permissions,
-        metadata = Metadata
+        metadata = statebox:new(fun() -> Metadata end)
        }.
 
 new() ->

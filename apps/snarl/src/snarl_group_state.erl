@@ -48,12 +48,13 @@ new() ->
 load(#?GROUP{} = Group) ->
     Group;
 
-load(Group) ->
+load(GroupSB) ->
+    Group = statebox:value(GroupSB),
     {ok, Name} = jsxd:get([<<"name">>], Group),
     {ok, UUID} = jsxd:get([<<"uuid">>], Group),
     ID0 = {{0,0,0}, load},
-    {ok, Permissions0} = jsxd:get([<<"permissions">>], Group),
-    {ok, Metadata} = jsxd:get([<<"metadata">>], Group),
+    Permissions0 = jsxd:get([<<"permissions">>], [], Group),
+    Metadata = jsxd:get([<<"metadata">>], [], Group),
     Permissions = lists:foldl(
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
