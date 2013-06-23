@@ -76,7 +76,7 @@ to_json(#?GROUP{
       [
        {<<"uuid">>, vlwwregister:value(UUID)},
        {<<"name">>, vlwwregister:value(Name)},
-       {<<"permissions">>, vorsetg:new(Permissions)},
+       {<<"permissions">>, vorsetg:value(Permissions)},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 

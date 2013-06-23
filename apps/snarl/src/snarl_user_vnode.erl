@@ -322,11 +322,11 @@ delete(State) ->
 handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
-                        fun (_K, #snarl_obj{val=U0}, not_found) ->
+                        fun (UUID, #snarl_obj{val=U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
                                 case snarl_user_state:password(U1) of
                                     Hash ->
-                                        snarl_user_state:uuid(U1);
+                                        UUID;
                                     _ ->
                                         not_found
                                 end;
