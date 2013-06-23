@@ -79,12 +79,10 @@ message({user, add, User}, State) when
 message({user, auth, User, Pass}, State) when
       is_binary(User),
       is_binary(Pass) ->
-    UserB = User,
-    Res = case snarl_user:auth(UserB, Pass) of
+    Res = case snarl_user:auth(User, Pass) of
               not_found ->
                   {error, not_found};
-              {ok, Obj}  ->
-                  {ok, UUID} = jsxd:get(<<"uuid">>, Obj),
+              {ok, UUID}  ->
                   {ok, Token} = snarl_token:add(UUID),
                   {ok, {token, Token}}
           end,
@@ -147,38 +145,6 @@ message({token, delete, Token}, State) when
       is_binary(Token) ->
     {reply, snarl_token:delete(Token), State};
 
-
-%%%===================================================================
-%%% Resource Functions
-%%%===================================================================
-
-message({user, set_resource, User, Resource, Value}, State) when
-      is_binary(User),
-      is_binary(Resource),
-      is_integer(Value),
-      Value > 0->
-    {reply, snarl_user:set_resource(User, Resource, Value), State};
-
-%%message({user, get_resource, User, Resource}, State) ->
-%%    {reply, snarl_user:get_resource(ensure_binary(User), Resource), State};
-
-message({user, claim_resource, User, Resource, Ammount}, State) when
-      is_binary(User),
-      is_binary(Resource),
-      is_integer(Ammount),
-      Ammount > 0 ->
-    ID = uuid:uuid4(),
-    {reply, {ID, snarl_user:claim_resource(User, ID, Resource, Ammount)}, State};
-
-message({user, free_resource, User, Resource, ID}, State) when
-      is_binary(User),
-      is_binary(Resource),
-      is_binary(ID) ->
-    {reply, snarl_user:free_resource(User, Resource, ID), State};
-
-message({user, resource_stat, User}, State) when
-      is_binary(User) ->
-    {reply, snarl_user:get_resource_stat(User), State};
 
 %%%===================================================================
 %%% Group Functions

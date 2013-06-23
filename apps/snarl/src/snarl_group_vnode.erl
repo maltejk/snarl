@@ -147,14 +147,14 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, Group, VClock, Obj}, _Sender, State) ->
+handle_command({repair, Group, _VClock, #snarl_obj{val = V} = Obj},
+               _Sender, State) ->
     case snarl_db:get(State#state.db, <<"group">>, Group) of
-        {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
-            snarl_db:put(State#state.db, <<"group">>, Group, Obj);
+        {ok, #snarl_obj{val = V0}} ->
+            snarl_db:put(State#state.db, <<"group">>, Group,
+                         Obj#snarl_obj{val = snarl_group_state:merge(V, V0)});
         not_found ->
-            snarl_db:put(State#state.db, <<"group">>, Group, Obj);
-        _ ->
-            lager:error("[groups] Read repair failed, data was updated too recent.")
+            snarl_db:put(State#state.db, <<"group">>, Group, Obj)
     end,
     {noreply, State};
 
@@ -168,10 +168,10 @@ handle_command({get, ReqID, Group}, _Sender, State) ->
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
-handle_command({add, {ReqID, Coordinator}, UUID, Group}, _Sender, State) ->
-    Group0 = statebox:new(fun snarl_group_state:new/0),
-    Group1 = statebox:modify({snarl_group_state, uuid, [UUID]}, Group0),
-    Group2 = statebox:modify({snarl_group_state, name, [Group]}, Group1),
+handle_command({add, {ReqID, Coordinator} = ID, UUID, Group}, _Sender, State) ->
+    Group0 = snarl_group_state:new(),
+    Group1 = snarl_group_state:name(ID, Group, Group0),
+    Group2 = snarl_group_state:uuid(ID, UUID, Group1),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     GroupObj = #snarl_obj{val=Group2, vclock=VC},
@@ -185,19 +185,17 @@ handle_command({delete, {ReqID, _Coordinator}, Group}, _Sender, State) ->
 handle_command({set, {ReqID, Coordinator}, Group, Attributes}, _Sender, State) ->
     case snarl_db:get(State#state.db, <<"group">>, Group) of
         {ok, #snarl_obj{val=H0} = O} ->
-            H1 = statebox:modify({fun snarl_group_state:load/1,[]}, H0),
+            H1 = snarl_group_state:load(H0),
             H2 = lists:foldr(
                    fun ({Attribute, Value}, H) ->
-                           statebox:modify(
-                             {fun snarl_group_state:set/3,
-                              [Attribute, Value]}, H)
+                           snarl_group_state:set_metadata(Attribute, Value, H)
                    end, H1, Attributes),
-            H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
+            H3 = snarl_group_state:expire(?STATEBOX_EXPIRE, H2),
             snarl_db:put(State#state.db, <<"group">>, Group,
                          snarl_obj:update(H3, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
-            lager:error("[groups] tried to write to a non existing user: ~p", [R]),
+            lager:error("[groups] tried to write to a non existing group: ~p", [R]),
             {reply, {ok, ReqID, not_found}, State}
     end;
 
@@ -255,17 +253,18 @@ delete(State) ->
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"group">>,
-                        fun (_U, #snarl_obj{val=SB}, Res) ->
-                                V = statebox:value(SB),
-                                case jsxd:get(<<"name">>, V) of
-                                    {ok, Name} ->
-                                        V;
+                        fun (_U, #snarl_obj{val=SB}, not_found) ->
+                                case snarl_group_state:name(SB) of
+                                    Name ->
+                                        snarl_group_state:uuid(SB);
                                     _ ->
-                                        Res
-                                end
+                                        not_found
+                                end;
+                            (_U, _, Res) ->
+                                Res
                         end, not_found),
     {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, [Res]},
+     {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
@@ -289,14 +288,20 @@ handle_exit(_Pid, _Reason, State) ->
 terminate(_Reason, _State) ->
     ok.
 
+
 change_group(Group, Action, Vals, Coordinator, State, ReqID) ->
     case snarl_db:get(State#state.db, <<"group">>, Group) of
         {ok, #snarl_obj{val=H0} = O} ->
-            H1 = statebox:modify({fun snarl_group_state:load/1,[]}, H0),
-            H2 = statebox:modify({fun snarl_group_state:Action/2, Vals}, H1),
-            H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
+            H1 = snarl_group_state:load(H0),
+            ID = {ReqID, Coordinator},
+            H2 = case Vals of
+                     [Val] ->
+                         snarl_group_state:Action(ID, Val, H1);
+                         [Val1, Val2] ->
+                         snarl_group_state:Action(ID, Val1, Val2, H1)
+                 end,
             snarl_db:put(State#state.db, <<"group">>, Group,
-                         snarl_obj:update(H3, Coordinator, O)),
+                         snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[groups] tried to write to a non existing group: ~p", [R]),

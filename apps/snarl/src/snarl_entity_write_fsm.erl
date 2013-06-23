@@ -86,7 +86,8 @@ write({VNode, System}, User, Op, Val) ->
     end.
 
 mk_reqid() ->
-    erlang:phash2(erlang:now()).
+    {MegaSecs,Secs,MicroSecs} = erlang:now(),
+	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 %%%===================================================================
 %%% States

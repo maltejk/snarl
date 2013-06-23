@@ -137,7 +137,7 @@ delete(Preflist, ReqID, User) ->
 
 passwd(Preflist, ReqID, User, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {passwd, ReqID, User, Val},
+                                   {password, ReqID, User, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -204,14 +204,14 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, User, VClock, Obj}, _Sender, State) ->
+handle_command({repair, User, _VClock, #snarl_obj{val = V} = Obj},
+               _Sender, State) ->
     case snarl_db:get(State#state.db, <<"user">>, User) of
-        {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
-            snarl_db:put(State#state.db, <<"user">>, User, Obj);
+        {ok, #snarl_obj{val = V0}} ->
+            snarl_db:put(State#state.db, <<"user">>, User,
+                         Obj#snarl_obj{val = snarl_user_state:merge(V, V0)});
         not_found ->
-            snarl_db:put(State#state.db, <<"user">>, User, Obj);
-        _ ->
-            lager:error("[users] Read repair failed, data was updated too recent.")
+            snarl_db:put(State#state.db, <<"user">>, User, Obj)
     end,
     {noreply, State};
 
@@ -226,11 +226,11 @@ handle_command({get, ReqID, User}, _Sender, State) ->
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
-handle_command({add, {ReqID, Coordinator}, UUID, User}, _Sender, State) ->
-    User0 = statebox:new(fun snarl_user_state:new/0),
-    User1 = statebox:modify({fun snarl_user_state:name/2, [User]}, User0),
-    User2 = statebox:modify({fun snarl_user_state:uuid/2, [UUID]}, User1),
-    User3 = statebox:modify({fun snarl_user_state:grant/2, [[<<"user">>, UUID, <<"...">>]]}, User2),
+handle_command({add, {ReqID, Coordinator} = ID, UUID, User}, _Sender, State) ->
+    User0 = snarl_user_state:new(),
+    User1 = snarl_user_state:name(ID, User, User0),
+    User2 = snarl_user_state:uuid(ID, UUID, User1),
+    User3 = snarl_user_state:grant(ID, [<<"user">>, UUID, <<"...">>], User2),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User3, vclock=VC},
@@ -252,14 +252,12 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, Stat
 handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
     case snarl_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val=H0} = O} ->
-            H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
+            H1 = snarl_user_state:load(H0),
             H2 = lists:foldr(
                    fun ({Attribute, Value}, H) ->
-                           statebox:modify(
-                             {fun snarl_user_state:set/3,
-                              [Attribute, Value]}, H)
+                           snarl_user_state:set_metadata(Attribute, Value, H)
                    end, H1, Attributes),
-            H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
+            H3 = snarl_user_state:expire(?STATEBOX_EXPIRE, H2),
             snarl_db:put(State#state.db, <<"user">>, User,
                          snarl_obj:update(H3, Coordinator, O)),
             {reply, {ok, ReqID}, State};
@@ -323,14 +321,15 @@ delete(State) ->
 handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
-                        fun (_K, #snarl_obj{val=SB}, Res) ->
-                                V = statebox:value(SB),
-                                case jsxd:get(<<"password">>, V) of
-                                    {ok, Hash} ->
-                                        V;
+                        fun (_K, #snarl_obj{val=SB}, not_found) ->
+                                case snarl_user_state:password(SB) of
+                                    Hash ->
+                                        snarl_user_state:uuid(SB);
                                     _ ->
-                                        Res
-                                end
+                                        not_found
+                                end;
+                            (_U, _, Res) ->
+                                Res
                         end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
@@ -339,14 +338,18 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
-                        fun (_U, #snarl_obj{val=SB}, Res) ->
-                                V = statebox:value(SB),
-                                case jsxd:get(<<"name">>, V) of
-                                    {ok, Name} ->
-                                        V;
-                                    _ ->
-                                        Res
-                                end
+                        fun (_U, #snarl_obj{val=SB}, not_found) ->
+                                N = snarl_user_state:name(SB),
+                                case N =:= Name  of
+                                    true ->
+                                        io:format("~p =:= ~p.~n", [Name, N]),
+                                        snarl_user_state:uuid(SB);
+                                    false ->
+                                        io:format("~p =/= ~p.~n", [Name, N]),
+                                        not_found
+                                end;
+                            (_U, _, Res) ->
+                                Res
                         end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
@@ -374,11 +377,16 @@ terminate(_Reason, _State) ->
 change_user(User, Action, Vals, Coordinator, State, ReqID) ->
     case snarl_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val=H0} = O} ->
-            H1 = statebox:modify({fun snarl_user_state:load/1,[]}, H0),
-            H2 = statebox:modify({fun snarl_user_state:Action/2, Vals}, H1),
-            H3 = statebox:expire(?STATEBOX_EXPIRE, H2),
+            H1 = snarl_user_state:load(H0),
+            ID = {ReqID, Coordinator},
+            H2 = case Vals of
+                     [Val] ->
+                         snarl_user_state:Action(ID, Val, H1);
+                         [Val1, Val2] ->
+                         snarl_user_state:Action(ID, Val1, Val2, H1)
+                 end,
             snarl_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H3, Coordinator, O)),
+                         snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),

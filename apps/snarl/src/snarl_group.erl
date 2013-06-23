@@ -6,6 +6,7 @@
          ping/0,
          list/0,
          get/1,
+         get_/1,
          lookup/1,
          add/1,
          delete/1,
@@ -38,19 +39,36 @@ ping() ->
 lookup(GroupName) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_group_vnode, snarl_group},
-                  lookup, GroupName
-                 ),
-    lists:foldl(fun (not_found, Acc) ->
-                               Acc;
-                           (R, _) ->
-                               {ok, R}
-                       end, not_found, Res).
+                  lookup, GroupName),
+    R0 = lists:foldl(fun (not_found, Acc) ->
+                             Acc;
+                         (R, _) ->
+                             {ok, R}
+                     end, not_found, Res),
+    case R0 of
+        {ok, UUID} ->
+            snarl_group:get(UUID);
+        R ->
+            R
+    end.
 
 -spec get(Group::fifo:group_id()) ->
-                 {ok, fifo:group()} |
                  not_found |
-                 {error, timeout}.
+                 {error, timeout} |
+                 {ok, Group::fifo:group()}.
 get(Group) ->
+    case get_(Group) of
+        {ok, GroupObj} ->
+            {ok, snarl_group_state:to_json(GroupObj)};
+        R  ->
+            R
+    end.
+
+-spec get_(Group::fifo:group_id()) ->
+                 not_found |
+                 {error, timeout} |
+                 {ok, Group::#?GROUP{}}.
+get_(Group) ->
     case snarl_entity_read_fsm:start(
            {snarl_group_vnode, snarl_group},
            get, Group
@@ -128,7 +146,7 @@ revoke_prefix(Group, Prefix) ->
 set(Group, Attribute, Value) ->
     set(Group, [{Attribute, Value}]).
 
--spec set(User::fifo:user_id(), Attirbutes::fifo:attr_list()) ->
+-spec set(Group::fifo:group_id(), Attirbutes::fifo:attr_list()) ->
                  not_found |
                  {error, timeout} |
                  ok.

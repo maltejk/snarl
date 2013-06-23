@@ -181,7 +181,8 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 mk_reqid() ->
-    erlang:phash2(erlang:now()).
+    {MegaSecs,Secs,MicroSecs} = erlang:now(),
+	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 stat_name(snarl_user_vnode) ->
     "user";

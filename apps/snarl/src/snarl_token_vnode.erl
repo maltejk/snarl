@@ -141,12 +141,9 @@ handle_command({delete, {ReqID, _Coordinator}, Token}, _Sender, State) ->
       }};
 
 handle_command({add, {ReqID, Coordinator}, Token, User}, _Sender, State) ->
-    T0 = statebox:new(fun snarl_token_state:new/0),
-    T1 = statebox:modify({fun snarl_token_state:user/2, [User]}, T0),
-
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    TObject = #snarl_obj{val=T1, vclock=VC},
+    TObject = #snarl_obj{val=User, vclock=VC},
     State1 = expire(State),
     Ts0 = dict:store(Token, {now(), TObject}, State1#state.tokens),
 

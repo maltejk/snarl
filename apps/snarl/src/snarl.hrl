@@ -39,3 +39,23 @@
 -type idx_node() :: {integer(), node()}.
 
 -type vnode_reply() :: {idx_node(), snarl_obj() | not_found}.
+
+
+-record(user_0_1_0, {
+          uuid :: ecrdt:vlwwregister(),
+          name :: ecrdt:vlwwregister(),
+          password :: ecrdt:vlwwregister(),
+          permissions :: ecrdt:vorsetg(),
+          groups :: ecrdt:vorsetg(),
+          metadata
+         }).
+
+-record(group_0_1_0, {
+          uuid :: ecrdt:vlwwregister(),
+          name :: ecrdt:vlwwregister(),
+          permissions :: ecrdt:vorsetg(),
+          metadata
+         }).
+
+-define(USER, user_0_1_0).
+-define(GROUP, group_0_1_0).

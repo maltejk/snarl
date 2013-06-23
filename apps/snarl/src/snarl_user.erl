@@ -23,10 +23,6 @@
          allowed/2,
          set/2,
          set/3,
-         set_resource/3,
-         claim_resource/4,
-         free_resource/3,
-         get_resource_stat/1,
          cache/1,
          create/2
         ]).
@@ -52,9 +48,9 @@ ping() ->
 auth(User, Passwd) ->
     Hash = crypto:sha([User, Passwd]),
     {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  auth, Hash
-                 ),
+                   {snarl_user_vnode, snarl_user},
+                   auth, Hash
+                  ),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->
@@ -69,11 +65,18 @@ lookup(User) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_user_vnode, snarl_user},
                   lookup, User),
-    lists:foldl(fun (not_found, Acc) ->
-                        Acc;
-                    (R, _) ->
-                        {ok, R}
-                end, not_found, Res).
+    R0 = lists:foldl(fun (not_found, Acc) ->
+                             Acc;
+                         (R, _) ->
+                             {ok, R}
+                     end, not_found, Res),
+    case R0 of
+        {ok, UUID} ->
+            snarl_user:get(UUID);
+        R ->
+            R
+    end.
+
 
 -spec revoke_prefix(User::fifo:user_id(),
                     Prefix::fifo:permission()) ->
@@ -89,7 +92,7 @@ revoke_prefix(User, Prefix) ->
                      {error, timeout} |
                      true | false.
 allowed(User, Permission) ->
-    case snarl_user:get(User) of
+    case get_(User) of
         {ok, UserObj} ->
             test_user(UserObj, Permission);
         E ->
@@ -101,20 +104,20 @@ allowed(User, Permission) ->
                    {error, timeout} |
                    {ok, Perms::[fifo:permission()]}.
 cache(User) ->
-    case snarl_user:get(User) of
+    case get_(User) of
         {ok, UserObj} ->
             {ok, lists:foldl(
                    fun(Group, Permissions) ->
                            case snarl_group:get(Group) of
                                {ok, GroupObj} ->
-                                   GrPerms = jsxd:get(<<"permissions">>, [], GroupObj),
+                                   GrPerms = snarl_group_state:permissions(GroupObj),
                                    ordsets:union(Permissions, GrPerms);
                                _ ->
                                    Permissions
                            end
                    end,
-                   jsxd:get(<<"permissions">>, [], UserObj),
-                   jsxd:get(<<"groups">>, [], UserObj))};
+                   snarl_user_state:permissions(UserObj),
+                   snarl_user_state:groups(UserObj))};
         E ->
             E
     end.
@@ -124,6 +127,18 @@ cache(User) ->
                  {error, timeout} |
                  {ok, User::fifo:user()}.
 get(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:to_json(UserObj)};
+        R  ->
+            R
+    end.
+
+-spec get_(User::fifo:user_id()) ->
+                 not_found |
+                 {error, timeout} |
+                 {ok, User::#?USER{}}.
+get_(User) ->
     case snarl_entity_read_fsm:start(
            {snarl_user_vnode, snarl_user},
            get, User
@@ -133,6 +148,7 @@ get(User) ->
         R ->
             R
     end.
+
 
 -spec list() ->
                   {error, timeout} |
@@ -219,37 +235,6 @@ revoke(User, Permission) ->
     do_write(User, revoke, Permission).
 
 %%%===================================================================
-%%% Resource Functions
-%%%===================================================================
-
-set_resource(User, Resource, Value) ->
-    do_write(User, set_resource, [Resource, Value]).
-
-claim_resource(User, ID, Resource, Ammount) ->
-    case snarl_user:get(User) of
-        {ok, UserObj} ->
-            case snarl_user_state:get_free_resource(Resource, UserObj) of
-                Free when Free >= Ammount ->
-                    do_write(User, claim_resource, [Resource, ID, Ammount]);
-                _ ->
-                    limit_reached
-            end;
-        E ->
-            E
-    end.
-
-free_resource(User, Resource, ID) ->
-    do_write(User, free_resource, [Resource, ID]).
-
-get_resource_stat(User) ->
-    case snarl_user:get(User) of
-        {ok, UserObj} ->
-            snarl_user_state:get_resource_stat(UserObj);
-        E ->
-            E
-    end.
-
-%%%===================================================================
 %%% Internal Functions
 %%%===================================================================
 
@@ -274,9 +259,11 @@ test_groups(_Permission, []) ->
     false;
 
 test_groups(Permission, [Group|Groups]) ->
-    case snarl_group:get(Group) of
+    case snarl_group:get_(Group) of
         {ok, GroupObj} ->
-            case libsnarlmatch:test_perms(Permission, jsxd:get(<<"permissions">>, [], GroupObj)) of
+            case libsnarlmatch:test_perms(
+                   Permission,
+                   snarl_group_state:permissions(GroupObj)) of
                 true ->
                     true;
                 false ->
@@ -287,9 +274,11 @@ test_groups(Permission, [Group|Groups]) ->
     end.
 
 test_user(UserObj, Permission) ->
-    case libsnarlmatch:test_perms(Permission, jsxd:get(<<"permissions">>, [], UserObj)) of
+    case libsnarlmatch:test_perms(
+           Permission,
+           snarl_user_state:permissions(UserObj)) of
         true ->
             true;
         false ->
-            test_groups(Permission,jsxd:get(<<"groups">>, [], UserObj))
+            test_groups(Permission, snarl_user_state:groups(UserObj))
     end.
