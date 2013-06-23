@@ -74,9 +74,9 @@ to_json(#?GROUP{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, ecrdt:value(UUID)},
-       {<<"name">>, ecrdt:value(Name)},
-       {<<"permissions">>, ecrdt:value(Permissions)},
+       {<<"uuid">>, vlwwregister:value(UUID)},
+       {<<"name">>, vlwwregister:value(Name)},
+       {<<"permissions">>, vorsetg:value(Permissions)},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
@@ -169,6 +169,14 @@ expire(Timeout, Group) ->
 reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
 	{(MegaSecs*1000000 + Secs)*1000000 + MicroSecs, test}.
+
+to_json_test() ->
+    Group = new(),
+    GroupJ = [{<<"metadata">>,[]},
+              {<<"name">>,<<>>},
+              {<<"permissions">>,[]},
+              {<<"uuid">>,<<>>}],
+    ?assertEqual(GroupJ, to_json(Group)).
 
 name_test() ->
     Name0 = <<"Test0">>,

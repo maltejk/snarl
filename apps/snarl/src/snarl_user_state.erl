@@ -90,11 +90,11 @@ to_json(#?USER{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, ecrdt:value(UUID)},
-       {<<"name">>, ecrdt:value(Name)},
-       {<<"password">>, ecrdt:value(Password)},
-       {<<"groups">>, ecrdt:value(Groups)},
-       {<<"permissions">>, ecrdt:value(Permissions)},
+       {<<"uuid">>, vlwwregister:value(UUID)},
+       {<<"name">>, vlwwregister:value(Name)},
+       {<<"password">>, vlwwregister:value(Password)},
+       {<<"groups">>, vorsetg:value(Groups)},
+       {<<"permissions">>, vorsetg:value(Permissions)},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
@@ -220,9 +220,20 @@ expire(Timeout, User) ->
            }.
 
 -ifdef(TEST).
+
 reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
 	{(MegaSecs*1000000 + Secs)*1000000 + MicroSecs, test}.
+
+to_json_test() ->
+    User = new(),
+    UserJ = [{<<"groups">>,[]},
+             {<<"metadata">>,[]},
+             {<<"name">>,<<>>},
+             {<<"password">>,<<>>},
+             {<<"permissions">>,[]},
+             {<<"uuid">>,<<>>}],
+    ?assertEqual(UserJ, to_json(User)).
 
 name_test() ->
     Name0 = <<"Test0">>,
