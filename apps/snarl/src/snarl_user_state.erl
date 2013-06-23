@@ -90,11 +90,11 @@ to_json(#?USER{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, vlwwregister:value(UUID)},
-       {<<"name">>, vlwwregister:value(Name)},
-       {<<"password">>, vlwwregister:value(Password)},
-       {<<"groups">>, vorsetg:value(Groups)},
-       {<<"permissions">>, vorsetg:value(Permissions)},
+       {<<"uuid">>, ecrdt:value(UUID)},
+       {<<"name">>, ecrdt:value(Name)},
+       {<<"password">>, ecrdt:value(Password)},
+       {<<"groups">>, ecrdt:value(Groups)},
+       {<<"permissions">>, ecrdt:value(Permissions)},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
@@ -124,7 +124,7 @@ merge(#?USER{
        }.
 
 name(User) ->
-    vlwwregister:value(User#?USER.name).
+    ecrdt:value(User#?USER.name).
 
 name(_, Name, User) ->
     User#?USER{
@@ -132,7 +132,7 @@ name(_, Name, User) ->
            }.
 
 uuid(User) ->
-    vlwwregister:value(User#?USER.uuid).
+    ecrdt:value(User#?USER.uuid).
 
 uuid(_, UUID, User) ->
     User#?USER{
@@ -140,7 +140,7 @@ uuid(_, UUID, User) ->
            }.
 
 password(User) ->
-    vlwwregister:value(User#?USER.password).
+    ecrdt:value(User#?USER.password).
 
 password(_, Password, User) ->
     Name = name(User),
@@ -150,7 +150,7 @@ password(_, Password, User) ->
            }.
 
 permissions(User) ->
-    vorsetg:value(User#?USER.permissions).
+    ecrdt:value(User#?USER.permissions).
 
 grant(ID, Permission, User) ->
     User#?USER{
@@ -181,7 +181,7 @@ revoke_prefix(ID, Prefix, User) ->
            }.
 
 groups(User) ->
-    vorsetg:value(User#?USER.groups).
+    ecrdt:value(User#?USER.groups).
 
 
 join(ID, Group, User) ->

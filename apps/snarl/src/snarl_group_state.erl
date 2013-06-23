@@ -74,9 +74,9 @@ to_json(#?GROUP{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, vlwwregister:value(UUID)},
-       {<<"name">>, vlwwregister:value(Name)},
-       {<<"permissions">>, vorsetg:value(Permissions)},
+       {<<"uuid">>, ecrdt:value(UUID)},
+       {<<"name">>, ecrdt:value(Name)},
+       {<<"permissions">>, ecrdt:value(Permissions)},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
@@ -100,7 +100,7 @@ merge(#?GROUP{
        }.
 
 name(Group) ->
-    vlwwregister:value(Group#?GROUP.name).
+    ecrdt:value(Group#?GROUP.name).
 
 name(_, Name, Group) ->
     Group#?GROUP{
@@ -108,7 +108,7 @@ name(_, Name, Group) ->
             }.
 
 uuid(Group) ->
-    vlwwregister:value(Group#?GROUP.uuid).
+    ecrdt:value(Group#?GROUP.uuid).
 
 uuid(_, UUID, Group) ->
     Group#?GROUP{
@@ -116,7 +116,7 @@ uuid(_, UUID, Group) ->
             }.
 
 permissions(Group) ->
-    vorsetg:value(Group#?GROUP.permissions).
+    ecrdt:value(Group#?GROUP.permissions).
 
 grant(ID, Permission, Group) ->
     Group#?GROUP{
