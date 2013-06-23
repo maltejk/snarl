@@ -322,10 +322,11 @@ delete(State) ->
 handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
-                        fun (_K, #snarl_obj{val=SB}, not_found) ->
-                                case snarl_user_state:password(SB) of
+                        fun (_K, #snarl_obj{val=U0}, not_found) ->
+                                U1 = snarl_user_state:load(U0),
+                                case snarl_user_state:password(U1) of
                                     Hash ->
-                                        snarl_user_state:uuid(SB);
+                                        snarl_user_state:uuid(U1);
                                     _ ->
                                         not_found
                                 end;
@@ -339,14 +340,12 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
-                        fun (_U, #snarl_obj{val=SB}, not_found) ->
-                                N = snarl_user_state:name(SB),
-                                case N =:= Name  of
-                                    true ->
-                                        io:format("~p =:= ~p.~n", [Name, N]),
-                                        snarl_user_state:uuid(SB);
-                                    false ->
-                                        io:format("~p =/= ~p.~n", [Name, N]),
+                        fun (UUID, #snarl_obj{val = U0}, not_found) ->
+                                U1 = snarl_user_state:load(U0),
+                                case snarl_user_state:name(U1)  of
+                                    Name ->
+                                        UUID;
+                                    _ ->
                                         not_found
                                 end;
                             (_U, _, Res) ->

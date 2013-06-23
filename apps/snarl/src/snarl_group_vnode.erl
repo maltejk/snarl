@@ -254,10 +254,11 @@ delete(State) ->
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"group">>,
-                        fun (_U, #snarl_obj{val=SB}, not_found) ->
-                                case snarl_group_state:name(SB) of
+                        fun (UUID, #snarl_obj{val=G0}, not_found) ->
+                                G1 = snarl_group_state:load(G0),
+                                case snarl_group_state:name(G1) of
                                     Name ->
-                                        snarl_group_state:uuid(SB);
+                                        UUID;
                                     _ ->
                                         not_found
                                 end;
