@@ -186,6 +186,8 @@ expire(Timeout, Group) ->
            }.
 
 -ifdef(TEST).
+mkid() ->
+    {mkid(), test}.
 
 to_json_test() ->
     Group = new(),
@@ -198,9 +200,9 @@ to_json_test() ->
 name_test() ->
     Name0 = <<"Test0">>,
     Group0 = new(),
-    Group1 = name(ecrdt:timestamp_us(), Name0, Group0),
+    Group1 = name(mkid(), Name0, Group0),
     Name1 = <<"Test1">>,
-    Group2 = name(ecrdt:timestamp_us(), Name1, Group1),
+    Group2 = name(mkid(), Name1, Group1),
     ?assertEqual(Name0, name(Group1)),
     ?assertEqual(Name1, name(Group2)).
 
@@ -208,11 +210,11 @@ permissions_test() ->
     P0 = [<<"P0">>],
     P1 = [<<"P1">>],
     Group0 = new(),
-    Group1 = grant(ecrdt:timestamp_us(), P0, Group0),
-    Group2 = grant(ecrdt:timestamp_us(), P1, Group1),
-    Group3 = grant(ecrdt:timestamp_us(), P0, Group2),
-    Group4 = revoke(ecrdt:timestamp_us(), P0, Group3),
-    Group5 = revoke(ecrdt:timestamp_us(), P1, Group3),
+    Group1 = grant(mkid(), P0, Group0),
+    Group2 = grant(mkid(), P1, Group1),
+    Group3 = grant(mkid(), P0, Group2),
+    Group4 = revoke(mkid(), P0, Group3),
+    Group5 = revoke(mkid(), P1, Group3),
     ?assertEqual([P0], permissions(Group1)),
     ?assertEqual([P0, P1], permissions(Group2)),
     ?assertEqual([P0, P1], permissions(Group3)),

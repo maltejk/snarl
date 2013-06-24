@@ -246,6 +246,9 @@ expire(Timeout, User) ->
 
 -ifdef(TEST).
 
+mkid() ->
+    {ecrdt:timestamp_us(), test}.
+
 to_json_test() ->
     User = new(),
     UserJ = [{<<"groups">>,[]},
@@ -259,9 +262,9 @@ to_json_test() ->
 name_test() ->
     Name0 = <<"Test0">>,
     User0 = new(),
-    User1 = name(ecrdt:timestamp_us(), Name0, User0),
+    User1 = name(mkid(), Name0, User0),
     Name1 = <<"Test1">>,
-    User2 = name(ecrdt:timestamp_us(), Name1, User1),
+    User2 = name(mkid(), Name1, User1),
     ?assertEqual(Name0, name(User1)),
     ?assertEqual(Name1, name(User2)).
 
@@ -270,19 +273,19 @@ password_test() ->
     Password = "Test",
     Hash = crypto:sha([Name, Password]),
     User0 = new(),
-    User1 = name(ecrdt:timestamp_us(), Name, User0),
-    User2 = password(ecrdt:timestamp_us(), Password, User1),
+    User1 = name(mkid(), Name, User0),
+    User2 = password(mkid(), Password, User1),
     ?assertEqual(Hash, password(User2)).
 
 permissions_test() ->
     P0 = [<<"P0">>],
     P1 = [<<"P1">>],
     User0 = new(),
-    User1 = grant(ecrdt:timestamp_us(), P0, User0),
-    User2 = grant(ecrdt:timestamp_us(), P1, User1),
-    User3 = grant(ecrdt:timestamp_us(), P0, User2),
-    User4 = revoke(ecrdt:timestamp_us(), P0, User3),
-    User5 = revoke(ecrdt:timestamp_us(), P1, User3),
+    User1 = grant(mkid(), P0, User0),
+    User2 = grant(mkid(), P1, User1),
+    User3 = grant(mkid(), P0, User2),
+    User4 = revoke(mkid(), P0, User3),
+    User5 = revoke(mkid(), P1, User3),
     ?assertEqual([P0], permissions(User1)),
     ?assertEqual([P0, P1], permissions(User2)),
     ?assertEqual([P0, P1], permissions(User3)),
@@ -293,11 +296,11 @@ groups_test() ->
     G0 = "G0",
     G1 = "G1",
     User0 = new(),
-    User1 = join(ecrdt:timestamp_us(), G0, User0),
-    User2 = join(ecrdt:timestamp_us(), G1, User1),
-    User3 = join(ecrdt:timestamp_us(), G0, User2),
-    User4 = leave(ecrdt:timestamp_us(), G0, User3),
-    User5 = leave(ecrdt:timestamp_us(), G1, User3),
+    User1 = join(mkid(), G0, User0),
+    User2 = join(mkid(), G1, User1),
+    User3 = join(mkid(), G0, User2),
+    User4 = leave(mkid(), G0, User3),
+    User5 = leave(mkid(), G1, User3),
     ?assertEqual([G0], groups(User1)),
     ?assertEqual([G0, G1], groups(User2)),
     ?assertEqual([G0, G1], groups(User3)),
