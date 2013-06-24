@@ -23,13 +23,13 @@
          allowed/2,
          set/2,
          set/3,
+         import/2,
          cache/1,
-         create/2,
          gcable/1,
          gc/2
         ]).
 
--ignore_xref([ping/0, gc/2]).
+-ignore_xref([ping/0]).
 
 -define(TIMEOUT, 5000).
 
@@ -222,6 +222,9 @@ set(User, Attributes) ->
                     ok.
 passwd(User, Passwd) ->
     do_write(User, passwd, Passwd).
+
+import(User, Data) ->
+    do_write(User, import, Data).
 
 -spec join(User::fifo:user_id(), Group::fifo:group_id()) ->
                   not_found |

@@ -248,20 +248,18 @@ import_user([File]) ->
         {ok, B} ->
             JSON = jsx:decode(B),
             JSX = jsxd:from_list(JSON),
-            {ok, Name} = jsxd:get([<<"name">>], JSX),
             {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
                              {ok, U} ->
-                                 snarl_user:delete(U),
-                                 snarl_user:create(U, Name),
-                                 {ok, U};
+                                 U;
                              undefined ->
-                                 snarl_user:add(Name)
+                                 list_to_binary(uuid:to_string(uuid:uuid4()))
                          end,
             As = jsxd:thread([{delete, [<<"name">>]},
+                              {set, [<<"uuid">>], UUID},
                               {delete, [<<"uuid">>]},
                               {update, [<<"password">>],  fun base64:decode/1}],
                              JSX),
-            ok = snarl_user:set(UUID, As),
+            ok = snarl_user:import(UUID, As),
             ok
     end.
 
