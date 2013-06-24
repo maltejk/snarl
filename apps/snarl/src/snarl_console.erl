@@ -259,8 +259,7 @@ import_user([File]) ->
                               {delete, [<<"uuid">>]},
                               {update, [<<"password">>],  fun base64:decode/1}],
                              JSX),
-            ok = snarl_user:import(UUID, As),
-            ok
+            snarl_user:import(UUID, As)
     end.
 
 

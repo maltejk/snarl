@@ -141,7 +141,7 @@ set(Preflist, ReqID, UUID, Attributes) ->
 
 import(Preflist, ReqID, UUID, Import) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, UUID, Import},
+                                   {import, ReqID, UUID, Import},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
