@@ -36,7 +36,7 @@ case $2 in
         echo "# database is created                                      #"
         echo "############################################################"
         echo $BACKUP_FILE
-        tar cvfx $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
+        tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
     fi
 	;;
     POST-INSTALL)
