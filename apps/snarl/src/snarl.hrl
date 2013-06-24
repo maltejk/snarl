@@ -19,6 +19,9 @@
 -define(WEEK, 604800000000).
 -define(DAY,   86400000000).
 -define(HOUER,  3600000000).
+-define(MINUTE,   60000000).
+-define(SECOND,    1000000).
+
 
 -define(STATEBOX_EXPIRE, 60000).
 -define(DEFAULT_TIMEOUT, 10000).

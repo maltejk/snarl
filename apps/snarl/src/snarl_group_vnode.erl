@@ -147,9 +147,9 @@ init([Partition]) ->
     DB = list_to_atom(integer_to_list(Partition)),
     snarl_db:start(DB),
     {ok, #state {
-       db = DB,
-       node = node(),
-       partition = Partition}}.
+            db = DB,
+            node = node(),
+            partition = Partition}}.
 
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
@@ -236,8 +236,16 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {Group, HObject} = binary_to_term(Data),
-    snarl_db:put(State#state.db, <<"group">>, Group, HObject),
+    {Group, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
+    V = snarl_group_state:load(Vin),
+    case snarl_db:get(State#state.db, <<"group">>, Group) of
+        {ok, #snarl_obj{val = V0}} ->
+            V1 = snarl_group_state:load(V0),
+            snarl_db:put(State#state.db, <<"group">>, Group,
+                         Obj#snarl_obj{val = snarl_group_state:merge(V, V1)});
+        not_found ->
+            snarl_db:put(State#state.db, <<"group">>, Group, V)
+    end,
     {reply, ok, State}.
 
 encode_handoff_item(Group, Data) ->
@@ -245,17 +253,17 @@ encode_handoff_item(Group, Data) ->
 
 is_empty(State) ->
     snarl_db:fold(State#state.db,
-                    <<"group">>,
-                    fun (_,_, _) ->
-                            {false, State}
-                    end, {true, State}).
+                  <<"group">>,
+                  fun (_,_, _) ->
+                          {false, State}
+                  end, {true, State}).
 
 delete(State) ->
     Trans = snarl_db:fold(State#state.db,
-                            <<"group">>,
-                            fun (K,_, A) ->
-                                    [{delete, K} | A]
-                            end, []),
+                          <<"group">>,
+                          fun (K,_, A) ->
+                                  [{delete, K} | A]
+                          end, []),
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
@@ -307,7 +315,7 @@ change_group(Group, Action, Vals, Coordinator, State, ReqID) ->
             H2 = case Vals of
                      [Val] ->
                          snarl_group_state:Action(ID, Val, H1);
-                         [Val1, Val2] ->
+                     [Val1, Val2] ->
                          snarl_group_state:Action(ID, Val1, Val2, H1)
                  end,
             snarl_db:put(State#state.db, <<"group">>, Group,

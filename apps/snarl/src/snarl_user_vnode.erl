@@ -303,8 +303,16 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {User, HObject} = binary_to_term(Data),
-    snarl_db:put(State#state.db, <<"user">>, User, HObject),
+    {User, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
+    V = snarl_user_state:load(Vin),
+    case snarl_db:get(State#state.db, <<"user">>, User) of
+        {ok, #snarl_obj{val = V0}} ->
+            V1 = snarl_user_state:load(V0),
+            snarl_db:put(State#state.db, <<"user">>, User,
+                         Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
+        not_found ->
+            snarl_db:put(State#state.db, <<"user">>, User, V)
+    end,
     {reply, ok, State}.
 
 encode_handoff_item(User, Data) ->
