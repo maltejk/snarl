@@ -254,8 +254,7 @@ import_user([File]) ->
                        undefined ->
                            list_to_binary(uuid:to_string(uuid:uuid4()))
                    end,
-            As = jsxd:thread([{delete, [<<"name">>]},
-                              {set, [<<"uuid">>], UUID},
+            As = jsxd:thread([{set, [<<"uuid">>], UUID},
                               {delete, [<<"uuid">>]},
                               {update, [<<"password">>],  fun base64:decode/1}],
                              JSX),
