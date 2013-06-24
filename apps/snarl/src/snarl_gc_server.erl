@@ -126,7 +126,7 @@ handle_cast(next, State = #state{
                              users = [],
                              groups = []}) ->
     T0 = os:timestamp(),
-    Td = timer:now_diff(Start, T0) * 1000000,
+    Td = timer:now_diff(T0, Start) / 1000000,
     lager:info("[Auto GC] Run complete in ~ps.", [Td]),
     lager:info("[Auto GC] Saved a total of ~p byte in ~p objects.", [C, Cnt]),
     {ok, Users} = snarl_user:list(),
@@ -137,7 +137,7 @@ handle_cast(next, State = #state{
      State#state{
        users = Users,
        groups = Groups,
-       start = Start,
+       start = T0,
        cnt = 0,
        compacted = 0
       }};
