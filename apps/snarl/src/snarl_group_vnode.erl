@@ -28,6 +28,7 @@
 -export([add/4,
          gc/4,
          set/4,
+         import/4,
          delete/3,
          grant/4,
          repair/4,
@@ -44,6 +45,7 @@
               delete/3,
               grant/4,
               set/4,
+              import/4,
               repair/4,
               revoke/4,
               revoke_prefix/4
@@ -102,6 +104,12 @@ lookup(Preflist, ReqID, Name) ->
 set(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,
                                    {set, ReqID, UUID, Attributes},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+import(Preflist, ReqID, UUID, Import) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {import, ReqID, UUID, Import},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -206,6 +214,22 @@ handle_command({set, {ReqID, Coordinator}, Group, Attributes}, _Sender, State) -
         R ->
             lager:error("[groups] tried to write to a non existing group: ~p", [R]),
             {reply, {ok, ReqID, not_found}, State}
+    end;
+
+handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender, State) ->
+    H1 = snarl_group_state:load(Data),
+    H2 = snarl_group_state:uuid(ID, UUID, H1),
+    case snarl_db:get(State#state.db, <<"group">>, UUID) of
+        {ok, O} ->
+            snarl_db:put(State#state.db, <<"group">>, UUID,
+                         snarl_obj:update(H2, Coordinator, O)),
+            {reply, {ok, ReqID}, State};
+        _R ->
+            VC0 = vclock:fresh(),
+            VC = vclock:increment(Coordinator, VC0),
+            GroupObj = #snarl_obj{val=H2, vclock=VC},
+            snarl_db:put(State#state.db, <<"group">>, UUID, GroupObj),
+            {reply, {ok, ReqID}, State}
     end;
 
 handle_command({Action, {ReqID, Coordinator}, Group, Param1, Param2}, _Sender, State) ->

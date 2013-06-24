@@ -278,20 +278,14 @@ import_group([File]) ->
         {ok, B} ->
             JSON = jsx:decode(B),
             JSX = jsxd:from_list(JSON),
-            {ok, Name} = jsxd:get([<<"name">>], JSX),
-            {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
-                             {ok, U} ->
-                                 snarl_group:delete(U),
-                                 snarl_group:create(U, Name),
-                                 {ok, U};
-                             undefined ->
-                                 snarl_group:add(Name)
-                         end,
-            As = jsxd:thread([{delete, [<<"name">>]},
-                              {delete, [<<"uuid">>]}],
-                             JSX),
-            ok = snarl_group:set(UUID, As),
-            ok
+            UUID = case jsxd:get([<<"uuid">>], JSX) of
+                       {ok, U} ->
+                           U;
+                       undefined ->
+                           list_to_binary(uuid:to_string(uuid:uuid4()))
+                   end,
+            As = jsxd:thread([{set, [<<"uuid">>], UUID}], JSX),
+            snarl_group:import(UUID, statebox:new(fun() -> As end))
     end.
 
 add_group([Group]) ->

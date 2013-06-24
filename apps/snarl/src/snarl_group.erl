@@ -17,10 +17,11 @@
          create/2,
          revoke_prefix/2,
          gcable/1,
+         import/2,
          gc/2
         ]).
 
--ignore_xref([ping/0]).
+-ignore_xref([ping/0, create/2]).
 
 -define(TIMEOUT, 5000).
 
@@ -32,6 +33,9 @@ ping() ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_group),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_group_vnode_master).
+
+import(Group, Data) ->
+    do_write(Group, import, Data).
 
 -spec lookup(GroupName::binary()) ->
                     not_found |
