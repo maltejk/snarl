@@ -187,7 +187,7 @@ expire(Timeout, Group) ->
 
 -ifdef(TEST).
 mkid() ->
-    {mkid(), test}.
+    {ecrdt:timestamp_us(), test}.
 
 to_json_test() ->
     Group = new(),
