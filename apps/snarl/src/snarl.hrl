@@ -16,6 +16,13 @@
              undefined ->
                  {?N, ?R, ?W}
          end)).
+-define(WEEK, 604800000000).
+-define(DAY,   86400000000).
+-define(HOUER,  3600000000).
+-define(MINUTE,   60000000).
+-define(SECOND,    1000000).
+
+
 -define(STATEBOX_EXPIRE, 60000).
 -define(DEFAULT_TIMEOUT, 10000).
 
@@ -39,3 +46,23 @@
 -type idx_node() :: {integer(), node()}.
 
 -type vnode_reply() :: {idx_node(), snarl_obj() | not_found}.
+
+
+-record(user_0_1_0, {
+          uuid :: ecrdt:vlwwregister(),
+          name :: ecrdt:vlwwregister(),
+          password :: ecrdt:vlwwregister(),
+          permissions :: ecrdt:vorsetg(),
+          groups :: ecrdt:vorsetg(),
+          metadata
+         }).
+
+-record(group_0_1_0, {
+          uuid :: ecrdt:vlwwregister(),
+          name :: ecrdt:vlwwregister(),
+          permissions :: ecrdt:vorsetg(),
+          metadata
+         }).
+
+-define(USER, user_0_1_0).
+-define(GROUP, group_0_1_0).

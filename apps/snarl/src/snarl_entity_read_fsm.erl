@@ -181,7 +181,7 @@ waiting({ok, ReqID, IdxNode, Obj},
                     statman_histogram:record_value(
                       {list_to_binary(stat_name(SD0#state.vnode) ++ "/read"), total},
                       SD0#state.start),
-                    From ! {ReqID, ok, statebox:value(Reply)}
+                    From ! {ReqID, ok, Reply}
             end,
             if
                 NumR =:= N ->
@@ -256,11 +256,17 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: statebox:statebox()]) -> A :: statebox:statebox().
+-spec reconcile([A :: #?USER{} | #?GROUP{}]) -> A :: #?USER{} | #?GROUP{}.
 
-reconcile(Vals) ->
-    statebox:merge(Vals).
+reconcile([V | Vs]) ->
+    reconcile(V, Vs).
 
+reconcile([#?USER{} = U | R], Acc) ->
+    reconcile(R, snarl_user_state:merge(Acc, U));
+reconcile([#?GROUP{} = G | R], Acc) ->
+    reconcile(R, snarl_group_state:merge(Acc, G));
+reconcile(_, Acc) ->
+    Acc.
 
 %% @pure
 %%
@@ -302,7 +308,8 @@ unique(L) ->
     sets:to_list(sets:from_list(L)).
 
 mk_reqid() ->
-    erlang:phash2(erlang:now()).
+    {MegaSecs,Secs,MicroSecs} = erlang:now(),
+	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 stat_name(snarl_user_vnode) ->
     "user";
