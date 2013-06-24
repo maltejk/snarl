@@ -26,6 +26,7 @@
 
 %% Writes
 -export([add/4,
+         gc/4,
          set/4,
          delete/3,
          grant/4,
@@ -37,6 +38,7 @@
               start_vnode/1,
               lookup/3,
               list/2,
+              gc/4,
               get/3,
               add/4,
               delete/3,
@@ -100,6 +102,12 @@ lookup(Preflist, ReqID, Name) ->
 set(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,
                                    {set, ReqID, UUID, Attributes},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+gc(Preflist, ReqID, UUID, GCable) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {gc, ReqID, UUID, GCable},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 

@@ -16,6 +16,8 @@
 
 -export([add_group/1,
          delete_group/1,
+         gcable_group/1,
+         gc_group/1,
          join_group/1,
          leave_group/1,
          grant_group/1,
@@ -23,6 +25,8 @@
          revoke_group/1]).
 
 -export([add_user/1,
+         gc_user/1,
+         gcable_user/1,
          delete_user/1,
          list_user/1,
          grant_user/1,
@@ -32,6 +36,8 @@
 -ignore_xref([
               join/1,
               leave/1,
+              gcable_user/1,
+              gcable_group/1,
               delete_user/1,
               delete_group/1,
               remove/1,
@@ -53,7 +59,9 @@
               grant_user/1,
               revoke_user/1,
               revoke_group/1,
-              passwd/1
+              passwd/1,
+              gc_group/1,
+              gc_user/1
              ]).
 
 list_user([]) ->
@@ -76,6 +84,58 @@ list_group([]) ->
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
+
+
+gc_group(UUID, Timeout) ->
+    case snarl_group:gcable(UUID) of
+        {ok, A} ->
+            MinAge = ecrdt:timestamp_us() - Timeout,
+            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
+            {ok, Size} = snarl_group:gc(UUID, A1),
+            io:format("GC ~p bytes of memory.~n", [Size]),
+            ok;
+        _ ->
+            error
+    end.
+
+gc_group([UUID]) ->
+    gc_group(list_to_binary(UUID), 10).
+
+gc_user(UUID, Timeout) ->
+    case snarl_user:gcable(UUID) of
+        {ok, {A, B}} ->
+            MinAge = ecrdt:timestamp_us() - Timeout,
+            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
+            B1 = [E || {{T,_},_} = E <- B, T < MinAge],
+            {ok, Size} = snarl_user:gc(UUID, {A1, B1}),
+            io:format("GC ~p bytes of memory.~n", [Size]),
+            ok;
+        _ ->
+            error
+    end.
+
+
+
+gc_user([UUID]) ->
+    gc_user(list_to_binary(UUID), 10).
+
+gcable_user([UUID]) ->
+    case snarl_user:gcable(list_to_binary(UUID)) of
+        {ok, {A, B}} ->
+            io:format("GCable buckets: ~p~n", [length(A) + length(B)]),
+            ok;
+        _ ->
+            error
+    end.
+
+gcable_group([UUID]) ->
+    case snarl_group:gcable(list_to_binary(UUID)) of
+        {ok, A} ->
+            io:format("GCable buckets ~p~n", [length(A)]),
+            ok;
+        _ ->
+            error
+    end.
 
 delete_user([User]) ->
     snarl_user:delete(list_to_binary(User)),

@@ -127,9 +127,18 @@ case "$1" in
                 shift
                 run snarl_console import_user $@
                 ;;
+            "gcable")
+                shift
+                run snarl_console gcable_user $@
+                ;;
+            "gc")
+                shift
+                run snarl_console gc_user $@
+                ;;
+
             *)
                 echo "Usage: snarl-admin users { add | passwd | join | leave "
-                echo "                           grant | revoke }."
+                echo "                           grant | revoke | gcable | gc }."
                 exit 1
                 ;;
         esac
@@ -165,9 +174,17 @@ case "$1" in
                 shift
                 run snarl_console import_group $@
                 ;;
-
+            "gcable")
+                shift
+                run snarl_console gcable_group $@
+                ;;
+            "gc")
+                shift
+                run snarl_console gc_group $@
+                ;;
             *)
-                echo "Usage: snarl-admin groups { list | add | grant | revoke }."
+                echo "Usage: snarl-admin groups { list | add | grant | revoke "
+                echo "                            gc }."
                 exit 1
                 ;;
         esac

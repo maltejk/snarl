@@ -22,7 +22,9 @@
          metadata/1, set_metadata/3,
          merge/2,
          to_json/1,
-         expire/2
+         expire/2,
+         gcable/1,
+         gc/3
         ]).
 
 -ignore_xref([
@@ -32,15 +34,32 @@
               name/1, name/2,
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
               metadata/1, set_metadata/3,
-              to_json/1
+              to_json/1,
+              gcable/1,
+              gc/3
              ]).
 
+gcable(#?GROUP{
+           permissions = Permissions
+          }) ->
+    vorsetg:gcable(Permissions).
+
+gc(_ID,
+   Ps,
+   #?GROUP{
+       permissions = Permissions
+      } = Group) ->
+    Ps1 = lists:foldl(fun vorsetg:gc/2, Permissions, Ps),
+    Group#?GROUP{
+            permissions = Ps1
+           }.
 
 new() ->
+    Size = ?ENV(group_bucket_size, 50),
     #?GROUP{
         uuid = vlwwregister:new(<<>>),
         name = vlwwregister:new(<<>>),
-        permissions = vorsetg:new(),
+        permissions = vorsetg:new(Size),
         metadata = statebox:new(fun jsxd:new/0)
        }.
 
@@ -49,6 +68,7 @@ load(#?GROUP{} = Group) ->
     Group;
 
 load(GroupSB) ->
+    Size = ?ENV(group_bucket_size, 50),
     Group = statebox:value(GroupSB),
     {ok, Name} = jsxd:get([<<"name">>], Group),
     {ok, UUID} = jsxd:get([<<"uuid">>], Group),
@@ -58,7 +78,7 @@ load(GroupSB) ->
     Permissions = lists:foldl(
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
-                    end, vorsetg:new(), Permissions0),
+                    end, vorsetg:new(Size), Permissions0),
     #?GROUP{
         uuid = vlwwregister:new(UUID),
         name = vlwwregister:new(Name),
@@ -166,9 +186,6 @@ expire(Timeout, Group) ->
            }.
 
 -ifdef(TEST).
-reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-	{(MegaSecs*1000000 + Secs)*1000000 + MicroSecs, test}.
 
 to_json_test() ->
     Group = new(),
@@ -181,9 +198,9 @@ to_json_test() ->
 name_test() ->
     Name0 = <<"Test0">>,
     Group0 = new(),
-    Group1 = name(reqid(), Name0, Group0),
+    Group1 = name(ecrdt:timestamp_us(), Name0, Group0),
     Name1 = <<"Test1">>,
-    Group2 = name(reqid(), Name1, Group1),
+    Group2 = name(ecrdt:timestamp_us(), Name1, Group1),
     ?assertEqual(Name0, name(Group1)),
     ?assertEqual(Name1, name(Group2)).
 
@@ -191,11 +208,11 @@ permissions_test() ->
     P0 = [<<"P0">>],
     P1 = [<<"P1">>],
     Group0 = new(),
-    Group1 = grant(reqid(), P0, Group0),
-    Group2 = grant(reqid(), P1, Group1),
-    Group3 = grant(reqid(), P0, Group2),
-    Group4 = revoke(reqid(), P0, Group3),
-    Group5 = revoke(reqid(), P1, Group3),
+    Group1 = grant(ecrdt:timestamp_us(), P0, Group0),
+    Group2 = grant(ecrdt:timestamp_us(), P1, Group1),
+    Group3 = grant(ecrdt:timestamp_us(), P0, Group2),
+    Group4 = revoke(ecrdt:timestamp_us(), P0, Group3),
+    Group5 = revoke(ecrdt:timestamp_us(), P1, Group3),
     ?assertEqual([P0], permissions(Group1)),
     ?assertEqual([P0, P1], permissions(Group2)),
     ?assertEqual([P0, P1], permissions(Group3)),

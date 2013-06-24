@@ -24,7 +24,9 @@
          metadata/1, set_metadata/3,
          merge/2,
          to_json/1,
-         expire/2
+         expire/2,
+         gc/3,
+         gcable/1
         ]).
 
 -ignore_xref([
@@ -38,13 +40,16 @@
               metadata/1, set_metadata/3,
               merge/2,
               to_json/1,
-              expire/2
+              expire/2,
+              gc/3,
+              gcable/1
              ]).
 
 load(#?USER{} = User) ->
     User;
 
 load(UserSB) ->
+    Size = ?ENV(user_bucket_size, 50),
     User = statebox:value(UserSB),
     {ok, Name} = jsxd:get([<<"name">>], User),
     {ok, UUID} = jsxd:get([<<"uuid">>], User),
@@ -56,11 +61,11 @@ load(UserSB) ->
     Groups = lists:foldl(
                fun (G, Acc) ->
                        vorsetg:add(ID0, G, Acc)
-               end, vorsetg:new(), Groups0),
+               end, vorsetg:new(Size), Groups0),
     Permissions = lists:foldl(
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
-                    end, vorsetg:new(), Permissions0),
+                    end, vorsetg:new(Size), Permissions0),
     #?USER{
         uuid = vlwwregister:new(UUID),
         name = vlwwregister:new(Name),
@@ -70,13 +75,33 @@ load(UserSB) ->
         metadata = statebox:new(fun() -> Metadata end)
        }.
 
+gcable(#?USER{
+           permissions = Permissions,
+           groups = Groups
+          }) ->
+    {vorsetg:gcable(Permissions), vorsetg:gcable(Groups)}.
+
+gc(_ID,
+   {Ps, Gs},
+   #?USER{
+       permissions = Permissions,
+       groups = Groups
+      } = User) ->
+    Ps1 = lists:foldl(fun vorsetg:gc/2, Permissions, Ps),
+    Gs1 = lists:foldl(fun vorsetg:gc/2, Groups, Gs),
+    User#?USER{
+            permissions = Ps1,
+            groups = Gs1
+           }.
+
 new() ->
+    Size = ?ENV(user_bucket_size, 50),
     #?USER{
         uuid = vlwwregister:new(<<>>),
         name = vlwwregister:new(<<>>),
         password = vlwwregister:new(<<>>),
-        groups = vorsetg:new(),
-        permissions = vorsetg:new(),
+        groups = vorsetg:new(Size),
+        permissions = vorsetg:new(Size),
         metadata = statebox:new(fun jsxd:new/0)
        }.
 
@@ -221,10 +246,6 @@ expire(Timeout, User) ->
 
 -ifdef(TEST).
 
-reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-	{(MegaSecs*1000000 + Secs)*1000000 + MicroSecs, test}.
-
 to_json_test() ->
     User = new(),
     UserJ = [{<<"groups">>,[]},
@@ -238,9 +259,9 @@ to_json_test() ->
 name_test() ->
     Name0 = <<"Test0">>,
     User0 = new(),
-    User1 = name(reqid(), Name0, User0),
+    User1 = name(ecrdt:timestamp_us(), Name0, User0),
     Name1 = <<"Test1">>,
-    User2 = name(reqid(), Name1, User1),
+    User2 = name(ecrdt:timestamp_us(), Name1, User1),
     ?assertEqual(Name0, name(User1)),
     ?assertEqual(Name1, name(User2)).
 
@@ -249,19 +270,19 @@ password_test() ->
     Password = "Test",
     Hash = crypto:sha([Name, Password]),
     User0 = new(),
-    User1 = name(reqid(), Name, User0),
-    User2 = password(reqid(), Password, User1),
+    User1 = name(ecrdt:timestamp_us(), Name, User0),
+    User2 = password(ecrdt:timestamp_us(), Password, User1),
     ?assertEqual(Hash, password(User2)).
 
 permissions_test() ->
     P0 = [<<"P0">>],
     P1 = [<<"P1">>],
     User0 = new(),
-    User1 = grant(reqid(), P0, User0),
-    User2 = grant(reqid(), P1, User1),
-    User3 = grant(reqid(), P0, User2),
-    User4 = revoke(reqid(), P0, User3),
-    User5 = revoke(reqid(), P1, User3),
+    User1 = grant(ecrdt:timestamp_us(), P0, User0),
+    User2 = grant(ecrdt:timestamp_us(), P1, User1),
+    User3 = grant(ecrdt:timestamp_us(), P0, User2),
+    User4 = revoke(ecrdt:timestamp_us(), P0, User3),
+    User5 = revoke(ecrdt:timestamp_us(), P1, User3),
     ?assertEqual([P0], permissions(User1)),
     ?assertEqual([P0, P1], permissions(User2)),
     ?assertEqual([P0, P1], permissions(User3)),
@@ -272,11 +293,11 @@ groups_test() ->
     G0 = "G0",
     G1 = "G1",
     User0 = new(),
-    User1 = join(reqid(), G0, User0),
-    User2 = join(reqid(), G1, User1),
-    User3 = join(reqid(), G0, User2),
-    User4 = leave(reqid(), G0, User3),
-    User5 = leave(reqid(), G1, User3),
+    User1 = join(ecrdt:timestamp_us(), G0, User0),
+    User2 = join(ecrdt:timestamp_us(), G1, User1),
+    User3 = join(ecrdt:timestamp_us(), G0, User2),
+    User4 = leave(ecrdt:timestamp_us(), G0, User3),
+    User5 = leave(ecrdt:timestamp_us(), G1, User3),
     ?assertEqual([G0], groups(User1)),
     ?assertEqual([G0, G1], groups(User2)),
     ?assertEqual([G0, G1], groups(User3)),

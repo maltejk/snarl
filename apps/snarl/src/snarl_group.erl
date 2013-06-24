@@ -15,7 +15,9 @@
          set/2,
          set/3,
          create/2,
-         revoke_prefix/2
+         revoke_prefix/2,
+         gcable/1,
+         gc/2
         ]).
 
 -ignore_xref([ping/0]).
@@ -49,6 +51,29 @@ lookup(GroupName) ->
         {ok, UUID} ->
             snarl_group:get(UUID);
         R ->
+            R
+    end.
+
+gc(Group, GCable) ->
+    case get_(Group) of
+        {ok, GroupObj1} ->
+            do_write(Group, gc, GCable),
+            {ok, GroupObj2} = get_(Group),
+            {ok, byte_size(term_to_binary(GroupObj1)) -
+                 byte_size(term_to_binary(GroupObj2))};
+        R ->
+            R
+    end.
+
+-spec gcable(Group::fifo:group_id()) ->
+                    not_found |
+                    {error, timeout} |
+                    {ok, []}.
+gcable(Group) ->
+    case get_(Group) of
+        {ok, GroupObj} ->
+            {ok, snarl_group_state:gcable(GroupObj)};
+        R  ->
             R
     end.
 

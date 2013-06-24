@@ -24,10 +24,12 @@
          set/2,
          set/3,
          cache/1,
-         create/2
+         create/2,
+         gcable/1,
+         gc/2
         ]).
 
--ignore_xref([ping/0]).
+-ignore_xref([ping/0, gc/2]).
 
 -define(TIMEOUT, 5000).
 
@@ -122,6 +124,30 @@ cache(User) ->
             E
     end.
 
+
+-spec gcable(User::fifo:user_id()) ->
+                    not_found |
+                    {error, timeout} |
+                    {ok, {[], []}}.
+gcable(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:gcable(UserObj)};
+        R  ->
+            R
+    end.
+
+gc(User, {_,_} = GCable) ->
+    case get_(User) of
+        {ok, UserObj1} ->
+            do_write(User, gc, GCable),
+            {ok, UserObj2} = get_(User),
+            {ok, byte_size(term_to_binary(UserObj1)) -
+                 byte_size(term_to_binary(UserObj2))};
+        R ->
+            R
+    end.
+
 -spec get(User::fifo:user_id()) ->
                  not_found |
                  {error, timeout} |
@@ -168,7 +194,7 @@ add(User) ->
     create(UUID, User).
 
 create(UUID, User) ->
-        case snarl_user:lookup(User) of
+    case snarl_user:lookup(User) of
         not_found ->
             ok = do_write(UUID, add, User),
             {ok, UUID};

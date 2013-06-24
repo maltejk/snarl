@@ -35,6 +35,7 @@
          revoke_prefix/4,
          revoke/4,
          set/4,
+         gc/4,
          set_resource/4,
          claim_resource/4,
          free_resource/4
@@ -54,6 +55,7 @@
               grant/4,
               repair/4,
               set/4,
+              gc/4,
               revoke/4,
               set_resource/4,
               claim_resource/4,
@@ -120,6 +122,12 @@ lookup(Preflist, ReqID, Name) ->
 add(Preflist, ReqID, UUID, User) ->
     riak_core_vnode_master:command(Preflist,
                                    {add, ReqID, UUID, User},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+gc(Preflist, ReqID, UUID, GCable) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {gc, ReqID, UUID, GCable},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
