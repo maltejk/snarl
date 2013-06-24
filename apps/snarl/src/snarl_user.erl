@@ -110,7 +110,7 @@ cache(User) ->
         {ok, UserObj} ->
             {ok, lists:foldl(
                    fun(Group, Permissions) ->
-                           case snarl_group:get(Group) of
+                           case snarl_group:get_(Group) of
                                {ok, GroupObj} ->
                                    GrPerms = snarl_group_state:permissions(GroupObj),
                                    ordsets:union(Permissions, GrPerms);
