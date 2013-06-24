@@ -248,12 +248,12 @@ import_user([File]) ->
         {ok, B} ->
             JSON = jsx:decode(B),
             JSX = jsxd:from_list(JSON),
-            {ok, UUID} = case jsxd:get([<<"uuid">>], JSX) of
-                             {ok, U} ->
-                                 U;
-                             undefined ->
-                                 list_to_binary(uuid:to_string(uuid:uuid4()))
-                         end,
+            UUID = case jsxd:get([<<"uuid">>], JSX) of
+                       {ok, U} ->
+                           U;
+                       undefined ->
+                           list_to_binary(uuid:to_string(uuid:uuid4()))
+                   end,
             As = jsxd:thread([{delete, [<<"name">>]},
                               {set, [<<"uuid">>], UUID},
                               {delete, [<<"uuid">>]},
