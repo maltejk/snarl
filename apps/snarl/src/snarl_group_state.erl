@@ -120,7 +120,7 @@ merge(#?GROUP{
        }.
 
 name(Group) ->
-    ecrdt:value(Group#?GROUP.name).
+    vlwwregister:value(Group#?GROUP.name).
 
 name(_, Name, Group) ->
     Group#?GROUP{
@@ -128,7 +128,7 @@ name(_, Name, Group) ->
             }.
 
 uuid(Group) ->
-    ecrdt:value(Group#?GROUP.uuid).
+    vlwwregister:value(Group#?GROUP.uuid).
 
 uuid(_, UUID, Group) ->
     Group#?GROUP{
@@ -136,7 +136,7 @@ uuid(_, UUID, Group) ->
             }.
 
 permissions(Group) ->
-    ecrdt:value(Group#?GROUP.permissions).
+    vorsetg:value(Group#?GROUP.permissions).
 
 grant(ID, Permission, Group) ->
     Group#?GROUP{
