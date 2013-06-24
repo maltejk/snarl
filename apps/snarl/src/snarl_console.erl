@@ -255,7 +255,6 @@ import_user([File]) ->
                            list_to_binary(uuid:to_string(uuid:uuid4()))
                    end,
             As = jsxd:thread([{set, [<<"uuid">>], UUID},
-                              {delete, [<<"uuid">>]},
                               {update, [<<"password">>],  fun base64:decode/1}],
                              JSX),
             snarl_user:import(UUID, statebox:new(fun() -> As end))
