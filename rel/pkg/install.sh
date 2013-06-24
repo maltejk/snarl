@@ -28,7 +28,7 @@ case $2 in
 	chown -R snarl:snarl /var/db/snarl
 	mkdir -p /var/log/snarl/sasl
 	chown -R snarl:snarl /var/log/snarl
-    if [! -f $BACKUP_FILE ]
+    if [ ! -f $BACKUP_FILE ]
     then
         echo "############################################################"
         echo "# This release introduces a update in the Database!        #"
