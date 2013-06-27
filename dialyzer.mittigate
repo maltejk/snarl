@@ -22,3 +22,4 @@
 ^jsx_parser.erl
 ^lhttpc
 ^newrelic
+^jsx_decoder.erl:149:

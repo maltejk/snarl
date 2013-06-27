@@ -128,7 +128,7 @@ cache(User) ->
 -spec gcable(User::fifo:user_id()) ->
                     not_found |
                     {error, timeout} |
-                    {ok, {[], []}}.
+                    {ok, {[term()], [term()]}}.
 gcable(User) ->
     case get_(User) of
         {ok, UserObj} ->
@@ -137,6 +137,11 @@ gcable(User) ->
             R
     end.
 
+-spec gc(User::fifo:user_id(),
+         GCable::rot:hash()) ->
+                not_found |
+                {error, timeout} |
+                ok.
 gc(User, {_,_} = GCable) ->
     case get_(User) of
         {ok, UserObj1} ->
