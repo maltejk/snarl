@@ -259,7 +259,7 @@ merge(Replies) ->
 -spec reconcile([A :: #?USER{} | #?GROUP{}]) -> A :: #?USER{} | #?GROUP{}.
 
 reconcile([V | Vs]) ->
-    reconcile(V, Vs).
+    reconcile(Vs, V).
 
 reconcile([#?USER{} = U | R], Acc) ->
     reconcile(R, snarl_user_state:merge(Acc, U));

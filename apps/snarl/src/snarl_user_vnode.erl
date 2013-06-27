@@ -335,7 +335,10 @@ handle_handoff_data(Data, State) ->
             snarl_db:put(State#state.db, <<"user">>, User,
                          Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
         not_found ->
-            snarl_db:put(State#state.db, <<"user">>, User, V)
+            VC0 = vclock:fresh(),
+            VC = vclock:increment(node(), VC0),
+            UserObj = #snarl_obj{val=V, vclock=VC},
+            snarl_db:put(State#state.db, <<"user">>, User, UserObj)
     end,
     {reply, ok, State}.
 
