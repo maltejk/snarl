@@ -150,7 +150,12 @@ handle_cast(next, State = #state{
     case snarl_user:gcable(UUID) of
         {ok, {A, B}} ->
             MinAge = ecrdt:timestamp_us() - Timeout,
-            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
+            A1 = case A of
+                     [] ->
+                         [];
+                     _ ->
+                         [E || {{T,_},_} = E <- A, T < MinAge]
+                 end,
             B1 = [E || {{T,_},_} = E <- B, T < MinAge],
             {ok, Size} = snarl_user:gc(UUID, {A1, B1}),
             {noreply,

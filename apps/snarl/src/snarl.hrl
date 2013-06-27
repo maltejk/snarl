@@ -49,18 +49,18 @@
 
 
 -record(user_0_1_0, {
-          uuid :: ecrdt:vlwwregister(),
-          name :: ecrdt:vlwwregister(),
-          password :: ecrdt:vlwwregister(),
-          permissions :: ecrdt:vorsetg(),
-          groups :: ecrdt:vorsetg(),
+          uuid :: vlwwregister:vlwwregister(),
+          name :: vlwwregister:vlwwregister(),
+          password :: vlwwregister:vlwwregister(),
+          permissions :: vorsetg:vorsetg(),
+          groups :: vorsetg:vorsetg(),
           metadata
          }).
 
 -record(group_0_1_0, {
-          uuid :: ecrdt:vlwwregister(),
-          name :: ecrdt:vlwwregister(),
-          permissions :: ecrdt:vorsetg(),
+          uuid :: vlwwregister:vlwwregister(),
+          name :: vlwwregister:vlwwregister(),
+          permissions :: vorsetg:vorsetg(),
           metadata
          }).
 

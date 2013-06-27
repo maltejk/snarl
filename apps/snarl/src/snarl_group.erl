@@ -58,6 +58,23 @@ lookup(GroupName) ->
             R
     end.
 
+-spec gcable(Group::fifo:group_id()) ->
+                    not_found |
+                    {error, timeout} |
+                    {ok, [term()]}.
+gcable(Group) ->
+    case get_(Group) of
+        {ok, GroupObj} ->
+            {ok, snarl_group_state:gcable(GroupObj)};
+        R  ->
+            R
+    end.
+
+-spec gc(Group::fifo:group_id(),
+         GCable::term()) ->
+                not_found |
+                {error, timeout} |
+                ok.
 gc(Group, GCable) ->
     case get_(Group) of
         {ok, GroupObj1} ->
@@ -69,17 +86,6 @@ gc(Group, GCable) ->
             R
     end.
 
--spec gcable(Group::fifo:group_id()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, []}.
-gcable(Group) ->
-    case get_(Group) of
-        {ok, GroupObj} ->
-            {ok, snarl_group_state:gcable(GroupObj)};
-        R  ->
-            R
-    end.
 
 -spec get(Group::fifo:group_id()) ->
                  not_found |

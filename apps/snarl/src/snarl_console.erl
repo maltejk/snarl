@@ -108,7 +108,7 @@ gc_group(<<"all">>, Timeout) ->
                                 _ ->
                                     {Cnt + 1, GCed, Size}
                             end
-                    end, UUIDs, {0, 0, 0}),
+                    end, {0, 0, 0}, UUIDs),
     io:format("Checked ~p objects, GCed ~p of them for a total of ~p bytes.~n",
               [Cnt, GCed, Size]),
     ok;
@@ -155,7 +155,7 @@ gc_user(<<"all">>, Timeout) ->
                                 _ ->
                                     {Cnt + 1, GCed, Size}
                             end
-                    end, UUIDs, {0, 0, 0}),
+                    end, {0, 0, 0}, UUIDs),
     io:format("Checked ~p objects, GCed ~p of them for a total of ~p bytes.~n",
               [Cnt, GCed, Size]),
     ok;
