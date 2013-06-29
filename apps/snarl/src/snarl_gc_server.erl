@@ -76,7 +76,7 @@ init([]) ->
             {ok, #state{}};
         I ->
             T = 1000 * I,
-            lager:warning("[Auto GC] enabled one object every ~ps.", [T]),
+            lager:warning("[Auto GC] enabled one object every ~ps.", [I]),
             timer:apply_interval(T, ?MODULE, next, []),
             {UserT, UserU} = env(user_sync_timeout, {1, week}),
             {GroupT, GroupU} = env(group_sync_timeout, {1, week}),
