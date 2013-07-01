@@ -34,8 +34,8 @@
                 from,
                 entity,
                 op,
-                r=?R,
                 n,
+                r,
                 preflist,
                 num_r=0,
                 size,
@@ -85,13 +85,7 @@ init([ReqId, {VNode, System}, Op, From, Entity]) ->
     init([ReqId, {VNode, System}, Op, From, Entity, undefined]);
 
 init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
-    ?PRINT({init, [Op, ReqId, From, Entity, Val]}),
-    {N, R, _W} = case application:get_key(System) of
-                     {ok, Res} ->
-                         Res;
-                     undefined ->
-                         {?N, ?R, ?W}
-                 end,
+    {N, R, _W} = ?NRW(System),
     SD = #state{req_id=ReqId,
                 from=From,
                 op=Op,
@@ -106,11 +100,11 @@ init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
 
 %% @doc Calculate the Preflist.
 prepare(timeout, SD0=#state{system=System,
+                            n = PVC = N,
                             req_id=ReqId}) ->
-    PVC = ?N,
     {Nodes, _Other} =
         riak_core_coverage_plan:create_plan(
-          allup, ?N, PVC, ReqId, System),
+          allup, N, PVC, ReqId, System),
     {ok, CHash} = riak_core_ring_manager:get_my_ring(),
     {Num, _} = riak_core_ring:chash(CHash),
     SD = SD0#state{preflist=Nodes, size=Num},
@@ -187,7 +181,8 @@ terminate(_Reason, _SN, _SD) ->
 %%%===================================================================
 
 mk_reqid() ->
-    erlang:phash2(erlang:now()).
+    {MegaSecs,Secs,MicroSecs} = erlang:now(),
+	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 stat_name(snarl_user_vnode) ->
     "user";

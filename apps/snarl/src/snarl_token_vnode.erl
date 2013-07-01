@@ -71,7 +71,6 @@ repair(IdxNode, Token, VClock, Obj) ->
 %%%===================================================================
 
 get(Preflist, ReqID, Token) ->
-    ?PRINT({get, Preflist, ReqID, Token}),
     riak_core_vnode_master:command(Preflist,
                                    {get, ReqID, Token},
                                    {fsm, undefined, self()},
@@ -119,7 +118,6 @@ handle_command({repair, Group, _, Obj}, _Sender, #state{tokens=Tokens0}=State) -
     {noreply, State#state{tokens=Tokens1}};
 
 handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) ->
-    ?PRINT({handle_command, get, ReqID, Token}),
     NodeIdx = {State#state.partition, State#state.node},
     {Tokens1, Res} = case dict:find(Token, Tokens0) of
                          error ->
@@ -143,12 +141,9 @@ handle_command({delete, {ReqID, _Coordinator}, Token}, _Sender, State) ->
       }};
 
 handle_command({add, {ReqID, Coordinator}, Token, User}, _Sender, State) ->
-    T0 = statebox:new(fun snarl_token_state:new/0),
-    T1 = statebox:modify({fun snarl_token_state:user/2, [User]}, T0),
-
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    TObject = #snarl_obj{val=T1, vclock=VC},
+    TObject = #snarl_obj{val=User, vclock=VC},
     State1 = expire(State),
     Ts0 = dict:store(Token, {now(), TObject}, State1#state.tokens),
 
@@ -158,8 +153,7 @@ handle_command({add, {ReqID, Coordinator}, Token, User}, _Sender, State) ->
                                   cnt = State1#state.cnt + 1
                                  }};
 
-handle_command(Message, _Sender, State) ->
-    ?PRINT({unhandled_command, Message}),
+handle_command(_Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
