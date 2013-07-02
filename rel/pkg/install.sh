@@ -21,13 +21,6 @@ case $2 in
 	    echo Creating snarl user ...
 	    useradd -g $GROUP -d /var/db/snarl -s /bin/false $USER
 	fi
-	echo Creating directories ...
-	mkdir -p /var/db/snarl/ring
-	mkdir -p /var/db/snarl/users
-	mkdir -p /var/db/snarl/groups
-	chown -R snarl:snarl /var/db/snarl
-	mkdir -p /var/log/snarl/sasl
-	chown -R snarl:snarl /var/log/snarl
     if [ ! -f $BACKUP_FILE -a -d /var/db/snarl/ring ]
     then
         echo "############################################################"
@@ -38,6 +31,13 @@ case $2 in
         echo $BACKUP_FILE
         tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
     fi
+	echo Creating directories ...
+	mkdir -p /var/db/snarl/ring
+	mkdir -p /var/db/snarl/users
+	mkdir -p /var/db/snarl/groups
+	chown -R snarl:snarl /var/db/snarl
+	mkdir -p /var/log/snarl/sasl
+	chown -R snarl:snarl /var/log/snarl
 	;;
     POST-INSTALL)
 	if svcs svc:/network/snarl:default > /dev/null 2>&1
