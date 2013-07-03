@@ -135,7 +135,7 @@ gc(Preflist, ReqID, UUID, GCable) ->
 
 add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add_key, ReqID, UUID, [KeyId, Key]},
+                                   {add_key, ReqID, UUID, KeyId, Key},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -340,17 +340,17 @@ encode_handoff_item(User, Data) ->
 
 is_empty(State) ->
     snarl_db:fold(State#state.db,
-                    <<"user">>,
-                    fun (_,_, _) ->
-                            {false, State}
-                    end, {true, State}).
+                  <<"user">>,
+                  fun (_,_, _) ->
+                          {false, State}
+                  end, {true, State}).
 
 delete(State) ->
     Trans = snarl_db:fold(State#state.db,
-                            <<"user">>,
-                            fun (K,_, A) ->
-                                    [{delete, K} | A]
-                            end, []),
+                          <<"user">>,
+                          fun (K,_, A) ->
+                                  [{delete, K} | A]
+                          end, []),
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
@@ -393,10 +393,10 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
     List = snarl_db:fold(State#state.db,
-                          <<"user">>,
-                           fun (K, _, L) ->
-                                   [K|L]
-                           end, []),
+                         <<"user">>,
+                         fun (K, _, L) ->
+                                 [K|L]
+                         end, []),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, List},
      State};
@@ -418,7 +418,7 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
             H2 = case Vals of
                      [Val] ->
                          snarl_user_state:Action(ID, Val, H1);
-                         [Val1, Val2] ->
+                     [Val1, Val2] ->
                          snarl_user_state:Action(ID, Val1, Val2, H1)
                  end,
             snarl_db:put(State#state.db, <<"user">>, User,

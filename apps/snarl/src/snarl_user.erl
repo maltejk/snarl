@@ -159,7 +159,7 @@ gcable(User) ->
                 not_found |
                 {error, timeout} |
                 ok.
-gc(User, {_,_} = GCable) ->
+gc(User, {_,_,_} = GCable) ->
     case get_(User) of
         {ok, UserObj1} ->
             do_write(User, gc, GCable),
