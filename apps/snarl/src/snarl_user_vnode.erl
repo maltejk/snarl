@@ -25,43 +25,43 @@
          get/3]).
 
 %% Writes
--export([add/4,
+-export([
+         add/4,
+         add_key/4,
          delete/3,
-         passwd/4,
+         gc/4,
+         grant/4,
+         import/4,
          join/4,
          leave/4,
-         grant/4,
+         passwd/4,
          repair/4,
-         revoke_prefix/4,
          revoke/4,
-         set/4,
-         import/4,
-         gc/4,
-         set_resource/4,
-         claim_resource/4,
-         free_resource/4
+         revoke_key/4,
+         revoke_prefix/4,
+         set/4
         ]).
 
--ignore_xref([start_vnode/1,
-              lookup/3,
-              auth/3,
-              get/3,
-              list/2,
+-ignore_xref([
               add/4,
+              add_key/4,
+              auth/3,
               delete/3,
-              revoke_prefix/4,
-              passwd/4,
+              gc/4,
+              get/3,
+              grant/4,
+              import/4,
               join/4,
               leave/4,
-              grant/4,
+              list/2,
+              lookup/3,
+              passwd/4,
               repair/4,
-              set/4,
-              import/4,
-              gc/4,
               revoke/4,
-              set_resource/4,
-              claim_resource/4,
-              free_resource/4
+              revoke_key/4,
+              revoke_prefix/4,
+              set/4,
+              start_vnode/1
              ]).
 
 
@@ -92,7 +92,6 @@ get(Preflist, ReqID, User) ->
                                    {get, ReqID, User},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-
 list(Preflist, ReqID) ->
     riak_core_vnode_master:coverage(
       {list, ReqID},
@@ -130,6 +129,19 @@ add(Preflist, ReqID, UUID, User) ->
 gc(Preflist, ReqID, UUID, GCable) ->
     riak_core_vnode_master:command(Preflist,
                                    {gc, ReqID, UUID, GCable},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+
+add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {add_key, ReqID, UUID, [KeyId, Key]},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+revoke_key(Preflist, ReqID, UUID, KeyId) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {revoke_key, ReqID, UUID, KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -187,25 +199,6 @@ revoke_prefix(Preflist, ReqID, User, Val) ->
                                    {revoke_prefix, ReqID, User, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-
-set_resource(Preflist, ReqID, User, [Resource, Value]) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {set_resource, ReqID, User, Resource, Value},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-claim_resource(Preflist, ReqID, User, [Resource, ID, Ammount]) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {claim_resource, ReqID, User, Resource, ID, Ammount},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-free_resource(Preflist, ReqID, User, [Resource, ID]) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {free_resource, ReqID, User, Resource, ID},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
 
 
 %%%===================================================================

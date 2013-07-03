@@ -26,6 +26,9 @@
          import/2,
          cache/1,
          gcable/1,
+         add_key/3,
+         revoke_key/2,
+         keys/1,
          gc/2
         ]).
 
@@ -97,6 +100,20 @@ allowed(User, Permission) ->
     case get_(User) of
         {ok, UserObj} ->
             test_user(UserObj, Permission);
+        E ->
+            E
+    end.
+
+add_key(User, KeyID, Key) ->
+    do_write(User, add_key, {KeyID, Key}).
+
+revoke_key(User, KeyID) ->
+    do_write(User, revoke_key, KeyID).
+
+keys(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:keys(UserObj)};
         E ->
             E
     end.

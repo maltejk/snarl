@@ -39,6 +39,24 @@ message({user, get, User}, State) when
      snarl_user:get(User),
      State};
 
+message({user, keys, get, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:keys(User),
+     State};
+
+message({user, keys, add, User, KeyId, Key}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add_key(User, KeyId, Key),
+     State};
+
+message({user, keys, revoke, User, KeyId}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:revoke_key(User, KeyId),
+     State};
+
 message({user, set, User, Attribute, Value}, State) when
       is_binary(User) ->
     {reply,
