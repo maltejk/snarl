@@ -26,6 +26,9 @@
          import/2,
          cache/1,
          gcable/1,
+         add_key/3,
+         revoke_key/2,
+         keys/1,
          gc/2
         ]).
 
@@ -101,6 +104,20 @@ allowed(User, Permission) ->
             E
     end.
 
+add_key(User, KeyID, Key) ->
+    do_write(User, add_key, {KeyID, Key}).
+
+revoke_key(User, KeyID) ->
+    do_write(User, revoke_key, KeyID).
+
+keys(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:keys(UserObj)};
+        E ->
+            E
+    end.
+
 -spec cache(User::fifo:user_id()) ->
                    not_found |
                    {error, timeout} |
@@ -142,7 +159,7 @@ gcable(User) ->
                 not_found |
                 {error, timeout} |
                 ok.
-gc(User, {_,_} = GCable) ->
+gc(User, {_,_,_} = GCable) ->
     case get_(User) of
         {ok, UserObj1} ->
             do_write(User, gc, GCable),
