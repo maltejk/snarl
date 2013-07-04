@@ -22,6 +22,7 @@
 -export([list/2,
          lookup/3,
          auth/3,
+         find_key/3,
          get/3]).
 
 %% Writes
@@ -46,6 +47,7 @@
               add/4,
               add_key/4,
               auth/3,
+              find_key/3,
               delete/3,
               gc/4,
               get/3,
@@ -103,6 +105,14 @@ list(Preflist, ReqID) ->
 auth(Preflist, ReqID, Hash) ->
     riak_core_vnode_master:coverage(
       {auth, ReqID, Hash},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
+find_key(Preflist, ReqID, KeyID) ->
+    riak_core_vnode_master:coverage(
+      {ssh_key_id, ReqID, KeyID},
       Preflist,
       all,
       {fsm, undefined, self()},
@@ -373,12 +383,32 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
+handle_coverage({ssh_key_id, ReqID, KeyID}, _KeySpaces, _Sender, State) ->
+    Res = snarl_db:fold(State#state.db,
+                        <<"user">>,
+                        fun (UUID, #snarl_obj{val=U0}, not_found) ->
+                                U1 = snarl_user_state:load(U0),
+                                Ks = snarl_user_state:keys(U1),
+                                Ks1 = [key_to_id(K) || K <- Ks],
+                                case lists:member(KeyID, Ks1) of
+                                    true ->
+                                        UUID;
+                                    _ ->
+                                        not_found
+                                end;
+                            (_U, _, Res) ->
+                                Res
+                        end, not_found),
+    {reply,
+     {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
+     State};
+
 handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
                         fun (UUID, #snarl_obj{val = U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:name(U1)  of
+                                case snarl_user_state:name(U1) of
                                     Name ->
                                         UUID;
                                     _ ->
@@ -428,3 +458,11 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),
             {reply, {ok, ReqID, not_found}, State}
     end.
+
+key_to_id(Key) ->
+    [_, ID0, _] = re:split(Key, " "),
+    ID1 = base64:decode(ID0),
+    crypto:md5(ID1).
+
+
+
