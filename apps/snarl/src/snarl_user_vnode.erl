@@ -112,7 +112,7 @@ auth(Preflist, ReqID, Hash) ->
 
 find_key(Preflist, ReqID, KeyID) ->
     riak_core_vnode_master:coverage(
-      {ssh_key_id, ReqID, KeyID},
+      {find_key, ReqID, KeyID},
       Preflist,
       all,
       {fsm, undefined, self()},
@@ -383,13 +383,13 @@ handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
-handle_coverage({ssh_key_id, ReqID, KeyID}, _KeySpaces, _Sender, State) ->
+handle_coverage({find_key, ReqID, KeyID}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
                         fun (UUID, #snarl_obj{val=U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
                                 Ks = snarl_user_state:keys(U1),
-                                Ks1 = [key_to_id(K) || K <- Ks],
+                                Ks1 = [key_to_id(K) || {_, K} <- Ks],
                                 case lists:member(KeyID, Ks1) of
                                     true ->
                                         UUID;

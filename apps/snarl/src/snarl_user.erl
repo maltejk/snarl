@@ -54,7 +54,7 @@ ping() ->
 find_key(KeyID) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                    {snarl_user_vnode, snarl_user},
-                   auth, KeyID),
+                   find_key, KeyID),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->
