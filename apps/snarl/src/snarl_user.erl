@@ -10,6 +10,7 @@
          ping/0,
          list/0,
          auth/2,
+         find_key/1,
          get/1,
          lookup/1,
          add/1,
@@ -46,6 +47,20 @@ ping() ->
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
 
+-spec find_key(KeyID::binary()) ->
+                  not_found |
+                  {error, timeout} |
+                  {ok, User::fifo:user_id()}.
+find_key(KeyID) ->
+    {ok, Res} = snarl_entity_coverage_fsm:start(
+                   {snarl_user_vnode, snarl_user},
+                   find_key, KeyID),
+    lists:foldl(fun (not_found, Acc) ->
+                        Acc;
+                    (R, _) ->
+                        {ok, R}
+                end, not_found, Res).
+
 -spec auth(User::binary(), Passwd::binary()) ->
                   not_found |
                   {error, timeout} |
@@ -54,8 +69,7 @@ auth(User, Passwd) ->
     Hash = crypto:sha([User, Passwd]),
     {ok, Res} = snarl_entity_coverage_fsm:start(
                    {snarl_user_vnode, snarl_user},
-                   auth, Hash
-                  ),
+                   auth, Hash),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->

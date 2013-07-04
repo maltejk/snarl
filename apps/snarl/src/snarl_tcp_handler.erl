@@ -39,6 +39,12 @@ message({user, get, User}, State) when
      snarl_user:get(User),
      State};
 
+message({user, keys, find, KeyID}, State) when
+      is_binary(KeyID) ->
+    {reply,
+     snarl_user:find_key(KeyID),
+     State};
+
 message({user, keys, get, User}, State) when
       is_binary(User) ->
     {reply,
