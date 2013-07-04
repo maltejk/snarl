@@ -250,7 +250,7 @@ handle_command({add, {ReqID, Coordinator} = ID, UUID, User}, _Sender, State) ->
     User0 = snarl_user_state:new(),
     User1 = snarl_user_state:name(ID, User, User0),
     User2 = snarl_user_state:uuid(ID, UUID, User1),
-    User3 = snarl_user_state:grant(ID, [<<"user">>, UUID, <<"...">>], User2),
+    User3 = snarl_user_state:grant(ID, [<<"users">>, UUID, <<"...">>], User2),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User3, vclock=VC},
