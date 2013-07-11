@@ -11,17 +11,14 @@
          list/0,
          auth/2,
          find_key/1,
-         get/1,
-         get_/1,
-         lookup/1,
+         get_/1, get/1,
+         lookup_/1, lookup/1,
          add/1,
          delete/1,
          passwd/2,
-         join/2,
-         leave/2,
-         revoke_prefix/2,
-         grant/2,
-         revoke/2,
+         join/2, leave/2,
+         join_org/2, leave_org/2, select_org/2,
+         grant/2, revoke/2, revoke_prefix/2,
          allowed/2,
          set/2,
          set/3,
@@ -34,7 +31,11 @@
          gc/2
         ]).
 
--ignore_xref([ping/0]).
+-ignore_xref([
+              join_org/2, leave_org/2, select_org/2,
+              lookup_/1,
+              ping/0
+             ]).
 
 -define(TIMEOUT, 5000).
 
@@ -196,7 +197,7 @@ gcable(User) ->
                 not_found |
                 {error, timeout} |
                 ok.
-gc(User, {_,_,_} = GCable) ->
+gc(User, {_,_,_,_} = GCable) ->
     case get_(User) of
         {ok, UserObj1} ->
             do_write(User, gc, GCable),
@@ -305,6 +306,30 @@ join(User, Group) ->
                    ok.
 leave(User, Group) ->
     do_write(User, leave, Group).
+
+
+-spec join_org(User::fifo:user_id(), Org::fifo:org_id()) ->
+                  not_found |
+                  {error, timeout} |
+                  ok.
+join_org(User, Org) ->
+    do_write(User, join_org, Org).
+
+-spec select_org(User::fifo:user_id(), Org::fifo:org_id()) ->
+                  not_found |
+                  {error, timeout} |
+                  ok.
+select_org(User, Org) ->
+    do_write(User, select_org, Org).
+
+-spec leave_org(User::fifo:user_id(), Org::fifo:org_id()) ->
+                   not_found |
+                   {error, timeout} |
+                   ok.
+leave_org(User, Org) ->
+    do_write(User, leave_org, Org).
+
+
 
 -spec delete(User::fifo:user_id()) ->
                     not_found |

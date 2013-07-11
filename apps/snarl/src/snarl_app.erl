@@ -21,6 +21,9 @@ start(_StartType, _StartArgs) ->
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),
             ok = riak_core_node_watcher:service_up(snarl_token, self()),
 
+            ok = riak_core:register([{vnode_module, snarl_org_vnode}]),
+            ok = riak_core_node_watcher:service_up(snarl_org, self()),
+
             ok = riak_core_ring_events:add_guarded_handler(snarl_ring_event_handler, []),
             ok = riak_core_node_watcher_events:add_guarded_handler(snarl_node_event_handler, []),
 

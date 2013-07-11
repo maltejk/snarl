@@ -89,7 +89,8 @@
 -record(organisation_0_1_0, {
           uuid             :: vlwwregister:vlwwregister(),
           name             :: vlwwregister:vlwwregister(),
-          triggers         :: vorsetg:vorsetg()
+          triggers         :: vorsetg:vorsetg(),
+          metadata
          }).
 
 -define(USER, user_0_1_2).

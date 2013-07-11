@@ -191,5 +191,7 @@ stat_name(snarl_user_vnode) ->
     "user";
 stat_name(snarl_group_vnode) ->
     "group";
+stat_name(snarl_org_vnode) ->
+    "org";
 stat_name(snarl_token_vnode) ->
     "token".
