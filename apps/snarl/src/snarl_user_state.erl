@@ -49,7 +49,6 @@
               gcable/1
              ]).
 
-
 join_org(ID, Org, User) ->
     User#?USER{
             orgs =
@@ -239,7 +238,6 @@ merge(#?USER{
         orgs = vorsetg:merge(Orgs1, Orgs2),
         metadata = statebox:merge([Metadata1, Metadata2])
        }.
-
 
 add_key(ID, KeyID, Key, User) ->
     User#?USER{
