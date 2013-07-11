@@ -21,6 +21,7 @@
          password/1, password/3,
          permissions/1, grant/3, revoke/3, revoke_prefix/3,
          groups/1, join/3, leave/3,
+         join_org/2, leave_org/2, select_org/2,
          add_key/4, revoke_key/3, keys/1,
          metadata/1, set_metadata/3,
          merge/2,
@@ -40,12 +41,22 @@
               groups/1, join/3, leave/3,
               add_key/4, revoke_key/3, keys/1,
               metadata/1, set_metadata/3,
+              join_org/2, leave_org/2, select_org/2,
               merge/2,
               to_json/1,
               expire/2,
               gc/3,
               gcable/1
              ]).
+
+join_org(_Org, _User) ->
+    ok.
+
+leave_org(_Org, _User) ->
+    ok.
+
+select_org(_Org, _User) ->
+    ok.
 
 load(#?USER{} = User) ->
     User;
@@ -66,6 +77,27 @@ load(#user_0_1_0{
             permissions = Permissions,
             groups = Groups,
             ssh_keys = vorsetg:new(Size),
+            metadata = Metadata});
+
+load(#user_0_1_1{
+        uuid = UUID,
+        name = Name,
+        password = Passwd,
+        permissions = Permissions,
+        groups = Groups,
+        ssh_keys = Keys,
+        metadata = Metadata
+       }) ->
+    Size = ?ENV(user_bucket_size, 50),
+    load(#user_0_1_2{
+            uuid = UUID,
+            name = Name,
+            password = Passwd,
+            permissions = Permissions,
+            active_org = vlwwregister:new(<<"">>),
+            groups = Groups,
+            ssh_keys = Keys,
+            orgs = vorsetg:new(Size),
             metadata = Metadata});
 
 load(UserSB) ->
@@ -132,7 +164,6 @@ new() ->
 to_json(#?USER{
             uuid = UUID,
             name = Name,
-            password = Password,
             groups = Groups,
             ssh_keys = Keys,
             permissions = Permissions,
@@ -142,7 +173,6 @@ to_json(#?USER{
       [
        {<<"uuid">>, vlwwregister:value(UUID)},
        {<<"name">>, vlwwregister:value(Name)},
-       {<<"password">>, vlwwregister:value(Password)},
        {<<"groups">>, vorsetg:value(Groups)},
        {<<"permissions">>, vorsetg:value(Permissions)},
        {<<"keys">>, vorsetg:value(Keys)},
@@ -217,10 +247,9 @@ uuid(_, UUID, User) ->
 password(User) ->
     vlwwregister:value(User#?USER.password).
 
-password(_, Password, User) ->
-    Name = name(User),
+password(_, Hash, User) ->
     User#?USER{
-            password = vlwwregister:assign(crypto:sha([Name, Password]),
+            password = vlwwregister:assign(Hash,
                                            User#?USER.password)
            }.
 
@@ -305,7 +334,6 @@ to_json_test() ->
              {<<"keys">>,[]},
              {<<"metadata">>,[]},
              {<<"name">>,<<>>},
-             {<<"password">>,<<>>},
              {<<"permissions">>,[]},
              {<<"uuid">>,<<>>}],
     ?assertEqual(UserJ, to_json(User)).
@@ -322,11 +350,10 @@ name_test() ->
 password_test() ->
     Name = "Test",
     Password = "Test",
-    Hash = crypto:sha([Name, Password]),
     User0 = new(),
     User1 = name(mkid(), Name, User0),
     User2 = password(mkid(), Password, User1),
-    ?assertEqual(Hash, password(User2)).
+    ?assertEqual(Password, password(User2)).
 
 permissions_test() ->
     P0 = [<<"P0">>],

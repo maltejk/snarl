@@ -364,25 +364,6 @@ delete(State) ->
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
-
-handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
-    Res = snarl_db:fold(State#state.db,
-                        <<"user">>,
-                        fun (UUID, #snarl_obj{val=U0}, not_found) ->
-                                U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:password(U1) of
-                                    Hash ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
-    {reply,
-     {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
-     State};
-
 handle_coverage({find_key, ReqID, KeyID}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
@@ -463,6 +444,3 @@ key_to_id(Key) ->
     [_, ID0, _] = re:split(Key, " "),
     ID1 = base64:decode(ID0),
     crypto:md5(ID1).
-
-
-

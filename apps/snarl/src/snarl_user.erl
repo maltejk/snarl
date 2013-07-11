@@ -12,6 +12,7 @@
          auth/2,
          find_key/1,
          get/1,
+         get_/1,
          lookup/1,
          add/1,
          delete/1,
@@ -46,15 +47,14 @@ ping() ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
-
 -spec find_key(KeyID::binary()) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, User::fifo:user_id()}.
+                      not_found |
+                      {error, timeout} |
+                      {ok, User::fifo:user_id()}.
 find_key(KeyID) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
-                   {snarl_user_vnode, snarl_user},
-                   find_key, KeyID),
+                  {snarl_user_vnode, snarl_user},
+                  find_key, KeyID),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->
@@ -66,21 +66,45 @@ find_key(KeyID) ->
                   {error, timeout} |
                   {ok, User::fifo:user()}.
 auth(User, Passwd) ->
-    Hash = crypto:sha([User, Passwd]),
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                   {snarl_user_vnode, snarl_user},
-                   auth, Hash),
-    lists:foldl(fun (not_found, Acc) ->
-                        Acc;
-                    (R, _) ->
-                        {ok, R}
-                end, not_found, Res).
+    case lookup_(User) of
+        {ok, UserR} ->
+            case snarl_user_state:password(UserR) of
+                {Salt, Hash} ->
+                    case crypto:sha512([Salt, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end;
+                Hash ->
+                    case crypto:sha([User, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end
+            end;
+        E ->
+            E
+    end.
 
 -spec lookup(User::binary()) ->
                     not_found |
                     {error, timeout} |
                     {ok, User::fifo:user()}.
 lookup(User) ->
+    case lookup_(User) of
+        {ok, Obj} ->
+            {ok, snarl_user_state:to_json(Obj)};
+        R ->
+            R
+    end.
+
+-spec lookup_(User::binary()) ->
+                     not_found |
+                     {error, timeout} |
+                     {ok, User::fifo:user()}.
+lookup_(User) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_user_vnode, snarl_user},
                   lookup, User),
@@ -91,17 +115,16 @@ lookup(User) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            snarl_user:get(UUID);
+            snarl_user:get_(UUID);
         R ->
             R
     end.
 
-
 -spec revoke_prefix(User::fifo:user_id(),
                     Prefix::fifo:permission()) ->
-                    not_found |
-                    {error, timeout} |
-                    ok.
+                           not_found |
+                           {error, timeout} |
+                           ok.
 revoke_prefix(User, Prefix) ->
     do_write(User, revoke_prefix, Prefix).
 
@@ -197,9 +220,9 @@ get(User) ->
     end.
 
 -spec get_(User::fifo:user_id()) ->
-                 not_found |
-                 {error, timeout} |
-                 {ok, User::#?USER{}}.
+                  not_found |
+                  {error, timeout} |
+                  {ok, User::#?USER{}}.
 get_(User) ->
     case snarl_entity_read_fsm:start(
            {snarl_user_vnode, snarl_user},
@@ -226,11 +249,16 @@ list() ->
                  {error, timeout} |
                  {ok, UUID::fifo:user_id()}.
 add(User) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    create(UUID, User).
+    case lookup(User) of
+        {ok, _} ->
+            duplicate;
+        _ ->
+            UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+            create(UUID, User)
+    end.
 
 create(UUID, User) ->
-    case snarl_user:lookup(User) of
+    case lookup_(User) of
         not_found ->
             ok = do_write(UUID, add, User),
             {ok, UUID};
@@ -257,7 +285,9 @@ set(User, Attributes) ->
                     {error, timeout} |
                     ok.
 passwd(User, Passwd) ->
-    do_write(User, passwd, Passwd).
+    Salt = crypto:rand_bytes(64),
+    Hash = crypto:sha512([Salt, Passwd]),
+    do_write(User, passwd, {Salt, Hash}).
 
 import(User, Data) ->
     do_write(User, import, Data).
