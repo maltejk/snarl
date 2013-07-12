@@ -338,16 +338,36 @@ join_org(User, Org) ->
                   {error, timeout} |
                   ok.
 select_org(User, Org) ->
-    do_write(User, select_org, Org).
+    case get_(User) of
+        {ok, UserObj} ->
+            Orgs = snarl_user_state:orgs(UserObj),
+            case lists:member(Org, Orgs) of
+                true ->
+                    do_write(User, select_org, Org);
+                _ ->
+                    not_found
+            end;
+        R  ->
+            R
+    end.
 
 -spec leave_org(User::fifo:user_id(), Org::fifo:org_id()) ->
                    not_found |
                    {error, timeout} |
                    ok.
 leave_org(User, Org) ->
-    do_write(User, leave_org, Org).
-
-
+    case get_(User) of
+        {ok, UserObj} ->
+            case snarl_user_state:active_org(UserObj) of
+                Org ->
+                    do_write(User, select_org, <<"">>);
+                _ ->
+                    ok
+            end,
+            do_write(User, leave_org, Org);
+        R  ->
+            R
+    end.
 
 -spec delete(User::fifo:user_id()) ->
                     not_found |
