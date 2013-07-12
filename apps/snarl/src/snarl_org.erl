@@ -15,29 +15,34 @@
          create/2,
          gcable/1,
          import/2,
+         trigger/3,
+         add_trigger/2, remove_trigger/2,
          gc/2
         ]).
 
 -ignore_xref([
-         ping/0,
-         list/0,
-         get/1,
-         get_/1,
-         lookup/1,
-         add/1,
-         delete/1,
-         set/2,
-         set/3,
-         create/2,
-         gcable/1,
-         import/2,
-         gc/2
-        ]).
+              ping/0,
+              list/0,
+              get/1,
+              get_/1,
+              lookup/1,
+              add/1,
+              delete/1,
+              set/2,
+              set/3,
+              create/2,
+              gcable/1,
+              import/2,
+              trigger/3,
+              add_trigger/2, remove_trigger/2,
+              gc/2
+             ]).
 
 -ignore_xref([ping/0, create/2]).
 
 -define(TIMEOUT, 5000).
 
+-type template() :: [binary()|placeholder].
 %% Public API
 
 %% @doc Pings a random vnode to make sure communication is functional
@@ -46,6 +51,53 @@ ping() ->
     PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_org),
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_org_vnode_master).
+
+
+add_trigger(Org, Trigger) ->
+    do_write(Org, add_trigger, Trigger).
+
+remove_trigger(Org, Trigger) ->
+    do_write(Org, remove_trigger, Trigger).
+
+trigger(Org, Event, Payload) ->
+    case get_(Org) of
+        {ok, OrgObj} ->
+            Triggers = snarl_org_state:triggers(OrgObj),
+            Executed = do_events(Triggers, Event, Payload, 0),
+            {ok, Executed};
+        R  ->
+            R
+    end.
+
+do_events([{Event, Template}|Ts], Event, Payload, N) ->
+    do_event(Template, Payload),
+    do_events(Ts, Event, Payload, N+1);
+
+do_events([_|Ts], Event, Payload, N) ->
+    do_events(Ts, Event, Payload, N);
+
+do_events([], _Event, _Payload, N) ->
+    N.
+
+-spec do_event(Action::{grant, group|user, Group::fifo:group_id(), Template::template()},
+               Payload::template()) ->
+                      ok.
+
+do_event({grant, group, Group, Template}, Payload) ->
+    snarl_group:grant(Group, build_template(Template, Payload)),
+    ok;
+
+do_event({grant, user, Group, Template}, Payload) ->
+    snarl_user:grant(Group, build_template(Template, Payload)),
+    ok.
+
+build_template(Template, Payload) ->
+    lists:map(fun(placeholder) ->
+                      Payload;
+                 (E) ->
+                      E
+              end, Template).
+
 
 import(Org, Data) ->
     do_write(Org, import, Data).
@@ -113,9 +165,9 @@ get(Org) ->
     end.
 
 -spec get_(Org::fifo:org_id()) ->
-                 not_found |
-                 {error, timeout} |
-                 {ok, Org::#?ORG{}}.
+                  not_found |
+                  {error, timeout} |
+                  {ok, Org::#?ORG{}}.
 get_(Org) ->
     case snarl_entity_read_fsm:start(
            {snarl_org_vnode, snarl_org},

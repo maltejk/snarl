@@ -25,15 +25,15 @@
          get/3]).
 
 %% Writes
--export([add/4,
+-export([
+         add/4,
          gc/4,
          set/4,
          import/4,
          delete/3,
-         grant/4,
-         repair/4,
-         revoke/4,
-         revoke_prefix/4]).
+         add_trigger/4, remove_trigger/4,
+         repair/4
+        ]).
 
 -ignore_xref([
               start_vnode/1,
@@ -43,12 +43,10 @@
               get/3,
               add/4,
               delete/3,
-              grant/4,
+              add_trigger/4, remove_trigger/4,
               set/4,
               import/4,
-              repair/4,
-              revoke/4,
-              revoke_prefix/4
+              repair/4
              ]).
 
 
@@ -62,7 +60,6 @@
 
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
-
 
 repair(IdxNode, Org, VClock, Obj) ->
     riak_core_vnode_master:command(IdxNode,
@@ -131,21 +128,15 @@ delete(Preflist, ReqID, Org) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-grant(Preflist, ReqID, Org, Val) ->
+add_trigger(Preflist, ReqID, Org, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {grant, ReqID, Org, Val},
+                                   {add_trigger, ReqID, Org, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-revoke(Preflist, ReqID, Org, Val) ->
+remove_trigger(Preflist, ReqID, Org, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {revoke, ReqID, Org, Val},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-revoke_prefix(Preflist, ReqID, Org, Val) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {revoke_prefix, ReqID, Org, Val},
+                                   {remove_trigger, ReqID, Org, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 %%%===================================================================

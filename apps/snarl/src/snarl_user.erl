@@ -28,6 +28,8 @@
          add_key/3,
          revoke_key/2,
          keys/1,
+         active/1,
+         orgs/1,
          gc/2
         ]).
 
@@ -152,6 +154,22 @@ keys(User) ->
     case get_(User) of
         {ok, UserObj} ->
             {ok, snarl_user_state:keys(UserObj)};
+        E ->
+            E
+    end.
+
+active(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:active_org(UserObj)};
+        E ->
+            E
+    end.
+
+orgs(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:orgs(UserObj)};
         E ->
             E
     end.
