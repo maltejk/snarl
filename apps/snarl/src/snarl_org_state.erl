@@ -88,6 +88,19 @@ load(OrgSB) ->
         metadata = statebox:new(fun () -> Metadata end)
        }.
 
+jsonify_trigger({vm_create,
+                  {grant, group, Group,
+                   Permission}}) ->
+    [{<<"group">>, Group},
+     {<<"permission">>, jsonify_permission(Permission)}].
+
+jsonify_permission(Permission) ->
+    lists:map(fun (placeholder) ->
+                      <<"$">>;
+                  (E) ->
+                      E
+              end, Permission).
+
 to_json(#?ORG{
             uuid = UUID,
             name = Name,
@@ -98,7 +111,7 @@ to_json(#?ORG{
       [
        {<<"uuid">>, vlwwregister:value(UUID)},
        {<<"name">>, vlwwregister:value(Name)},
-       {<<"triggers">>, vorsetg:value(Triggers)},
+       {<<"triggers">>, [jsonify_trigger(T) || T <- vorsetg:value(Triggers)]},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
