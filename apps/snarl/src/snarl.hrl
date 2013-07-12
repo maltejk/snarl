@@ -67,6 +67,17 @@
           metadata
          }).
 
+-record(user_0_1_2, {
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          password         :: vlwwregister:vlwwregister(),
+          active_org       :: vlwwregister:vlwwregister(),
+          permissions      :: vorsetg:vorsetg(),
+          groups           :: vorsetg:vorsetg(),
+          ssh_keys         :: vorsetg:vorsetg(),
+          orgs             :: vorsetg:vorsetg(),
+          metadata
+         }).
 
 -record(group_0_1_0, {
           uuid             :: vlwwregister:vlwwregister(),
@@ -75,5 +86,13 @@
           metadata
          }).
 
--define(USER, user_0_1_1).
+-record(organisation_0_1_0, {
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          triggers         :: vorsetg:vorsetg(),
+          metadata
+         }).
+
+-define(USER, user_0_1_2).
 -define(GROUP, group_0_1_0).
+-define(ORG, organisation_0_1_0).

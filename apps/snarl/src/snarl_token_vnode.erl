@@ -33,7 +33,6 @@
               add/4
              ]).
 
-
 -define(TIMEOUT, 43200000).
 
 -define(TIMEOUT_LIMIT, 1000).
@@ -127,7 +126,6 @@ handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) -
                              {dict:update(Token, fun({_, User}) ->
                                                          {now(), User}
                                                  end, Tokens0),
-
                               {ok, ReqID, NodeIdx, V}}
                      end,
     {reply,

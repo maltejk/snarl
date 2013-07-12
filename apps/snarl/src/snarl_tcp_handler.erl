@@ -14,13 +14,55 @@ init(Prot, []) ->
     {ok, #state{port = Prot}}.
 
 %%%===================================================================
-%%% User Functions
+%%% General Functions
 %%%===================================================================
 
 -spec message(fifo:snarl_message(), term()) -> any().
 
 message(version, State) ->
     {reply, {ok, ?VERSION}, State};
+
+%%%===================================================================
+%%% Org Functions
+%%%===================================================================
+
+message({org, list}, State) ->
+    {reply, snarl_org:list(), State};
+
+message({org, get, Org}, State) ->
+    {reply, snarl_org:get(Org), State};
+
+message({org, set, Org, Attribute, Value}, State) when
+      is_binary(Org) ->
+    {reply,
+     snarl_org:set(Org, Attribute, Value),
+     State};
+
+message({org, set, Org, Attributes}, State) when
+      is_binary(Org) ->
+    {reply,
+     snarl_org:set(Org, Attributes),
+     State};
+
+message({org, add, Org}, State) ->
+    {reply, snarl_org:add(Org), State};
+
+message({org, delete, Org}, State) ->
+    {reply, snarl_org:delete(Org), State};
+
+message({org, trigger, add, Org, Trigger}, State) ->
+    {reply, snarl_org:add_trigger(Org, Trigger), State};
+
+message({org, trigger, remove, Org, Trigger}, State) ->
+    {reply, snarl_org:remove_trigger(Org, Trigger), State};
+
+message({org, trigger, execute, Org, Event, Payload}, State) ->
+    {reply, snarl_org:trigger(Org, Event, Payload), State};
+
+%%%===================================================================
+%%% User Functions
+%%%===================================================================
+
 
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
@@ -169,6 +211,32 @@ message({token, delete, Token}, State) when
       is_binary(Token) ->
     {reply, snarl_token:delete(Token), State};
 
+message({user, org, get, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:orgs(User),
+     State};
+
+message({user, org, active, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:active(User),
+     State};
+
+message({user, org, join, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:join_org(User, Org), State};
+
+message({user, org, leave, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:leave_org(User, Org), State};
+
+message({user, org, select, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:select_org(User, Org), State};
 
 %%%===================================================================
 %%% Group Functions

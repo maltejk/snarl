@@ -28,18 +28,16 @@
 %% Writes
 -export([
          add/4,
+         import/4,
+         repair/4,
          add_key/4,
          delete/3,
          gc/4,
-         grant/4,
-         import/4,
-         join/4,
-         leave/4,
+         grant/4, revoke/4, revoke_prefix/4,
+         join/4, leave/4,
          passwd/4,
-         repair/4,
-         revoke/4,
+         join_org/4, leave_org/4, select_org/4,
          revoke_key/4,
-         revoke_prefix/4,
          set/4
         ]).
 
@@ -63,6 +61,7 @@
               revoke_key/4,
               revoke_prefix/4,
               set/4,
+              join_org/4, leave_org/4, select_org/4,
               start_vnode/1
              ]).
 
@@ -192,6 +191,23 @@ leave(Preflist, ReqID, User, Val) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
+join_org(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {join_org, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+leave_org(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {leave_org, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+select_org(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {select_org, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 grant(Preflist, ReqID, User, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {grant, ReqID, User, Val},
@@ -364,25 +380,6 @@ delete(State) ->
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
-
-handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
-    Res = snarl_db:fold(State#state.db,
-                        <<"user">>,
-                        fun (UUID, #snarl_obj{val=U0}, not_found) ->
-                                U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:password(U1) of
-                                    Hash ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
-    {reply,
-     {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
-     State};
-
 handle_coverage({find_key, ReqID, KeyID}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
@@ -463,6 +460,3 @@ key_to_id(Key) ->
     [_, ID0, _] = re:split(Key, " "),
     ID1 = base64:decode(ID0),
     crypto:md5(ID1).
-
-
-
