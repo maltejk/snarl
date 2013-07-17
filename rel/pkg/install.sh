@@ -28,7 +28,7 @@ case $2 in
 	chown -R snarl:snarl /var/db/snarl
 	mkdir -p /var/log/snarl/sasl
 	chown -R snarl:snarl /var/log/snarl
-    if [ -d /var/db/snarl/ring ]
+    if [ -d /var/db/snarl/0 ]
         then
         if [ ! -f $BACKUP_FILE ]
         then
