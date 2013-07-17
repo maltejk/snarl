@@ -28,15 +28,18 @@ case $2 in
 	chown -R snarl:snarl /var/db/snarl
 	mkdir -p /var/log/snarl/sasl
 	chown -R snarl:snarl /var/log/snarl
-    if [ ! -f $BACKUP_FILE -a -d /var/db/snarl/ring ]
-    then
-        echo "############################################################"
-        echo "# This release introduces a update in the Database!        #"
-        echo "# To ensure a a fallback option a backup file if the       #"
-        echo "# database is created                                      #"
-        echo "############################################################"
-        echo $BACKUP_FILE
-        tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
+    if [ -d /var/db/snarl/ring ]
+        then
+        if [ ! -f $BACKUP_FILE ]
+        then
+            echo "############################################################"
+            echo "# This release introduces a update in the Database!        #"
+            echo "# To ensure a a fallback option a backup file if the       #"
+            echo "# database is created                                      #"
+            echo "############################################################"
+            echo $BACKUP_FILE
+            tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
+        fi
     fi
 	;;
     POST-INSTALL)
