@@ -29,6 +29,9 @@ message(version, State) ->
 message({org, list}, State) ->
     {reply, snarl_org:list(), State};
 
+message({org, list, Requirements}, State) ->
+    {reply, snarl_org:list(Requirements), State};
+
 message({org, get, Org}, State) ->
     {reply, snarl_org:get(Org), State};
 
@@ -66,6 +69,9 @@ message({org, trigger, execute, Org, Event, Payload}, State) ->
 
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
+
+message({user, list, Requirements}, State) ->
+    {reply, snarl_user:list(Requirements), State};
 
 message({user, get, {token, Token}}, State) ->
     case snarl_token:get(Token) of
@@ -244,6 +250,9 @@ message({user, org, select, User, Org}, State) when
 
 message({group, list}, State) ->
     {reply, snarl_group:list(), State};
+
+message({group, list, Requirements}, State) ->
+    {reply, snarl_group:list(Requirements), State};
 
 message({group, get, Group}, State) ->
     {reply, snarl_group:get(Group), State};

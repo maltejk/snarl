@@ -21,6 +21,7 @@
 
 %% Reads
 -export([list/2,
+         list/3,
          lookup/3,
          get/3]).
 
@@ -39,6 +40,7 @@
               start_vnode/1,
               lookup/3,
               list/2,
+              list/3,
               gc/4,
               get/3,
               add/4,
@@ -83,6 +85,14 @@ get(Preflist, ReqID, Group) ->
 list(Preflist, ReqID) ->
     riak_core_vnode_master:coverage(
       {list, ReqID},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
+list(Preflist, ReqID, Requirements) ->
+    riak_core_vnode_master:coverage(
+      {list, ReqID, Requirements},
       Preflist,
       all,
       {fsm, undefined, self()},
@@ -246,8 +256,17 @@ handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     Acc = snarl_db:fold(State#state.db, <<"group">>, Fun, Acc0),
     {reply, Acc, State};
 
-handle_handoff_command(_Message, _Sender, State) ->
-    {noreply, State}.
+handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
+    handle_command(Req, Sender, State);
+
+handle_handoff_command(Req, Sender, State) ->
+    S1 = case handle_command(Req, Sender, State) of
+             {noreply, NewState} ->
+                 NewState;
+             {reply, _, NewState} ->
+                 NewState
+         end,
+    {forward, S1}.
 
 handoff_starting(TargetNode, State) ->
     lager:warning("Starting handof to: ~p", [TargetNode]),
@@ -289,7 +308,7 @@ delete(State) ->
     Trans = snarl_db:fold(State#state.db,
                           <<"group">>,
                           fun (K,_, A) ->
-                                  [{delete, K} | A]
+                                  [{delete, <<"group", K/binary>>} | A]
                           end, []),
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
@@ -310,6 +329,24 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
                         end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
+     State};
+
+handle_coverage({list, ReqID, Requirements}, _KeySpaces, _Sender, State) ->
+    Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
+                     snarl_group_state:uuid(S0)
+             end,
+    List = snarl_db:fold(State#state.db,
+                           <<"group">>,
+                           fun (Key, E, C) ->
+                                   case rankmatcher:match(E, Getter, Requirements) of
+                                       false ->
+                                           C;
+                                       Pts ->
+                                           [{Pts, Key} | C]
+                                   end
+                           end, []),
+    {reply,
+     {ok, ReqID, {State#state.partition, State#state.node}, List},
      State};
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->

@@ -9,6 +9,7 @@
 -export([
          ping/0,
          list/0,
+         list/1,
          auth/2,
          find_key/1,
          get_/1, get/1,
@@ -263,6 +264,15 @@ list() ->
       list
      ).
 
+-spec list(Reqs::[fifo:matcher()]) ->
+                  {ok, [IPR::fifo:user_id()]} | {error, timeout}.
+list(Requirements) ->
+    {ok, Res} = snarl_entity_coverage_fsm:start(
+                  {snarl_user_vnode, snarl_user},
+                  list, Requirements),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)}.
+
 -spec add(UserName::binary()) ->
                  duplicate |
                  {error, timeout} |
@@ -327,16 +337,16 @@ leave(User, Group) ->
 
 
 -spec join_org(User::fifo:user_id(), Org::fifo:org_id()) ->
-                  not_found |
-                  {error, timeout} |
-                  ok.
+                      not_found |
+                      {error, timeout} |
+                      ok.
 join_org(User, Org) ->
     do_write(User, join_org, Org).
 
 -spec select_org(User::fifo:user_id(), Org::fifo:org_id()) ->
-                  not_found |
-                  {error, timeout} |
-                  ok.
+                        not_found |
+                        {error, timeout} |
+                        ok.
 select_org(User, Org) ->
     case get_(User) of
         {ok, UserObj} ->
@@ -352,9 +362,9 @@ select_org(User, Org) ->
     end.
 
 -spec leave_org(User::fifo:user_id(), Org::fifo:org_id()) ->
-                   not_found |
-                   {error, timeout} |
-                   ok.
+                       not_found |
+                       {error, timeout} |
+                       ok.
 leave_org(User, Org) ->
     case get_(User) of
         {ok, UserObj} ->
