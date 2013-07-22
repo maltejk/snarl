@@ -287,9 +287,9 @@ add(Creator, User) when is_binary(Creator),
             case get_(Creator) of
                 {ok, C} ->
                     case snarl_user_state:active_org(C) of
-                        {ok, <<>>} ->
+                        <<>> ->
                             R;
-                        {ok, Org} ->
+                        Org ->
                             snarl_org:trigger(Org, user_create, UUID)
                     end;
                 _ ->
