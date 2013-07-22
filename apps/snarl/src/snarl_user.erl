@@ -279,7 +279,6 @@ list(Requirements) ->
                  {error, timeout} |
                  {ok, UUID::fifo:user_id()}.
 
-
 add(Creator, User) when is_binary(Creator),
                         is_binary(User) ->
     case add(undefined, User) of
@@ -290,7 +289,8 @@ add(Creator, User) when is_binary(Creator),
                         <<>> ->
                             R;
                         Org ->
-                            snarl_org:trigger(Org, user_create, UUID)
+                            snarl_org:trigger(Org, user_create, UUID),
+                            R
                     end;
                 _ ->
                     R
