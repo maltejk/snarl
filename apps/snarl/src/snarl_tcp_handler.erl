@@ -66,7 +66,6 @@ message({org, trigger, execute, Org, Event, Payload}, State) ->
 %%% User Functions
 %%%===================================================================
 
-
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
@@ -146,6 +145,12 @@ message({user, add, User}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:add(User),
+     State};
+
+message({user, add, Creator, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add(Creator, User),
      State};
 
 message({user, auth, User, Pass}, State) when

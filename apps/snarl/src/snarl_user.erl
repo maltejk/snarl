@@ -14,7 +14,7 @@
          find_key/1,
          get_/1, get/1,
          lookup_/1, lookup/1,
-         add/1,
+         add/1, add/2,
          delete/1,
          passwd/2,
          join/2, leave/2,
@@ -273,18 +273,38 @@ list(Requirements) ->
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
--spec add(UserName::binary()) ->
+-spec add(Creator::fifo:user_id(),
+          UserName::binary()) ->
                  duplicate |
                  {error, timeout} |
                  {ok, UUID::fifo:user_id()}.
+
+
+add(Creator, User) when is_binary(Creator),
+                        is_binary(User) ->
+    case add(undefined, User) of
+        {ok, UUID} = R ->
+            case get_(Creator) of
+                {ok, C} ->
+                    case snarl_user_state:active_org(C) of
+                        {ok, <<>>} ->
+                            R;
+                        {ok, Org} ->
+                            snarl_org:trigger(Org, user_create, UUID)
+                    end;
+                _ ->
+                    R
+            end;
+        E ->
+            E
+    end;
+
+add(_, User) ->
+    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    create(UUID, User).
+
 add(User) ->
-    case lookup(User) of
-        {ok, _} ->
-            duplicate;
-        _ ->
-            UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-            create(UUID, User)
-    end.
+    add(undefined, User).
 
 create(UUID, User) ->
     case lookup_(User) of

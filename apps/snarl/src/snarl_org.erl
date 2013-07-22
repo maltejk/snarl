@@ -80,9 +80,21 @@ do_events([_|Ts], Event, Payload, N) ->
 do_events([], _Event, _Payload, N) ->
     N.
 
--spec do_event(Action::{grant, group|user, Group::fifo:group_id(), Template::template()},
+-spec do_event(Action::{grant, group, Group::fifo:group_id(), Template::template()} |
+                       {grant, user, User::fifo:user_id(), Template::template()} |
+                       {join, group, Group::fifo:group_id()} |
+                       {join, org, Org::fifo:org_id()},
                Payload::template()) ->
                       ok.
+
+do_event({join, group, Group}, Payload) ->
+    snarl_user:join(Payload, Group),
+    ok;
+
+do_event({join, org, Org}, Payload) ->
+    snarl_user:join_org(Payload, Org),
+    snarl_user:select_org(Payload, Org),
+    ok;
 
 do_event({grant, group, Group, Template}, Payload) ->
     snarl_group:grant(Group, build_template(Template, Payload)),
