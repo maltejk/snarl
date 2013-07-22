@@ -331,6 +331,24 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
+handle_coverage({list, ReqID, Requirements}, _KeySpaces, _Sender, State) ->
+    Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
+                     snarl_group_state:uuid(S0)
+             end,
+    List = snarl_db:fold(State#state.db,
+                           <<"group">>,
+                           fun (Key, E, C) ->
+                                   case rankmatcher:match(E, Getter, Requirements) of
+                                       false ->
+                                           C;
+                                       Pts ->
+                                           [{Pts, Key} | C]
+                                   end
+                           end, []),
+    {reply,
+     {ok, ReqID, {State#state.partition, State#state.node}, List},
+     State};
+
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
     List = snarl_db:fold(State#state.db,
                          <<"group">>,
