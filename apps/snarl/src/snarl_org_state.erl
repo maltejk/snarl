@@ -89,8 +89,8 @@ load(OrgSB) ->
        }.
 
 jsonify_trigger({Trigger, Action}) ->
-    jsxd:set(<<"trigger">>, list_to_binary(atom_to_list(Trigger))),
-    jsonify_action(Action)).
+    jsxd:set(<<"trigger">>, list_to_binary(atom_to_list(Trigger)),
+             jsonify_action(Action)).
 
 jsonify_action({grant, group, Target, Permission}) ->
     [{<<"action">>, <<"group_grant">>},
