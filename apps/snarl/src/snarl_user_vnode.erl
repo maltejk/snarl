@@ -19,11 +19,14 @@
          handle_exit/3]).
 
 %% Reads
--export([list/2,
+-export([
+         list/2,
+         list/3,
          lookup/3,
          auth/3,
          find_key/3,
-         get/3]).
+         get/3
+        ]).
 
 %% Writes
 -export([
@@ -54,6 +57,7 @@
               join/4,
               leave/4,
               list/2,
+              list/3,
               lookup/3,
               passwd/4,
               repair/4,
@@ -96,6 +100,14 @@ get(Preflist, ReqID, User) ->
 list(Preflist, ReqID) ->
     riak_core_vnode_master:coverage(
       {list, ReqID},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
+list(Preflist, ReqID, Requirements) ->
+    riak_core_vnode_master:coverage(
+      {list, ReqID, Requirements},
       Preflist,
       all,
       {fsm, undefined, self()},
@@ -332,8 +344,17 @@ handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     Acc = snarl_db:fold(State#state.db, <<"user">>, Fun, Acc0),
     {reply, Acc, State};
 
-handle_handoff_command(_Message, _Sender, State) ->
-    {noreply, State}.
+handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
+    handle_command(Req, Sender, State);
+
+handle_handoff_command(Req, Sender, State) ->
+    S1 = case handle_command(Req, Sender, State) of
+             {noreply, NewState} ->
+                 NewState;
+             {reply, _, NewState} ->
+                 NewState
+         end,
+    {forward, S1}.
 
 handoff_starting(TargetNode, State) ->
     lager:warning("Starting handof to: ~p", [TargetNode]),
@@ -375,7 +396,7 @@ delete(State) ->
     Trans = snarl_db:fold(State#state.db,
                           <<"user">>,
                           fun (K,_, A) ->
-                                  [{delete, K} | A]
+                                  [{delete, <<"user", K/binary>>} | A]
                           end, []),
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.

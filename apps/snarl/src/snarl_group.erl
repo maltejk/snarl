@@ -5,6 +5,7 @@
 -export([
          ping/0,
          list/0,
+         list/1,
          get/1,
          get_/1,
          lookup/1,
@@ -123,6 +124,15 @@ list() ->
       {snarl_group_vnode, snarl_group},
       list
      ).
+
+-spec list(Reqs::[fifo:matcher()]) ->
+                  {ok, [IPR::fifo:group_id()]} | {error, timeout}.
+list(Requirements) ->
+    {ok, Res} = snarl_entity_coverage_fsm:start(
+                  {snarl_group_vnode, snarl_group},
+                  list, Requirements),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)}.
 
 -spec add(Group::binary()) ->
                  {ok, UUID::fifo:group_id()} |
