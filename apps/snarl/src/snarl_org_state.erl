@@ -88,11 +88,28 @@ load(OrgSB) ->
         metadata = statebox:new(fun () -> Metadata end)
        }.
 
-jsonify_trigger({vm_create,
-                  {grant, group, Group,
-                   Permission}}) ->
-    [{<<"group">>, Group},
-     {<<"permission">>, jsonify_permission(Permission)}].
+jsonify_trigger({Trigger, Action}) ->
+    jsxd:set(<<"trigger">>, list_to_binary(atom_to_list(Trigger)),
+             jsonify_action(Action)).
+
+jsonify_action({grant, group, Target, Permission}) ->
+    [{<<"action">>, <<"group_grant">>},
+     {<<"permission">>, jsonify_permission(Permission)},
+     {<<"target">>, Target}];
+
+jsonify_action({grant, user, Target, Permission}) ->
+    [{<<"action">>, <<"user_grant">>},
+     {<<"permission">>, jsonify_permission(Permission)},
+     {<<"target">>, Target}];
+
+jsonify_action({join, org, Org}) ->
+    [{<<"action">>, <<"join_org">>},
+     {<<"target">>, Org}];
+
+jsonify_action({join, group, Group}) ->
+    [{<<"action">>, <<"join_group">>},
+     {<<"target">>, Group}].
+
 
 jsonify_permission(Permission) ->
     lists:map(fun (placeholder) ->
