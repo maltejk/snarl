@@ -104,7 +104,7 @@ jsonify_action({grant, user, Target, Permission}) ->
 
 jsonify_action({join, org, Org}) ->
     [{<<"action">>, <<"join_org">>},
-     {<<"Org">>, Org}];
+     {<<"org">>, Org}];
 
 jsonify_action({join, group, Group}) ->
     [{<<"action">>, <<"join_group">>},
