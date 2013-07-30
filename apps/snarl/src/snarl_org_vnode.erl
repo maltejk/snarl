@@ -355,10 +355,8 @@ handle_coverage(_Req, _KeySpaces, _Sender, State) ->
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.
 
-
 terminate(_Reason, _State) ->
     ok.
-
 
 change_org(Org, Action, Vals, Coordinator, State, ReqID) ->
     case snarl_db:get(State#state.db, <<"org">>, Org) of

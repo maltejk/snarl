@@ -494,8 +494,14 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),
             {reply, {ok, ReqID, not_found}, State}
     end.
-
+-ifndef(old_hash).
+key_to_id(Key) ->
+    [_, ID0, _] = re:split(Key, " "),
+    ID1 = base64:decode(ID0),
+    crypto:hash(md5,ID1).
+-else.
 key_to_id(Key) ->
     [_, ID0, _] = re:split(Key, " "),
     ID1 = base64:decode(ID0),
     crypto:md5(ID1).
+-endif.

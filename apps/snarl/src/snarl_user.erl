@@ -64,11 +64,35 @@ find_key(KeyID) ->
                     (R, _) ->
                         {ok, R}
                 end, not_found, Res).
-
 -spec auth(User::binary(), Passwd::binary()) ->
                   not_found |
                   {error, timeout} |
                   {ok, User::fifo:user()}.
+
+-ifndef(old_hash).
+auth(User, Passwd) ->
+    case lookup_(User) of
+        {ok, UserR} ->
+            case snarl_user_state:password(UserR) of
+                {Salt, Hash} ->
+                    case crypto:hash(sha512, [Salt, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end;
+                Hash ->
+                    case crypto:hash(sha, [User, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end
+            end;
+        E ->
+            E
+    end.
+-else.
 auth(User, Passwd) ->
     case lookup_(User) of
         {ok, UserR} ->
@@ -91,6 +115,7 @@ auth(User, Passwd) ->
         E ->
             E
     end.
+-endif.
 
 -spec lookup(User::binary()) ->
                     not_found |
@@ -333,10 +358,17 @@ set(User, Attributes) ->
                     not_found |
                     {error, timeout} |
                     ok.
+-ifndef(old_hash).
+passwd(User, Passwd) ->
+    Salt = crypto:rand_bytes(64),
+    Hash = crypto:hash(sha512, [Salt, Passwd]),
+    do_write(User, passwd, {Salt, Hash}).
+-else.
 passwd(User, Passwd) ->
     Salt = crypto:rand_bytes(64),
     Hash = crypto:sha512([Salt, Passwd]),
     do_write(User, passwd, {Salt, Hash}).
+-endif.
 
 import(User, Data) ->
     do_write(User, import, Data).
