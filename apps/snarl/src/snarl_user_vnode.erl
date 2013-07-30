@@ -451,7 +451,7 @@ handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
 
 handle_coverage({list, ReqID, Requirements}, _KeySpaces, _Sender, State) ->
     Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
-                     snarl_user_state:uuid(S0)
+                     snarl_user_state:uuid(snarl_user_state:load(S0))
              end,
     List = snarl_db:fold(State#state.db,
                            <<"user">>,
