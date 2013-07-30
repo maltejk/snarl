@@ -140,16 +140,19 @@ gc_user(<<"all">>, Timeout) ->
     {Cnt, GCed, Size} =
         lists:foldl(fun (UUID, {Cnt, GCed, Size}) ->
                             case snarl_user:gcable(UUID) of
-                                {ok, {A, B}} ->
+                                {ok, {A, B, C, D}} ->
                                     MinAge = ecrdt:timestamp_us() - Timeout,
                                     A1 = [E || {{T,_},_} = E <- A, T < MinAge],
                                     B1 = [E || {{T,_},_} = E <- B, T < MinAge],
-                                    case {A1, B1} of
-                                        {[], []} ->
+                                    C1 = [E || {{T,_},_} = E <- C, T < MinAge],
+                                    D1 = [E || {{T,_},_} = E <- D, T < MinAge],
+                                    S = {A1, B1, C1, D1},
+                                    case S of
+                                        {[], [], [], []} ->
                                             {Cnt + 1, GCed, Size};
                                         _ ->
                                             {ok, Size1} =
-                                                snarl_user:gc(UUID, {A1, B1}),
+                                                snarl_user:gc(UUID, S),
                                             {Cnt + 1, GCed + 1, Size + Size1}
                                     end;
                                 _ ->
@@ -162,11 +165,14 @@ gc_user(<<"all">>, Timeout) ->
 
 gc_user(UUID, Timeout) ->
     case snarl_user:gcable(UUID) of
-        {ok, {A, B}} ->
+        {ok, {A, B, C, D}} ->
             MinAge = ecrdt:timestamp_us() - Timeout,
             A1 = [E || {{T,_},_} = E <- A, T < MinAge],
             B1 = [E || {{T,_},_} = E <- B, T < MinAge],
-            {ok, Size} = snarl_user:gc(UUID, {A1, B1}),
+            C1 = [E || {{T,_},_} = E <- C, T < MinAge],
+            D1 = [E || {{T,_},_} = E <- D, T < MinAge],
+            S = {A1, B1, C1, D1},
+            {ok, Size} = snarl_user:gc(UUID, S),
             io:format("GC ~p bytes of memory.~n", [Size]),
             ok;
         _ ->
@@ -197,8 +203,9 @@ time_to_us(Time, [$w | _]) ->
 
 gcable_user([UUID]) ->
     case snarl_user:gcable(list_to_binary(UUID)) of
-        {ok, {A, B}} ->
-            io:format("GCable buckets: ~p~n", [length(A) + length(B)]),
+        {ok, {A, B, C, D}} ->
+            io:format("GCable buckets: ~p~n", [length(A) + length(B) +
+                                                   length(C) + length(D)]),
             ok;
         _ ->
             error
@@ -335,9 +342,10 @@ leave_group([User, Group]) ->
     end.
 
 passwd([User, Pass]) ->
-    case snarl_user:lookup(list_to_binary(User)) of
+    case snarl_user:lookup_(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:passwd(jsxd:get(<<"uuid">>, <<>>, UserObj), list_to_binary(Pass)) of
+            case snarl_user:passwd(snarl_user_state:uuid(UserObj),
+                                   list_to_binary(Pass)) of
                 ok ->
                     io:format("Password successfully changed for user '~s'.~n", [User]),
                     ok;
@@ -351,9 +359,10 @@ passwd([User, Pass]) ->
     end.
 
 grant_group([Group | P]) ->
-    case snarl_group:lookup(list_to_binary(Group)) of
+    case snarl_group:lookup_(list_to_binary(Group)) of
         {ok, GroupObj} ->
-            case snarl_group:grant(jsxd:get(<<"uuid">>, <<>>, GroupObj), build_permission(P)) of
+            case snarl_group:grant(snarl_group_state:uuid(GroupObj),
+                                   build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
@@ -367,9 +376,10 @@ grant_group([Group | P]) ->
     end.
 
 grant_user([User | P ]) ->
-    case snarl_user:lookup(list_to_binary(User)) of
+    case snarl_user:lookup_(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:grant(jsxd:get(<<"uuid">>, <<>>, UserObj), build_permission(P)) of
+            case snarl_user:grant(snarl_user_state:uuid(UserObj),
+                                  build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
@@ -383,9 +393,10 @@ grant_user([User | P ]) ->
     end.
 
 revoke_user([User | P ]) ->
-    case snarl_user:lookup(list_to_binary(User)) of
+    case snarl_user:lookup_(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:revoke(jsxd:get(<<"uuid">>, <<>>, UserObj), build_permission(P)) of
+            case snarl_user:revoke(snarl_user_state:uuid(UserObj),
+                                   build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
@@ -399,9 +410,10 @@ revoke_user([User | P ]) ->
     end.
 
 revoke_group([Group | P]) ->
-    case snarl_group:lookup(list_to_binary(Group)) of
+    case snarl_group:lookup_(list_to_binary(Group)) of
         {ok, GroupObj} ->
-            case snarl_group:revoke(jsxd:get(<<"uuid">>, <<>>, GroupObj), build_permission(P)) of
+            case snarl_group:revoke(snarl_group_state:uuid(GroupObj),
+                                    build_permission(P)) of
                 ok ->
                     io:format("Revoked.~n", []),
                     ok;
@@ -510,9 +522,6 @@ down([Node]) ->
         case riak_core:down(list_to_atom(Node)) of
             ok ->
                 io:format("Success: ~p marked as down~n", [Node]),
-                ok;
-            {error, legacy_mode} ->
-                io:format("Cluster is currently in legacy mode~n"),
                 ok;
             {error, is_up} ->
                 io:format("Failed: ~s is up~n", [Node]),

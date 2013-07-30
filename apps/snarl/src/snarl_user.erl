@@ -132,7 +132,7 @@ lookup(User) ->
 -spec lookup_(User::binary()) ->
                      not_found |
                      {error, timeout} |
-                     {ok, User::fifo:user()}.
+                     {ok, User::#?USER{}}.
 lookup_(User) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_user_vnode, snarl_user},
@@ -227,7 +227,7 @@ cache(User) ->
 -spec gcable(User::fifo:user_id()) ->
                     not_found |
                     {error, timeout} |
-                    {ok, {[term()], [term()]}}.
+                    {ok, {[term()], [term()], [term()], [term()]}}.
 gcable(User) ->
     case get_(User) of
         {ok, UserObj} ->
@@ -237,10 +237,10 @@ gcable(User) ->
     end.
 
 -spec gc(User::fifo:user_id(),
-         GCable::rot:hash()) ->
+         GCable::{_, _, _, _}) ->
                 not_found |
                 {error, timeout} |
-                ok.
+                {ok, integer()}.
 gc(User, {_,_,_,_} = GCable) ->
     case get_(User) of
         {ok, UserObj1} ->
