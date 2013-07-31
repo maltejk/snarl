@@ -154,25 +154,22 @@ handle_cast(next, State = #state{
 
 handle_cast(next, State = #state{
                              user_timeout = Timeout,
-                             compacted = C,
+                             compacted = Cpd,
                              cnt = Cnt,
                              users = [UUID | Us]}) ->
     case snarl_user:gcable(UUID) of
-        {ok, {A, B}} ->
+        {ok, {A, B, C, D}} ->
             MinAge = ecrdt:timestamp_us() - Timeout,
-            A1 = case A of
-                     [] ->
-                         [];
-                     _ ->
-                         [E || {{T,_},_} = E <- A, T < MinAge]
-                 end,
+            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
             B1 = [E || {{T,_},_} = E <- B, T < MinAge],
-            {ok, Size} = snarl_user:gc(UUID, {A1, B1}),
+            C1 = [E || {{T,_},_} = E <- C, T < MinAge],
+            D1 = [E || {{T,_},_} = E <- D, T < MinAge],
+            {ok, Size} = snarl_user:gc(UUID, {A1, B1, C1, D1}),
             {noreply,
              State#state{
                users = Us,
                cnt = Cnt + 1,
-               compacted = C + Size
+               compacted = Cpd + Size
               }};
         _ ->
             {noreply,

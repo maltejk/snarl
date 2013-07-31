@@ -16,6 +16,7 @@
 ^snarl_group_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_token_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_user_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
+^snarl_org_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_tcp_handler.erl:199: Matching of pattern 
 ^snarl_tcp_handler.erl:211: Matching of pattern
 ^snarl_tcp_handler.erl:216: Matching of pattern
@@ -23,3 +24,5 @@
 ^lhttpc
 ^newrelic
 ^jsx_decoder.erl:149:
+^glc_code.erl:
+^lager
