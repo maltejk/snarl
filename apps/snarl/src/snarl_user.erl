@@ -9,27 +9,36 @@
 -export([
          ping/0,
          list/0,
+         list/1,
          auth/2,
-         get/1,
-         lookup/1,
-         add/1,
+         find_key/1,
+         get_/1, get/1,
+         lookup_/1, lookup/1,
+         add/1, add/2,
          delete/1,
          passwd/2,
-         join/2,
-         leave/2,
-         revoke_prefix/2,
-         grant/2,
-         revoke/2,
+         join/2, leave/2,
+         join_org/2, leave_org/2, select_org/2,
+         grant/2, revoke/2, revoke_prefix/2,
          allowed/2,
          set/2,
          set/3,
          import/2,
          cache/1,
          gcable/1,
+         add_key/3,
+         revoke_key/2,
+         keys/1,
+         active/1,
+         orgs/1,
          gc/2
         ]).
 
--ignore_xref([ping/0]).
+-ignore_xref([
+              join_org/2, leave_org/2, select_org/2,
+              lookup_/1,
+              ping/0
+             ]).
 
 -define(TIMEOUT, 5000).
 
@@ -42,28 +51,89 @@ ping() ->
     [{IndexNode, _Type}] = PrefList,
     riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
-
--spec auth(User::binary(), Passwd::binary()) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, User::fifo:user()}.
-auth(User, Passwd) ->
-    Hash = crypto:sha([User, Passwd]),
+-spec find_key(KeyID::binary()) ->
+                      not_found |
+                      {error, timeout} |
+                      {ok, User::fifo:user_id()}.
+find_key(KeyID) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
-                   {snarl_user_vnode, snarl_user},
-                   auth, Hash
-                  ),
+                  {snarl_user_vnode, snarl_user},
+                  find_key, KeyID),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->
                         {ok, R}
                 end, not_found, Res).
+-spec auth(User::binary(), Passwd::binary()) ->
+                  not_found |
+                  {error, timeout} |
+                  {ok, User::fifo:user()}.
+
+-ifndef(old_hash).
+auth(User, Passwd) ->
+    case lookup_(User) of
+        {ok, UserR} ->
+            case snarl_user_state:password(UserR) of
+                {Salt, Hash} ->
+                    case crypto:hash(sha512, [Salt, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end;
+                Hash ->
+                    case crypto:hash(sha, [User, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end
+            end;
+        E ->
+            E
+    end.
+-else.
+auth(User, Passwd) ->
+    case lookup_(User) of
+        {ok, UserR} ->
+            case snarl_user_state:password(UserR) of
+                {Salt, Hash} ->
+                    case crypto:sha512([Salt, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end;
+                Hash ->
+                    case crypto:sha([User, Passwd]) of
+                        Hash ->
+                            {ok, snarl_user_state:uuid(UserR)};
+                        _ ->
+                            not_found
+                    end
+            end;
+        E ->
+            E
+    end.
+-endif.
 
 -spec lookup(User::binary()) ->
                     not_found |
                     {error, timeout} |
                     {ok, User::fifo:user()}.
 lookup(User) ->
+    case lookup_(User) of
+        {ok, Obj} ->
+            {ok, snarl_user_state:to_json(Obj)};
+        R ->
+            R
+    end.
+
+-spec lookup_(User::binary()) ->
+                     not_found |
+                     {error, timeout} |
+                     {ok, User::#?USER{}}.
+lookup_(User) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_user_vnode, snarl_user},
                   lookup, User),
@@ -74,17 +144,16 @@ lookup(User) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            snarl_user:get(UUID);
+            snarl_user:get_(UUID);
         R ->
             R
     end.
 
-
 -spec revoke_prefix(User::fifo:user_id(),
                     Prefix::fifo:permission()) ->
-                    not_found |
-                    {error, timeout} |
-                    ok.
+                           not_found |
+                           {error, timeout} |
+                           ok.
 revoke_prefix(User, Prefix) ->
     do_write(User, revoke_prefix, Prefix).
 
@@ -97,6 +166,36 @@ allowed(User, Permission) ->
     case get_(User) of
         {ok, UserObj} ->
             test_user(UserObj, Permission);
+        E ->
+            E
+    end.
+
+add_key(User, KeyID, Key) ->
+    do_write(User, add_key, {KeyID, Key}).
+
+revoke_key(User, KeyID) ->
+    do_write(User, revoke_key, KeyID).
+
+keys(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:keys(UserObj)};
+        E ->
+            E
+    end.
+
+active(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:active_org(UserObj)};
+        E ->
+            E
+    end.
+
+orgs(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:orgs(UserObj)};
         E ->
             E
     end.
@@ -128,7 +227,7 @@ cache(User) ->
 -spec gcable(User::fifo:user_id()) ->
                     not_found |
                     {error, timeout} |
-                    {ok, {[term()], [term()]}}.
+                    {ok, {[term()], [term()], [term()], [term()]}}.
 gcable(User) ->
     case get_(User) of
         {ok, UserObj} ->
@@ -138,11 +237,11 @@ gcable(User) ->
     end.
 
 -spec gc(User::fifo:user_id(),
-         GCable::rot:hash()) ->
+         GCable::{_, _, _, _}) ->
                 not_found |
                 {error, timeout} |
-                ok.
-gc(User, {_,_} = GCable) ->
+                {ok, integer()}.
+gc(User, {_,_,_,_} = GCable) ->
     case get_(User) of
         {ok, UserObj1} ->
             do_write(User, gc, GCable),
@@ -166,9 +265,9 @@ get(User) ->
     end.
 
 -spec get_(User::fifo:user_id()) ->
-                 not_found |
-                 {error, timeout} |
-                 {ok, User::#?USER{}}.
+                  not_found |
+                  {error, timeout} |
+                  {ok, User::#?USER{}}.
 get_(User) ->
     case snarl_entity_read_fsm:start(
            {snarl_user_vnode, snarl_user},
@@ -190,16 +289,50 @@ list() ->
       list
      ).
 
--spec add(UserName::binary()) ->
+-spec list(Reqs::[fifo:matcher()]) ->
+                  {ok, [IPR::fifo:user_id()]} | {error, timeout}.
+list(Requirements) ->
+    {ok, Res} = snarl_entity_coverage_fsm:start(
+                  {snarl_user_vnode, snarl_user},
+                  list, Requirements),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)}.
+
+-spec add(Creator::fifo:user_id(),
+          UserName::binary()) ->
                  duplicate |
                  {error, timeout} |
                  {ok, UUID::fifo:user_id()}.
-add(User) ->
+
+add(Creator, User) when is_binary(Creator),
+                        is_binary(User) ->
+    case add(undefined, User) of
+        {ok, UUID} = R ->
+            case get_(Creator) of
+                {ok, C} ->
+                    case snarl_user_state:active_org(C) of
+                        <<>> ->
+                            R;
+                        Org ->
+                            snarl_org:trigger(Org, user_create, UUID),
+                            R
+                    end;
+                _ ->
+                    R
+            end;
+        E ->
+            E
+    end;
+
+add(_, User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
     create(UUID, User).
 
+add(User) ->
+    add(undefined, User).
+
 create(UUID, User) ->
-    case snarl_user:lookup(User) of
+    case lookup_(User) of
         not_found ->
             ok = do_write(UUID, add, User),
             {ok, UUID};
@@ -225,8 +358,17 @@ set(User, Attributes) ->
                     not_found |
                     {error, timeout} |
                     ok.
+-ifndef(old_hash).
 passwd(User, Passwd) ->
-    do_write(User, passwd, Passwd).
+    Salt = crypto:rand_bytes(64),
+    Hash = crypto:hash(sha512, [Salt, Passwd]),
+    do_write(User, passwd, {Salt, Hash}).
+-else.
+passwd(User, Passwd) ->
+    Salt = crypto:rand_bytes(64),
+    Hash = crypto:sha512([Salt, Passwd]),
+    do_write(User, passwd, {Salt, Hash}).
+-endif.
 
 import(User, Data) ->
     do_write(User, import, Data).
@@ -244,6 +386,50 @@ join(User, Group) ->
                    ok.
 leave(User, Group) ->
     do_write(User, leave, Group).
+
+
+-spec join_org(User::fifo:user_id(), Org::fifo:org_id()) ->
+                      not_found |
+                      {error, timeout} |
+                      ok.
+join_org(User, Org) ->
+    do_write(User, join_org, Org).
+
+-spec select_org(User::fifo:user_id(), Org::fifo:org_id()) ->
+                        not_found |
+                        {error, timeout} |
+                        ok.
+select_org(User, Org) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            Orgs = snarl_user_state:orgs(UserObj),
+            case lists:member(Org, Orgs) of
+                true ->
+                    do_write(User, select_org, Org);
+                _ ->
+                    not_found
+            end;
+        R  ->
+            R
+    end.
+
+-spec leave_org(User::fifo:user_id(), Org::fifo:org_id()) ->
+                       not_found |
+                       {error, timeout} |
+                       ok.
+leave_org(User, Org) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            case snarl_user_state:active_org(UserObj) of
+                Org ->
+                    do_write(User, select_org, <<"">>);
+                _ ->
+                    ok
+            end,
+            do_write(User, leave_org, Org);
+        R  ->
+            R
+    end.
 
 -spec delete(User::fifo:user_id()) ->
                     not_found |

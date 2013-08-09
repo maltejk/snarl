@@ -19,49 +19,54 @@
          handle_exit/3]).
 
 %% Reads
--export([list/2,
+-export([
+         list/2,
+         list/3,
          lookup/3,
          auth/3,
-         get/3]).
-
-%% Writes
--export([add/4,
-         delete/3,
-         passwd/4,
-         join/4,
-         leave/4,
-         grant/4,
-         repair/4,
-         revoke_prefix/4,
-         revoke/4,
-         set/4,
-         import/4,
-         gc/4,
-         set_resource/4,
-         claim_resource/4,
-         free_resource/4
+         find_key/3,
+         get/3
         ]).
 
--ignore_xref([start_vnode/1,
-              lookup/3,
-              auth/3,
-              get/3,
-              list/2,
+%% Writes
+-export([
+         add/4,
+         import/4,
+         repair/4,
+         add_key/4,
+         delete/3,
+         gc/4,
+         grant/4, revoke/4, revoke_prefix/4,
+         join/4, leave/4,
+         passwd/4,
+         join_org/4, leave_org/4, select_org/4,
+         revoke_key/4,
+         set/4
+        ]).
+
+-ignore_xref([
               add/4,
+              add_key/4,
+              auth/3,
+              find_key/3,
               delete/3,
-              revoke_prefix/4,
-              passwd/4,
+              gc/4,
+              get/3,
+              grant/4,
+              import/4,
               join/4,
               leave/4,
-              grant/4,
+              list/2,
+              list/3,
+              lookup/3,
+              passwd/4,
               repair/4,
-              set/4,
-              import/4,
-              gc/4,
               revoke/4,
-              set_resource/4,
-              claim_resource/4,
-              free_resource/4
+              revoke_key/4,
+              revoke_prefix/4,
+              set/4,
+              join_org/4, leave_org/4, select_org/4,
+              start_vnode/1
              ]).
 
 
@@ -92,7 +97,6 @@ get(Preflist, ReqID, User) ->
                                    {get, ReqID, User},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-
 list(Preflist, ReqID) ->
     riak_core_vnode_master:coverage(
       {list, ReqID},
@@ -101,9 +105,25 @@ list(Preflist, ReqID) ->
       {fsm, undefined, self()},
       ?MASTER).
 
+list(Preflist, ReqID, Requirements) ->
+    riak_core_vnode_master:coverage(
+      {list, ReqID, Requirements},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
 auth(Preflist, ReqID, Hash) ->
     riak_core_vnode_master:coverage(
       {auth, ReqID, Hash},
+      Preflist,
+      all,
+      {fsm, undefined, self()},
+      ?MASTER).
+
+find_key(Preflist, ReqID, KeyID) ->
+    riak_core_vnode_master:coverage(
+      {find_key, ReqID, KeyID},
       Preflist,
       all,
       {fsm, undefined, self()},
@@ -130,6 +150,19 @@ add(Preflist, ReqID, UUID, User) ->
 gc(Preflist, ReqID, UUID, GCable) ->
     riak_core_vnode_master:command(Preflist,
                                    {gc, ReqID, UUID, GCable},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+
+add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {add_key, ReqID, UUID, KeyId, Key},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+revoke_key(Preflist, ReqID, UUID, KeyId) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {revoke_key, ReqID, UUID, KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -170,6 +203,23 @@ leave(Preflist, ReqID, User, Val) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
+join_org(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {join_org, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+leave_org(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {leave_org, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+select_org(Preflist, ReqID, User, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {select_org, ReqID, User, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 grant(Preflist, ReqID, User, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {grant, ReqID, User, Val},
@@ -187,25 +237,6 @@ revoke_prefix(Preflist, ReqID, User, Val) ->
                                    {revoke_prefix, ReqID, User, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-
-set_resource(Preflist, ReqID, User, [Resource, Value]) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {set_resource, ReqID, User, Resource, Value},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-claim_resource(Preflist, ReqID, User, [Resource, ID, Ammount]) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {claim_resource, ReqID, User, Resource, ID, Ammount},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-free_resource(Preflist, ReqID, User, [Resource, ID]) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {free_resource, ReqID, User, Resource, ID},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
 
 
 %%%===================================================================
@@ -313,8 +344,17 @@ handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     Acc = snarl_db:fold(State#state.db, <<"user">>, Fun, Acc0),
     {reply, Acc, State};
 
-handle_handoff_command(_Message, _Sender, State) ->
-    {noreply, State}.
+handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
+    handle_command(Req, Sender, State);
+
+handle_handoff_command(Req, Sender, State) ->
+    S1 = case handle_command(Req, Sender, State) of
+             {noreply, NewState} ->
+                 NewState;
+             {reply, _, NewState} ->
+                 NewState
+         end,
+    {forward, S1}.
 
 handoff_starting(TargetNode, State) ->
     lager:warning("Starting handof to: ~p", [TargetNode]),
@@ -347,28 +387,29 @@ encode_handoff_item(User, Data) ->
 
 is_empty(State) ->
     snarl_db:fold(State#state.db,
-                    <<"user">>,
-                    fun (_,_, _) ->
-                            {false, State}
-                    end, {true, State}).
+                  <<"user">>,
+                  fun (_,_, _) ->
+                          {false, State}
+                  end, {true, State}).
 
 delete(State) ->
     Trans = snarl_db:fold(State#state.db,
-                            <<"user">>,
-                            fun (K,_, A) ->
-                                    [{delete, K} | A]
-                            end, []),
+                          <<"user">>,
+                          fun (K,_, A) ->
+                                  [{delete, <<"user", K/binary>>} | A]
+                          end, []),
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
-
-handle_coverage({auth, ReqID, Hash}, _KeySpaces, _Sender, State) ->
+handle_coverage({find_key, ReqID, KeyID}, _KeySpaces, _Sender, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"user">>,
                         fun (UUID, #snarl_obj{val=U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:password(U1) of
-                                    Hash ->
+                                Ks = snarl_user_state:keys(U1),
+                                Ks1 = [key_to_id(K) || {_, K} <- Ks],
+                                case lists:member(KeyID, Ks1) of
+                                    true ->
                                         UUID;
                                     _ ->
                                         not_found
@@ -385,7 +426,7 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
                         <<"user">>,
                         fun (UUID, #snarl_obj{val = U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:name(U1)  of
+                                case snarl_user_state:name(U1) of
                                     Name ->
                                         UUID;
                                     _ ->
@@ -400,12 +441,30 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
 
 handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
     List = snarl_db:fold(State#state.db,
-                          <<"user">>,
-                           fun (K, _, L) ->
-                                   [K|L]
-                           end, []),
+                         <<"user">>,
+                         fun (K, _, L) ->
+                                 [K|L]
+                         end, []),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, List},
+     State};
+
+handle_coverage({list, ReqID, Requirements}, _KeySpaces, _Sender, State) ->
+    Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
+                     snarl_user_state:uuid(snarl_user_state:load(S0))
+             end,
+    List = snarl_db:fold(State#state.db,
+                           <<"user">>,
+                           fun (Key, E, C) ->
+                                   case rankmatcher:match(E, Getter, Requirements) of
+                                       false ->
+                                           C;
+                                       Pts ->
+                                           [{Pts, Key} | C]
+                                   end
+                           end, []),
+    {reply,
+     {ok, ReqID, {State#state.partition, State#state.node}, List},
      State};
 
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
@@ -425,7 +484,7 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
             H2 = case Vals of
                      [Val] ->
                          snarl_user_state:Action(ID, Val, H1);
-                         [Val1, Val2] ->
+                     [Val1, Val2] ->
                          snarl_user_state:Action(ID, Val1, Val2, H1)
                  end,
             snarl_db:put(State#state.db, <<"user">>, User,
@@ -435,3 +494,14 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),
             {reply, {ok, ReqID, not_found}, State}
     end.
+-ifndef(old_hash).
+key_to_id(Key) ->
+    [_, ID0, _] = re:split(Key, " "),
+    ID1 = base64:decode(ID0),
+    crypto:hash(md5,ID1).
+-else.
+key_to_id(Key) ->
+    [_, ID0, _] = re:split(Key, " "),
+    ID1 = base64:decode(ID0),
+    crypto:md5(ID1).
+-endif.

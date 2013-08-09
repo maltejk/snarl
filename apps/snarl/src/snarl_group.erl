@@ -4,16 +4,12 @@
 
 -export([
          ping/0,
-         list/0,
-         get/1,
-         get_/1,
-         lookup/1,
-         add/1,
-         delete/1,
-         grant/2,
-         revoke/2,
-         set/2,
-         set/3,
+         list/0, list/1,
+         get/1, get_/1,
+         lookup/1, lookup_/1,
+         add/1, delete/1,
+         grant/2, revoke/2,
+         set/2, set/3,
          create/2,
          revoke_prefix/2,
          gcable/1,
@@ -37,15 +33,26 @@ ping() ->
 import(Group, Data) ->
     do_write(Group, import, Data).
 
--spec lookup(GroupName::binary()) ->
+-spec lookup(Group::binary()) ->
                     not_found |
                     {error, timeout} |
                     {ok, Group::fifo:group()}.
+lookup(Group) ->
+    case lookup_(Group) of
+        {ok, Obj} ->
+            {ok, snarl_group_state:to_json(Obj)};
+        R ->
+            R
+    end.
 
-lookup(GroupName) ->
+-spec lookup_(Group::binary()) ->
+                     not_found |
+                     {error, timeout} |
+                     {ok, Group::#?GROUP{}}.
+lookup_(Group) ->
     {ok, Res} = snarl_entity_coverage_fsm:start(
                   {snarl_group_vnode, snarl_group},
-                  lookup, GroupName),
+                  lookup, Group),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -53,10 +60,11 @@ lookup(GroupName) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            snarl_group:get(UUID);
+            snarl_group:get_(UUID);
         R ->
             R
     end.
+
 
 -spec gcable(Group::fifo:group_id()) ->
                     not_found |
@@ -124,6 +132,15 @@ list() ->
       list
      ).
 
+-spec list(Reqs::[fifo:matcher()]) ->
+                  {ok, [IPR::fifo:group_id()]} | {error, timeout}.
+list(Requirements) ->
+    {ok, Res} = snarl_entity_coverage_fsm:start(
+                  {snarl_group_vnode, snarl_group},
+                  list, Requirements),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)}.
+
 -spec add(Group::binary()) ->
                  {ok, UUID::fifo:group_id()} |
                  douplicate |
@@ -134,7 +151,7 @@ add(Group) ->
     create(UUID, Group).
 
 create(UUID, Group) ->
-    case snarl_group:lookup(Group) of
+    case snarl_group:lookup_(Group) of
         not_found ->
             ok = do_write(UUID, add, Group),
             {ok, UUID};

@@ -14,7 +14,7 @@ init(Prot, []) ->
     {ok, #state{port = Prot}}.
 
 %%%===================================================================
-%%% User Functions
+%%% General Functions
 %%%===================================================================
 
 -spec message(fifo:snarl_message(), term()) -> any().
@@ -22,8 +22,55 @@ init(Prot, []) ->
 message(version, State) ->
     {reply, {ok, ?VERSION}, State};
 
+%%%===================================================================
+%%% Org Functions
+%%%===================================================================
+
+message({org, list}, State) ->
+    {reply, snarl_org:list(), State};
+
+message({org, list, Requirements}, State) ->
+    {reply, snarl_org:list(Requirements), State};
+
+message({org, get, Org}, State) ->
+    {reply, snarl_org:get(Org), State};
+
+message({org, set, Org, Attribute, Value}, State) when
+      is_binary(Org) ->
+    {reply,
+     snarl_org:set(Org, Attribute, Value),
+     State};
+
+message({org, set, Org, Attributes}, State) when
+      is_binary(Org) ->
+    {reply,
+     snarl_org:set(Org, Attributes),
+     State};
+
+message({org, add, Org}, State) ->
+    {reply, snarl_org:add(Org), State};
+
+message({org, delete, Org}, State) ->
+    {reply, snarl_org:delete(Org), State};
+
+message({org, trigger, add, Org, Trigger}, State) ->
+    {reply, snarl_org:add_trigger(Org, Trigger), State};
+
+message({org, trigger, remove, Org, Trigger}, State) ->
+    {reply, snarl_org:remove_trigger(Org, Trigger), State};
+
+message({org, trigger, execute, Org, Event, Payload}, State) ->
+    {reply, snarl_org:trigger(Org, Event, Payload), State};
+
+%%%===================================================================
+%%% User Functions
+%%%===================================================================
+
 message({user, list}, State) ->
     {reply, snarl_user:list(), State};
+
+message({user, list, Requirements}, State) ->
+    {reply, snarl_user:list(Requirements), State};
 
 message({user, get, {token, Token}}, State) ->
     case snarl_token:get(Token) of
@@ -37,6 +84,30 @@ message({user, get, User}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:get(User),
+     State};
+
+message({user, keys, find, KeyID}, State) when
+      is_binary(KeyID) ->
+    {reply,
+     snarl_user:find_key(KeyID),
+     State};
+
+message({user, keys, get, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:keys(User),
+     State};
+
+message({user, keys, add, User, KeyId, Key}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add_key(User, KeyId, Key),
+     State};
+
+message({user, keys, revoke, User, KeyId}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:revoke_key(User, KeyId),
      State};
 
 message({user, set, User, Attribute, Value}, State) when
@@ -74,6 +145,12 @@ message({user, add, User}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:add(User),
+     State};
+
+message({user, add, Creator, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add(Creator, User),
      State};
 
 message({user, auth, User, Pass}, State) when
@@ -145,6 +222,32 @@ message({token, delete, Token}, State) when
       is_binary(Token) ->
     {reply, snarl_token:delete(Token), State};
 
+message({user, org, get, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:orgs(User),
+     State};
+
+message({user, org, active, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:active(User),
+     State};
+
+message({user, org, join, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:join_org(User, Org), State};
+
+message({user, org, leave, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:leave_org(User, Org), State};
+
+message({user, org, select, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:select_org(User, Org), State};
 
 %%%===================================================================
 %%% Group Functions
@@ -152,6 +255,9 @@ message({token, delete, Token}, State) when
 
 message({group, list}, State) ->
     {reply, snarl_group:list(), State};
+
+message({group, list, Requirements}, State) ->
+    {reply, snarl_group:list(Requirements), State};
 
 message({group, get, Group}, State) ->
     {reply, snarl_group:get(Group), State};

@@ -27,42 +27,72 @@
 -define(DEFAULT_TIMEOUT, 10000).
 
 -record(resource_claim,
-        {id :: fifo:uuid(),
-         ammount :: number()}).
+        {id                :: fifo:uuid(),
+         ammount           :: number()}).
 
 -record(resource,
-        {name :: fifo:resource_id(),
-         granted = 0:: number(),
-         claims = [] :: [fifo:resource_claim()],
+        {name              :: fifo:resource_id(),
+         granted = 0       :: number(),
+         claims = []       :: [fifo:resource_claim()],
          reservations = [] :: [fifo:reservation()]}).
 
 -record(snarl_obj, {val    :: val(),
                     vclock :: vclock:vclock()}).
 
--type val() ::  statebox:statebox().
+-type val()                ::  statebox:statebox().
 
--type snarl_obj() :: #snarl_obj{} | not_found.
+-type snarl_obj()          :: #snarl_obj{} | not_found.
 
--type idx_node() :: {integer(), node()}.
+-type idx_node()           :: {integer(), node()}.
 
--type vnode_reply() :: {idx_node(), snarl_obj() | not_found}.
+-type vnode_reply()        :: {idx_node(), snarl_obj() | not_found}.
 
 
 -record(user_0_1_0, {
-          uuid :: vlwwregister:vlwwregister(),
-          name :: vlwwregister:vlwwregister(),
-          password :: vlwwregister:vlwwregister(),
-          permissions :: vorsetg:vorsetg(),
-          groups :: vorsetg:vorsetg(),
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          password         :: vlwwregister:vlwwregister(),
+          permissions      :: vorsetg:vorsetg(),
+          groups           :: vorsetg:vorsetg(),
+          metadata
+         }).
+
+-record(user_0_1_1, {
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          password         :: vlwwregister:vlwwregister(),
+          permissions      :: vorsetg:vorsetg(),
+          groups           :: vorsetg:vorsetg(),
+          ssh_keys         :: vorsetg:vorsetg(),
+          metadata
+         }).
+
+-record(user_0_1_2, {
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          password         :: vlwwregister:vlwwregister(),
+          active_org       :: vlwwregister:vlwwregister(),
+          permissions      :: vorsetg:vorsetg(),
+          groups           :: vorsetg:vorsetg(),
+          ssh_keys         :: vorsetg:vorsetg(),
+          orgs             :: vorsetg:vorsetg(),
           metadata
          }).
 
 -record(group_0_1_0, {
-          uuid :: vlwwregister:vlwwregister(),
-          name :: vlwwregister:vlwwregister(),
-          permissions :: vorsetg:vorsetg(),
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          permissions      :: vorsetg:vorsetg(),
           metadata
          }).
 
--define(USER, user_0_1_0).
+-record(organisation_0_1_0, {
+          uuid             :: vlwwregister:vlwwregister(),
+          name             :: vlwwregister:vlwwregister(),
+          triggers         :: vorsetg:vorsetg(),
+          metadata
+         }).
+
+-define(USER, user_0_1_2).
 -define(GROUP, group_0_1_0).
+-define(ORG, organisation_0_1_0).

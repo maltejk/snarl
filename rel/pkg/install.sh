@@ -2,7 +2,7 @@
 
 USER=snarl
 GROUP=$USER
-DBID=1
+DBID=2
 BACKUP_FILE=/var/db/snarl/backup_$DBID.tar.gz
 
 case $2 in
@@ -21,16 +21,6 @@ case $2 in
 	    echo Creating snarl user ...
 	    useradd -g $GROUP -d /var/db/snarl -s /bin/false $USER
 	fi
-    if [ ! -f $BACKUP_FILE -a -d /var/db/snarl/ring ]
-    then
-        echo "############################################################"
-        echo "# This release introduces a update in the Database!        #"
-        echo "# To ensure a a fallback option a backup file if the       #"
-        echo "# database is created                                      #"
-        echo "############################################################"
-        echo $BACKUP_FILE
-        tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
-    fi
 	echo Creating directories ...
 	mkdir -p /var/db/snarl/ring
 	mkdir -p /var/db/snarl/users
@@ -38,6 +28,19 @@ case $2 in
 	chown -R snarl:snarl /var/db/snarl
 	mkdir -p /var/log/snarl/sasl
 	chown -R snarl:snarl /var/log/snarl
+    if [ -d /var/db/snarl/0 ]
+        then
+        if [ ! -f $BACKUP_FILE ]
+        then
+            echo "############################################################"
+            echo "# This release introduces a update in the Database!        #"
+            echo "# To ensure a a fallback option a backup file if the       #"
+            echo "# database is created                                      #"
+            echo "############################################################"
+            echo $BACKUP_FILE
+            tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
+        fi
+    fi
 	;;
     POST-INSTALL)
 	if svcs svc:/network/snarl:default > /dev/null 2>&1

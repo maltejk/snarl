@@ -21,6 +21,8 @@
          password/1, password/3,
          permissions/1, grant/3, revoke/3, revoke_prefix/3,
          groups/1, join/3, leave/3,
+         join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
+         add_key/4, revoke_key/3, keys/1,
          metadata/1, set_metadata/3,
          merge/2,
          to_json/1,
@@ -37,7 +39,9 @@
               password/1, password/3,
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
               groups/1, join/3, leave/3,
+              add_key/4, revoke_key/3, keys/1,
               metadata/1, set_metadata/3,
+              join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
               merge/2,
               to_json/1,
               expire/2,
@@ -45,8 +49,71 @@
               gcable/1
              ]).
 
+join_org(ID, Org, User) ->
+    User#?USER{
+            orgs =
+                vorsetg:add(ID, Org, User#?USER.orgs)
+           }.
+
+leave_org(ID, Org, User) ->
+    User#?USER{
+            orgs =
+                vorsetg:remove(ID, Org, User#?USER.orgs)
+           }.
+
+select_org(_, Org, User) ->
+    User#?USER{
+            active_org = vlwwregister:assign(Org,
+                                             User#?USER.active_org)
+           }.
+
+orgs(User) ->
+    vorsetg:value(User#?USER.orgs).
+
+active_org(User) ->
+    vlwwregister:value(User#?USER.active_org).
+
 load(#?USER{} = User) ->
     User;
+
+load(#user_0_1_0{
+        uuid = UUID,
+        name = Name,
+        password = Passwd,
+        permissions = Permissions,
+        groups = Groups,
+        metadata = Metadata
+       }) ->
+    Size = ?ENV(user_bucket_size, 50),
+    load(#user_0_1_1{
+            uuid = UUID,
+            name = Name,
+            password = Passwd,
+            permissions = Permissions,
+            groups = Groups,
+            ssh_keys = vorsetg:new(Size),
+            metadata = Metadata});
+
+load(#user_0_1_1{
+        uuid = UUID,
+        name = Name,
+        password = Passwd,
+        permissions = Permissions,
+        groups = Groups,
+        ssh_keys = Keys,
+        metadata = Metadata
+       }) ->
+    Size = ?ENV(user_bucket_size, 50),
+    load(#user_0_1_2{
+            uuid = UUID,
+            name = Name,
+            password = Passwd,
+            permissions = Permissions,
+            active_org = vlwwregister:new(<<"">>),
+            groups = Groups,
+            ssh_keys = Keys,
+            orgs = vorsetg:new(Size),
+            metadata = Metadata});
 
 load(UserSB) ->
     Size = ?ENV(user_bucket_size, 50),
@@ -66,32 +133,40 @@ load(UserSB) ->
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
                     end, vorsetg:new(Size), Permissions0),
-    #?USER{
-        uuid = vlwwregister:new(UUID),
-        name = vlwwregister:new(Name),
-        password = vlwwregister:new(Password),
-        groups = Groups,
-        permissions = Permissions,
-        metadata = statebox:new(fun() -> Metadata end)
-       }.
+    load(#user_0_1_0{
+            uuid = vlwwregister:new(UUID),
+            name = vlwwregister:new(Name),
+            password = vlwwregister:new(Password),
+            groups = Groups,
+            permissions = Permissions,
+            metadata = statebox:new(fun() -> Metadata end)}).
 
 gcable(#?USER{
            permissions = Permissions,
-           groups = Groups
+           groups = Groups,
+           ssh_keys = Keys,
+           orgs = Orgs
           }) ->
-    {vorsetg:gcable(Permissions), vorsetg:gcable(Groups)}.
+    {vorsetg:gcable(Permissions), vorsetg:gcable(Groups),
+     vorsetg:gcable(Keys), vorsetg:gcable(Orgs)}.
 
 gc(_ID,
-   {Ps, Gs},
+   {Ps, Gs, Ks, Os},
    #?USER{
        permissions = Permissions,
-       groups = Groups
+       groups = Groups,
+       ssh_keys = Keys,
+       orgs = Orgs
       } = User) ->
     Ps1 = lists:foldl(fun vorsetg:gc/2, Permissions, Ps),
     Gs1 = lists:foldl(fun vorsetg:gc/2, Groups, Gs),
+    Ks1 = lists:foldl(fun vorsetg:gc/2, Keys, Ks),
+    Os1 = lists:foldl(fun vorsetg:gc/2, Orgs, Os),
     User#?USER{
             permissions = Ps1,
-            groups = Gs1
+            groups = Gs1,
+            ssh_keys = Ks1,
+            orgs = Os1
            }.
 
 new() ->
@@ -100,36 +175,46 @@ new() ->
         uuid = vlwwregister:new(<<>>),
         name = vlwwregister:new(<<>>),
         password = vlwwregister:new(<<>>),
+        active_org = vlwwregister:new(<<>>),
         groups = vorsetg:new(Size),
         permissions = vorsetg:new(Size),
+        ssh_keys = vorsetg:new(Size),
+        orgs = vorsetg:new(Size),
         metadata = statebox:new(fun jsxd:new/0)
        }.
 
 to_json(#?USER{
             uuid = UUID,
             name = Name,
-            password = Password,
             groups = Groups,
+            ssh_keys = Keys,
             permissions = Permissions,
+            active_org = Org,
+            orgs = Orgs,
             metadata = Metadata
            }) ->
     jsxd:from_list(
       [
        {<<"uuid">>, vlwwregister:value(UUID)},
        {<<"name">>, vlwwregister:value(Name)},
-       {<<"password">>, vlwwregister:value(Password)},
        {<<"groups">>, vorsetg:value(Groups)},
        {<<"permissions">>, vorsetg:value(Permissions)},
+       {<<"keys">>, vorsetg:value(Keys)},
+       {<<"org">>, vlwwregister:value(Org)},
+       {<<"orgs">>, vorsetg:value(Orgs)},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
 merge(#?USER{
-            uuid = UUID1,
-            name = Name1,
-            password = Password1,
-            groups = Groups1,
-            permissions = Permissions1,
-            metadata = Metadata1
+          uuid = UUID1,
+          name = Name1,
+          password = Password1,
+          groups = Groups1,
+          permissions = Permissions1,
+          ssh_keys = Keys1,
+          active_org = Org1,
+          orgs = Orgs1,
+          metadata = Metadata1
          },
       #?USER{
           uuid = UUID2,
@@ -137,16 +222,42 @@ merge(#?USER{
           password = Password2,
           groups = Groups2,
           permissions = Permissions2,
+          ssh_keys = Keys2,
+          active_org = Org2,
+          orgs = Orgs2,
           metadata = Metadata2
          }) ->
     #?USER{
         uuid = vlwwregister:merge(UUID1, UUID2),
         name = vlwwregister:merge(Name1, Name2),
         password = vlwwregister:merge(Password1, Password2),
+        active_org = vlwwregister:merge(Org1, Org2),
         groups = vorsetg:merge(Groups1, Groups2),
+        ssh_keys = vorsetg:merge(Keys1, Keys2),
         permissions = vorsetg:merge(Permissions1, Permissions2),
+        orgs = vorsetg:merge(Orgs1, Orgs2),
         metadata = statebox:merge([Metadata1, Metadata2])
        }.
+
+add_key(ID, KeyID, Key, User) ->
+    User#?USER{
+            ssh_keys =
+                vorsetg:add(ID, {KeyID, Key}, User#?USER.ssh_keys)
+           }.
+
+revoke_key(ID, KeyID, User) ->
+    case lists:keyfind(KeyID, 1, keys(User)) of
+        false ->
+            User;
+        Tpl ->
+            User#?USER{
+                    ssh_keys =
+                        vorsetg:remove(ID, Tpl, User#?USER.ssh_keys)
+                   }
+    end.
+
+keys(User) ->
+    vorsetg:value(User#?USER.ssh_keys).
 
 name(User) ->
     vlwwregister:value(User#?USER.name).
@@ -167,10 +278,9 @@ uuid(_, UUID, User) ->
 password(User) ->
     vlwwregister:value(User#?USER.password).
 
-password(_, Password, User) ->
-    Name = name(User),
+password(_, Hash, User) ->
     User#?USER{
-            password = vlwwregister:assign(crypto:sha([Name, Password]),
+            password = vlwwregister:assign(Hash,
                                            User#?USER.password)
            }.
 
@@ -252,9 +362,11 @@ mkid() ->
 to_json_test() ->
     User = new(),
     UserJ = [{<<"groups">>,[]},
+             {<<"keys">>,[]},
              {<<"metadata">>,[]},
              {<<"name">>,<<>>},
-             {<<"password">>,<<>>},
+             {<<"org">>,<<>>},
+             {<<"orgs">>,[]},
              {<<"permissions">>,[]},
              {<<"uuid">>,<<>>}],
     ?assertEqual(UserJ, to_json(User)).
@@ -271,11 +383,10 @@ name_test() ->
 password_test() ->
     Name = "Test",
     Password = "Test",
-    Hash = crypto:sha([Name, Password]),
     User0 = new(),
     User1 = name(mkid(), Name, User0),
     User2 = password(mkid(), Password, User1),
-    ?assertEqual(Hash, password(User2)).
+    ?assertEqual(Password, password(User2)).
 
 permissions_test() ->
     P0 = [<<"P0">>],
