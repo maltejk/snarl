@@ -121,9 +121,9 @@ import(Org, Data) ->
                     {ok, Org::fifo:org()}.
 
 lookup(OrgName) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_org_vnode, snarl_org},
-                  lookup, OrgName),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {lookup, OrgName}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -197,17 +197,16 @@ get_(Org) ->
                 {error, timeout}.
 
 list() ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_org_vnode, snarl_org},
-      list
-     ).
+    snarl_coverage:start(
+      snarl_org_vnode_master, snarl_org,
+      list).
 
 -spec list(Reqs::[fifo:matcher()]) ->
                   {ok, [IPR::fifo:group_id()]} | {error, timeout}.
 list(Requirements) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                 {snarl_org_vnode, snarl_org},
-                  list, Requirements),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 

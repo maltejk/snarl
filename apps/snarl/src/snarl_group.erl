@@ -50,9 +50,9 @@ lookup(Group) ->
                      {error, timeout} |
                      {ok, Group::#?GROUP{}}.
 lookup_(Group) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_group_vnode, snarl_group},
-                  lookup, Group),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_group_vnode_master, snarl_group,
+                  {lookup, Group}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -127,17 +127,17 @@ get_(Group) ->
                 {error, timeout}.
 
 list() ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_group_vnode, snarl_group},
-      list
-     ).
+    snarl_coverage:start(
+      snarl_group_vnode_master, snarl_group,
+      list).
+
 
 -spec list(Reqs::[fifo:matcher()]) ->
                   {ok, [IPR::fifo:group_id()]} | {error, timeout}.
 list(Requirements) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_group_vnode, snarl_group},
-                  list, Requirements),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_group_vnode_master, snarl_group,
+                  {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 

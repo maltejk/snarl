@@ -56,9 +56,9 @@ ping() ->
                       {error, timeout} |
                       {ok, User::fifo:user_id()}.
 find_key(KeyID) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  find_key, KeyID),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {find_key, KeyID}),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->
@@ -134,9 +134,9 @@ lookup(User) ->
                      {error, timeout} |
                      {ok, User::#?USER{}}.
 lookup_(User) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  lookup, User),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {lookup, User}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -284,17 +284,16 @@ get_(User) ->
                   {error, timeout} |
                   {ok, Users::[fifo:user_id()]}.
 list() ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      list
-     ).
+    snarl_coverage:start(
+      snarl_user_vnode_master, snarl_user,
+      list).
 
 -spec list(Reqs::[fifo:matcher()]) ->
                   {ok, [IPR::fifo:user_id()]} | {error, timeout}.
 list(Requirements) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  list, Requirements),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
