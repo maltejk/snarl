@@ -303,7 +303,7 @@ delete(State) ->
     snarl_db:transact(State#state.db, Trans),
     {ok, State}.
 
-handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
+handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
     Res = snarl_db:fold(State#state.db,
                         <<"org">>,
                         fun (UUID, #snarl_obj{val=G0}, not_found) ->
@@ -321,7 +321,7 @@ handle_coverage({lookup, ReqID, Name}, _KeySpaces, _Sender, State) ->
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
-handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
+handle_coverage(list, _KeySpaces, {_, ReqID, _}, State) ->
     List = snarl_db:fold(State#state.db,
                          <<"org">>,
                          fun (K, _, L) ->
@@ -331,7 +331,7 @@ handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
      {ok, ReqID, {State#state.partition,State#state.node}, List},
      State};
 
-handle_coverage({list, ReqID, Requirements}, _KeySpaces, _Sender, State) ->
+handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
     Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
                      snarl_org_state:uuid(snarl_org_state:load(S0))
              end,
