@@ -20,10 +20,7 @@
          handle_exit/3]).
 
 %% Reads
--export([list/2,
-         list/3,
-         lookup/3,
-         get/3]).
+-export([get/3]).
 
 %% Writes
 -export([add/4,
@@ -38,9 +35,6 @@
 
 -ignore_xref([
               start_vnode/1,
-              lookup/3,
-              list/2,
-              list/3,
               gc/4,
               get/3,
               add/4,
@@ -81,31 +75,6 @@ get(Preflist, ReqID, Group) ->
                                    {get, ReqID, Group},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-
-list(Preflist, ReqID) ->
-    riak_core_vnode_master:coverage(
-      {list, ReqID},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
-list(Preflist, ReqID, Requirements) ->
-    riak_core_vnode_master:coverage(
-      {list, ReqID, Requirements},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
-lookup(Preflist, ReqID, Name) ->
-    riak_core_vnode_master:coverage(
-      {lookup, ReqID, Name},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
 
 %%%===================================================================
 %%% API - writes
