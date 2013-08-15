@@ -20,11 +20,6 @@
 
 %% Reads
 -export([
-         list/2,
-         list/3,
-         lookup/3,
-         auth/3,
-         find_key/3,
          get/3
         ]).
 
@@ -47,7 +42,6 @@
 -ignore_xref([
               add/4,
               add_key/4,
-              auth/3,
               find_key/3,
               delete/3,
               gc/4,
@@ -97,45 +91,6 @@ get(Preflist, ReqID, User) ->
                                    {get, ReqID, User},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-list(Preflist, ReqID) ->
-    riak_core_vnode_master:coverage(
-      {list, ReqID},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
-list(Preflist, ReqID, Requirements) ->
-    riak_core_vnode_master:coverage(
-      {list, ReqID, Requirements},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
-auth(Preflist, ReqID, Hash) ->
-    riak_core_vnode_master:coverage(
-      {auth, ReqID, Hash},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
-find_key(Preflist, ReqID, KeyID) ->
-    riak_core_vnode_master:coverage(
-      {find_key, ReqID, KeyID},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
-
-lookup(Preflist, ReqID, Name) ->
-    riak_core_vnode_master:coverage(
-      {lookup, ReqID, Name},
-      Preflist,
-      all,
-      {fsm, undefined, self()},
-      ?MASTER).
 
 %%%===================================================================
 %%% API - writes
