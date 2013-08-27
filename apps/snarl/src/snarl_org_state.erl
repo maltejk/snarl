@@ -188,12 +188,16 @@ metadata(Org) ->
 
 set_metadata(Attribute, delete, Org) ->
     Org#?ORG{
-           metadata = jsxd:delete(Attribute, Org#?ORG.metadata)
+           metadata =
+               statebox:modify({fun jsxd:delete/2,
+                                [Attribute]}, Org#?ORG.metadata)
           };
 
 set_metadata(Attribute, Value, Org) ->
     Org#?ORG{
-           metadata = jsxd:set(Attribute, Value, Org#?ORG.metadata)
+           metadata =
+               statebox:modify({fun jsxd:set/3,
+                                [Attribute, Value]}, Org#?ORG.metadata)
           }.
 
 expire(Timeout, Org) ->
