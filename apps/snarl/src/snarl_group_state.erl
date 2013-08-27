@@ -171,12 +171,17 @@ metadata(Group) ->
 
 set_metadata(Attribute, delete, Group) ->
     Group#?GROUP{
-             metadata = jsxd:delete(Attribute, Group#?GROUP.metadata)
+             metadata =
+                 statebox:modify({fun jsxd:delete/2,
+                                  [Attribute]}, Group#?GROUP.metadata)
             };
 
 set_metadata(Attribute, Value, Group) ->
     Group#?GROUP{
-             metadata = jsxd:set(Attribute, Value, Group#?GROUP.metadata)
+             metadata =
+                 statebox:modify({fun jsxd:set/3,
+                                  [Attribute, Value]}, Group#?GROUP.metadata)
+
             }.
 
 expire(Timeout, Group) ->
