@@ -44,7 +44,7 @@
     <exec_method
       type='method'
       name='start'
-      exec='/opt/local/snarl/bin/snarl %m'
+      exec='/opt/local/fifo-snarl/bin/snarl %m'
       timeout_seconds='30'>
       <method_context>
 	<method_credential user='snarl' group='snarl' />
@@ -58,7 +58,7 @@
     <exec_method
 	name='restart'
 	type='method'
-        exec='/opt/local/snarl/bin/snarl %m'
+        exec='/opt/local/fifo-snarl/bin/snarl %m'
 	timeout_seconds='60'>
       <method_context>
 	<method_credential user='snarl' group='snarl' />
@@ -72,7 +72,7 @@
     <exec_method
 	name='stop'
 	type='method'
-        exec='/opt/local/snarl/bin/snarl %m'
+        exec='/opt/local/fifo-snarl/bin/snarl %m'
 	timeout_seconds='60'>
       <method_context>
 	<method_credential user='snarl' group='snarl' />
