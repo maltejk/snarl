@@ -1,5 +1,5 @@
 VERSION=0.4.2
-COMPONENT=snarl
+COMPONENT=fifo-snarl
 
 .PHONY: build_info package package_list
 
