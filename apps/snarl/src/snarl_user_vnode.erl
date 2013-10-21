@@ -409,15 +409,15 @@ handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
                      snarl_user_state:uuid(snarl_user_state:load(S0))
              end,
     List = snarl_db:fold(State#state.db,
-                           <<"user">>,
-                           fun (Key, E, C) ->
-                                   case rankmatcher:match(E, Getter, Requirements) of
-                                       false ->
-                                           C;
-                                       Pts ->
-                                           [{Pts, Key} | C]
-                                   end
-                           end, []),
+                         <<"user">>,
+                         fun (Key, E, C) ->
+                                 case rankmatcher:match(E, Getter, Requirements) of
+                                     false ->
+                                         C;
+                                     Pts ->
+                                         [{Pts, Key} | C]
+                                 end
+                         end, []),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, List},
      State};

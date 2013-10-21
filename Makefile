@@ -28,6 +28,7 @@ test: all
 	$(REBAR) skip_deps=true eunit
 
 rel: all zabbix
+	-rm -r rel/snarl/share
 	$(REBAR) generate
 
 relclean:
