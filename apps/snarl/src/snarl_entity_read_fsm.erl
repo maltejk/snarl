@@ -210,9 +210,9 @@ wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
 finalize(timeout, SD=#state{
-                    vnode=VNode,
-                    replies=Replies,
-                    entity=Entity}) ->
+                        vnode=VNode,
+                        replies=Replies,
+                        entity=Entity}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
@@ -309,7 +309,7 @@ unique(L) ->
 
 mk_reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
-	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 stat_name(snarl_user_vnode) ->
     "user";
