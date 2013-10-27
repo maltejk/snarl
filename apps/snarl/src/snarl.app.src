@@ -8,7 +8,7 @@
                   kernel,
                   stdlib,
                   riak_core,
-                  hanoidb,
+                  fifo_db,
                   mdns_server_lib,
                   lager,
                   libsnarlmatch,

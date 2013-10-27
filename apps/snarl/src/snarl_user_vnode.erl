@@ -199,7 +199,7 @@ revoke_prefix(Preflist, ReqID, User, Val) ->
 %%%===================================================================
 init([Partition]) ->
     DB = list_to_atom(integer_to_list(Partition)),
-    snarl_db:start(DB),
+    fifo_db:start(DB),
     {ok, #state {db = DB, node = node(), partition = Partition}}.
 
 %% Sample command: respond to a ping
@@ -208,19 +208,19 @@ handle_command(ping, _Sender, State) ->
 
 handle_command({repair, User, _VClock, #snarl_obj{val = V} = Obj},
                _Sender, State) ->
-    case snarl_db:get(State#state.db, <<"user">>, User) of
+    case fifo_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val = V0}} ->
             V1 = snarl_user_state:load(V0),
-            snarl_db:put(State#state.db, <<"user">>, User,
+            fifo_db:put(State#state.db, <<"user">>, User,
                          Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
         not_found ->
-            snarl_db:put(State#state.db, <<"user">>, User, Obj)
+            fifo_db:put(State#state.db, <<"user">>, User, Obj)
     end,
     {noreply, State};
 
 
 handle_command({get, ReqID, User}, _Sender, State) ->
-    Res = case snarl_db:get(State#state.db, <<"user">>, User) of
+    Res = case fifo_db:get(State#state.db, <<"user">>, User) of
               {ok, #snarl_obj{val = V0} = R} ->
                   R#snarl_obj{val = snarl_user_state:load(V0)};
               not_found ->
@@ -237,11 +237,11 @@ handle_command({add, {ReqID, Coordinator} = ID, UUID, User}, _Sender, State) ->
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User3, vclock=VC},
-    snarl_db:put(State#state.db, <<"user">>, UUID, UserObj),
+    fifo_db:put(State#state.db, <<"user">>, UUID, UserObj),
     {reply, {ok, ReqID}, State};
 
 handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, State) ->
-    snarl_db:delete(State#state.db, <<"user">>, User),
+    fifo_db:delete(State#state.db, <<"user">>, User),
     {reply, {ok, ReqID}, State};
 
 handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, State) ->
@@ -253,7 +253,7 @@ handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, Stat
     end;
 
 handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
-    case snarl_db:get(State#state.db, <<"user">>, User) of
+    case fifo_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val=H0} = O} ->
             H1 = snarl_user_state:load(H0),
             H2 = lists:foldr(
@@ -261,7 +261,7 @@ handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
                            snarl_user_state:set_metadata(Attribute, Value, H)
                    end, H1, Attributes),
             H3 = snarl_user_state:expire(?STATEBOX_EXPIRE, H2),
-            snarl_db:put(State#state.db, <<"user">>, User,
+            fifo_db:put(State#state.db, <<"user">>, User,
                          snarl_obj:update(H3, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
@@ -272,16 +272,16 @@ handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
 handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender, State) ->
     H1 = snarl_user_state:load(Data),
     H2 = snarl_user_state:uuid(ID, UUID, H1),
-    case snarl_db:get(State#state.db, <<"user">>, UUID) of
+    case fifo_db:get(State#state.db, <<"user">>, UUID) of
         {ok, O} ->
-            snarl_db:put(State#state.db, <<"user">>, UUID,
+            fifo_db:put(State#state.db, <<"user">>, UUID,
                          snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         _R ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(Coordinator, VC0),
             UserObj = #snarl_obj{val=H2, vclock=VC},
-            snarl_db:put(State#state.db, <<"user">>, UUID, UserObj),
+            fifo_db:put(State#state.db, <<"user">>, UUID, UserObj),
             {reply, {ok, ReqID}, State}
     end;
 
@@ -296,7 +296,7 @@ handle_command(Message, _Sender, State) ->
     {noreply, State}.
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = snarl_db:fold(State#state.db, <<"user">>, Fun, Acc0),
+    Acc = fifo_db:fold(State#state.db, <<"user">>, Fun, Acc0),
     {reply, Acc, State};
 
 handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
@@ -324,16 +324,16 @@ handoff_finished(_TargetNode, State) ->
 handle_handoff_data(Data, State) ->
     {User, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
     V = snarl_user_state:load(Vin),
-    case snarl_db:get(State#state.db, <<"user">>, User) of
+    case fifo_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val = V0}} ->
             V1 = snarl_user_state:load(V0),
-            snarl_db:put(State#state.db, <<"user">>, User,
+            fifo_db:put(State#state.db, <<"user">>, User,
                          Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
         not_found ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(node(), VC0),
             UserObj = #snarl_obj{val=V, vclock=VC},
-            snarl_db:put(State#state.db, <<"user">>, User, UserObj)
+            fifo_db:put(State#state.db, <<"user">>, User, UserObj)
     end,
     {reply, ok, State}.
 
@@ -341,23 +341,23 @@ encode_handoff_item(User, Data) ->
     term_to_binary({User, Data}).
 
 is_empty(State) ->
-    snarl_db:fold(State#state.db,
+    fifo_db:fold(State#state.db,
                   <<"user">>,
                   fun (_,_, _) ->
                           {false, State}
                   end, {true, State}).
 
 delete(State) ->
-    Trans = snarl_db:fold(State#state.db,
+    Trans = fifo_db:fold(State#state.db,
                           <<"user">>,
                           fun (K,_, A) ->
                                   [{delete, <<"user", K/binary>>} | A]
                           end, []),
-    snarl_db:transact(State#state.db, Trans),
+    fifo_db:transact(State#state.db, Trans),
     {ok, State}.
 
 handle_coverage({find_key, KeyID}, _KeySpaces, {_, ReqID, _}, State) ->
-    Res = snarl_db:fold(State#state.db,
+    Res = fifo_db:fold(State#state.db,
                         <<"user">>,
                         fun (UUID, #snarl_obj{val=U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
@@ -377,7 +377,7 @@ handle_coverage({find_key, KeyID}, _KeySpaces, {_, ReqID, _}, State) ->
      State};
 
 handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
-    Res = snarl_db:fold(State#state.db,
+    Res = fifo_db:fold(State#state.db,
                         <<"user">>,
                         fun (UUID, #snarl_obj{val = U0}, not_found) ->
                                 U1 = snarl_user_state:load(U0),
@@ -395,7 +395,7 @@ handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
      State};
 
 handle_coverage(list, _KeySpaces, {_, ReqID, _}, State) ->
-    List = snarl_db:fold(State#state.db,
+    List = fifo_db:fold(State#state.db,
                          <<"user">>,
                          fun (K, _, L) ->
                                  [K|L]
@@ -408,7 +408,7 @@ handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
     Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
                      snarl_user_state:uuid(snarl_user_state:load(S0))
              end,
-    List = snarl_db:fold(State#state.db,
+    List = fifo_db:fold(State#state.db,
                          <<"user">>,
                          fun (Key, E, C) ->
                                  case rankmatcher:match(E, Getter, Requirements) of
@@ -433,7 +433,7 @@ terminate(_Reason, _State) ->
     ok.
 
 change_user(User, Action, Vals, Coordinator, State, ReqID) ->
-    case snarl_db:get(State#state.db, <<"user">>, User) of
+    case fifo_db:get(State#state.db, <<"user">>, User) of
         {ok, #snarl_obj{val=H0} = O} ->
             H1 = snarl_user_state:load(H0),
             ID = {ReqID, Coordinator},
@@ -443,7 +443,7 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
                      [Val1, Val2] ->
                          snarl_user_state:Action(ID, Val1, Val2, H1)
                  end,
-            snarl_db:put(State#state.db, <<"user">>, User,
+            fifo_db:put(State#state.db, <<"user">>, User,
                          snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
