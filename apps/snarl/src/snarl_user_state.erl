@@ -13,14 +13,6 @@
 -include_lib("eunit/include/eunit.hrl").
 -endif.
 
--define(NEW_LWW(V), riak_dt_lwwreg:update({assign, V}, none,
-                                          riak_dt_lwwreg:new())).
-
--define(CONVERT_VORSET(S),
-        riak_dt_orswot:update(
-          {add_all, riak_dt_orswot:value(S)}, none,
-          riak_dt_orswot:new())).
-
 -export([
          new/0,
          load/1,
@@ -52,25 +44,6 @@
               to_json/1,
               expire/2
              ]).
-
-join_org(ID, Org, User) ->
-    {ok, O1} = riak_dt_orswot:update({add, Org}, ID, User#?USER.orgs),
-    User#?USER{orgs = O1}.
-
-leave_org(ID, Org, User) ->
-    {ok, O1} = riak_dt_orswot:update({remove, Org}, ID, User#?USER.orgs),
-    User#?USER{orgs = O1}.
-
-select_org(_, Org, User) ->
-    {ok, O1} = riak_dt_lwwreg:update({assign, Org}, none, User#?USER.active_org),
-    User#?USER{active_org = O1}.
-
-orgs(User) ->
-    riak_dt_orswot:value(User#?USER.orgs).
-
-active_org(User) ->
-    riak_dt_lwwreg:value(User#?USER.active_org).
-
 
 load(#?USER{} = User) ->
     User;
@@ -124,7 +97,8 @@ load(#user_0_1_1{
             groups = Groups,
             ssh_keys = Keys,
             orgs = vorsetg:new(Size),
-            metadata = Metadata});
+            metadata = Metadata
+           });
 
 load(#user_0_1_0{
         uuid = UUID,
@@ -242,6 +216,24 @@ merge(#?USER{
         orgs = riak_dt_orswot:merge(Orgs1, Orgs2),
         metadata = statebox:merge([Metadata1, Metadata2])
        }.
+
+join_org(ID, Org, User) ->
+    {ok, O1} = riak_dt_orswot:update({add, Org}, ID, User#?USER.orgs),
+    User#?USER{orgs = O1}.
+
+leave_org(ID, Org, User) ->
+    {ok, O1} = riak_dt_orswot:update({remove, Org}, ID, User#?USER.orgs),
+    User#?USER{orgs = O1}.
+
+select_org(_, Org, User) ->
+    {ok, O1} = riak_dt_lwwreg:update({assign, Org}, none, User#?USER.active_org),
+    User#?USER{active_org = O1}.
+
+orgs(User) ->
+    riak_dt_orswot:value(User#?USER.orgs).
+
+active_org(User) ->
+    riak_dt_lwwreg:value(User#?USER.active_org).
 
 add_key(ID, KeyID, Key, User) ->
     {ok, S1} = riak_dt_orswot:update({add, {KeyID, Key}}, ID, User#?USER.ssh_keys),
