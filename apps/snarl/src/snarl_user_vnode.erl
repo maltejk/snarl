@@ -30,7 +30,6 @@
          repair/4,
          add_key/4,
          delete/3,
-         gc/4,
          grant/4, revoke/4, revoke_prefix/4,
          join/4, leave/4,
          passwd/4,
@@ -44,7 +43,6 @@
               add_key/4,
               find_key/3,
               delete/3,
-              gc/4,
               get/3,
               grant/4,
               import/4,
@@ -101,13 +99,6 @@ add(Preflist, ReqID, UUID, User) ->
                                    {add, ReqID, UUID, User},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-
-gc(Preflist, ReqID, UUID, GCable) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {gc, ReqID, UUID, GCable},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
 
 add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
     riak_core_vnode_master:command(Preflist,

@@ -26,7 +26,6 @@
 -define(SERVER, ?MODULE).
 
 -record(state, {
-          users = [],
           groups = [],
           orgs = [],
           interval = 0,
@@ -34,7 +33,6 @@
           compacted = 0,
           cnt = 0,
           group_timeout,
-          user_timeout,
           org_timeout,
           start = {0,0,0}
          }).
@@ -80,15 +78,12 @@ init([]) ->
             T = 1000 * I,
             lager:warning("[Auto GC] enabled one object every ~ps.", [I]),
             timer:apply_interval(T, ?MODULE, next, []),
-            {UserT, UserU} = env(user_sync_timeout, {1, week}),
             {GroupT, GroupU} = env(group_sync_timeout, {1, week}),
             {OrgT, OrgU} = env(org_sync_timeout, {1, week}),
             {ok, #state{
                     start = os:timestamp(),
                     group_timeout = time_to_us(GroupT,
                                                atom_to_list(GroupU)),
-                    user_timeout = time_to_us(UserT,
-                                              atom_to_list(UserU)),
                     org_timeout = time_to_us(OrgT,
                                               atom_to_list(OrgU))
                    }}
@@ -130,21 +125,18 @@ handle_cast(next, State = #state{
                              start = Start,
                              compacted = C,
                              cnt = Cnt,
-                             users = [],
                              groups = [],
                              orgs = []}) ->
     T0 = os:timestamp(),
     Td = timer:now_diff(T0, Start) / 1000000,
     lager:info("[Auto GC] Run complete in ~ps.", [Td]),
     lager:info("[Auto GC] Saved a total of ~p byte in ~p objects.", [C, Cnt]),
-    {ok, Users} = snarl_user:list(),
     {ok, Groups} = snarl_group:list(),
     {ok, Orgs} = snarl_group:list(),
-    lager:info("[Auto GC] Startign new run wiht ~p Users, ~p Groups and ~p Orgs.",
-               [length(Users), length(Groups), length(Orgs)]),
+    lager:info("[Auto GC] Startign new run wiht ~p Groups and ~p Orgs.",
+               [length(Groups), length(Orgs)]),
     {noreply,
      State#state{
-       users = Users,
        groups = Groups,
        orgs = Orgs,
        start = T0,
@@ -153,36 +145,9 @@ handle_cast(next, State = #state{
       }};
 
 handle_cast(next, State = #state{
-                             user_timeout = Timeout,
-                             compacted = Cpd,
-                             cnt = Cnt,
-                             users = [UUID | Us]}) ->
-    case snarl_user:gcable(UUID) of
-        {ok, {A, B, C, D}} ->
-            MinAge = ecrdt:timestamp_us() - Timeout,
-            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
-            B1 = [E || {{T,_},_} = E <- B, T < MinAge],
-            C1 = [E || {{T,_},_} = E <- C, T < MinAge],
-            D1 = [E || {{T,_},_} = E <- D, T < MinAge],
-            {ok, Size} = snarl_user:gc(UUID, {A1, B1, C1, D1}),
-            {noreply,
-             State#state{
-               users = Us,
-               cnt = Cnt + 1,
-               compacted = Cpd + Size
-              }};
-        _ ->
-            {noreply,
-             State#state{
-               users = Us
-              }}
-    end;
-
-handle_cast(next, State = #state{
-                             user_timeout = Timeout,
                              compacted = C,
                              cnt = Cnt,
-                             users = [],
+                             group_timeout = Timeout,
                              groups = [UUID | Gs]}) ->
     case snarl_group:gcable(UUID) of
         {ok, A} ->
@@ -203,11 +168,10 @@ handle_cast(next, State = #state{
     end;
 
 handle_cast(next, State = #state{
-                             user_timeout = Timeout,
                              compacted = C,
                              cnt = Cnt,
-                             users = [],
                              groups = [],
+                             org_timeout = Timeout,
                              orgs = [UUID | Os]}) ->
     case snarl_org:gcable(UUID) of
         {ok, A} ->
