@@ -98,6 +98,13 @@
           metadata
          }).
 
+-record(group_0_1_1, {
+          uuid             :: riak_dt_lwwreg:lwwreg(),
+          name             :: riak_dt_lwwreg:lwwreg(),
+          permissions      :: riak_dt_orswot:orswot(),
+          metadata
+         }).
+
 -record(organisation_0_1_0, {
           uuid             :: vlwwregister:vlwwregister(),
           name             :: vlwwregister:vlwwregister(),
@@ -105,6 +112,22 @@
           metadata
          }).
 
+-record(organisation_0_1_1, {
+          uuid             :: riak_dt_lwwreg:lwwreg(),
+          name             :: riak_dt_lwwreg:lwwreg(),
+          triggers         :: riak_dt_orswot:orswot(),
+          metadata
+         }).
+
 -define(USER, user_0_1_3).
--define(GROUP, group_0_1_0).
--define(ORG, organisation_0_1_0).
+-define(GROUP, group_0_1_1).
+-define(ORG, organisation_0_1_1).
+
+
+-define(NEW_LWW(V), riak_dt_lwwreg:update({assign, V}, none,
+                                          riak_dt_lwwreg:new())).
+
+-define(CONVERT_VORSET(S),
+        riak_dt_orswot:update(
+          {add_all, riak_dt_orswot:value(S)}, none,
+          riak_dt_orswot:new())).

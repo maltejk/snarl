@@ -26,13 +26,11 @@
 -define(SERVER, ?MODULE).
 
 -record(state, {
-          groups = [],
           orgs = [],
           interval = 0,
           total = 0,
           compacted = 0,
           cnt = 0,
-          group_timeout,
           org_timeout,
           start = {0,0,0}
          }).
@@ -78,12 +76,9 @@ init([]) ->
             T = 1000 * I,
             lager:warning("[Auto GC] enabled one object every ~ps.", [I]),
             timer:apply_interval(T, ?MODULE, next, []),
-            {GroupT, GroupU} = env(group_sync_timeout, {1, week}),
             {OrgT, OrgU} = env(org_sync_timeout, {1, week}),
             {ok, #state{
                     start = os:timestamp(),
-                    group_timeout = time_to_us(GroupT,
-                                               atom_to_list(GroupU)),
                     org_timeout = time_to_us(OrgT,
                                               atom_to_list(OrgU))
                    }}
@@ -125,19 +120,14 @@ handle_cast(next, State = #state{
                              start = Start,
                              compacted = C,
                              cnt = Cnt,
-                             groups = [],
                              orgs = []}) ->
     T0 = os:timestamp(),
     Td = timer:now_diff(T0, Start) / 1000000,
     lager:info("[Auto GC] Run complete in ~ps.", [Td]),
     lager:info("[Auto GC] Saved a total of ~p byte in ~p objects.", [C, Cnt]),
-    {ok, Groups} = snarl_group:list(),
-    {ok, Orgs} = snarl_group:list(),
-    lager:info("[Auto GC] Startign new run wiht ~p Groups and ~p Orgs.",
-               [length(Groups), length(Orgs)]),
+    {ok, Orgs} = snarl_org:list(),
     {noreply,
      State#state{
-       groups = Groups,
        orgs = Orgs,
        start = T0,
        cnt = 0,
@@ -147,30 +137,6 @@ handle_cast(next, State = #state{
 handle_cast(next, State = #state{
                              compacted = C,
                              cnt = Cnt,
-                             group_timeout = Timeout,
-                             groups = [UUID | Gs]}) ->
-    case snarl_group:gcable(UUID) of
-        {ok, A} ->
-            MinAge = ecrdt:timestamp_us() - Timeout,
-            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
-            {ok, Size} = snarl_group:gc(UUID, A1),
-            {noreply,
-             State#state{
-               groups = Gs,
-               cnt = Cnt + 1,
-               compacted = C + Size
-              }};
-        _ ->
-            {noreply,
-             State#state{
-               groups = Gs
-              }}
-    end;
-
-handle_cast(next, State = #state{
-                             compacted = C,
-                             cnt = Cnt,
-                             groups = [],
                              org_timeout = Timeout,
                              orgs = [UUID | Os]}) ->
     case snarl_org:gcable(UUID) of
@@ -187,7 +153,7 @@ handle_cast(next, State = #state{
         _ ->
             {noreply,
              State#state{
-               groups = Os
+               orgs = Os
               }}
     end;
 
