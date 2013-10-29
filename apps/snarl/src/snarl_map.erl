@@ -115,6 +115,9 @@ remove_path([K | Ks], Path, M) ->
             {ok, missing}
     end.
 
+nested_update([], U) ->
+    U;
+
 nested_update([K], U) ->
     [{update, {K, ?MAP}, {update, U}}];
 
@@ -128,7 +131,6 @@ nested_create([K], V) ->
 nested_create([K | Ks], V) ->
     Field = {K, ?MAP},
     [{add, Field}, {update, Field, {update, nested_create(Ks, V)}}].
-
 
 value_(N) when is_number(N) ->
     N;
@@ -161,6 +163,25 @@ nested_set_test() ->
     {ok, M2} = snarl_map:set([o, k], v1, a, M1),
     ?assertEqual(v, snarl_map:get([o, k], M1)),
     ?assertEqual(v1, snarl_map:get([o, k], M2)),
+    ok.
+
+delete_test() ->
+    M = snarl_map:new(),
+    {ok, M1} = snarl_map:set(k, v, a, M),
+    {ok, M2} = snarl_map:set([o, k], v1, a, M1),
+    {ok, M3} = snarl_map:remove(k, a, M2),
+    {ok, M4} = snarl_map:remove(o, a, M2),
+    {ok, M5} = snarl_map:remove([o, k], a, M2),
+    ?assertEqual(v, snarl_map:get(k, M1)),
+    ?assertEqual(v1, snarl_map:get([o, k], M2)),
+    ?assertEqual([{k, v}, {o, [{k, v1}]}],
+                 snarl_map:value(M2)),
+    ?assertEqual([{o, [{k, v1}]}],
+                 snarl_map:value(M3)),
+    ?assertEqual([{k, v}],
+                 snarl_map:value(M4)),
+    ?assertEqual([{k, v}, {o, []}],
+                 snarl_map:value(M5)),
     ok.
 
 -endif.
