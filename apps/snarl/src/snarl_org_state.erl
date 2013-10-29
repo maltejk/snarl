@@ -22,9 +22,7 @@
          metadata/1, set_metadata/3,
          merge/2,
          to_json/1,
-         expire/2,
-         gcable/1,
-         gc/3
+         expire/2
         ]).
 
 -ignore_xref([
@@ -36,38 +34,37 @@
               metadata/1, set_metadata/3,
               merge/2,
               to_json/1,
-              expire/2,
-              gcable/1,
-              gc/3
+              expire/2
              ]).
 
-gcable(#?ORG{
-           triggers = Triggers
-          }) ->
-    vorsetg:gcable(Triggers).
-
-gc(_ID,
-   Ps,
-   #?ORG{
-       triggers = Triggers
-      } = Org) ->
-    Ps1 = lists:foldl(fun vorsetg:gc/2, Triggers, Ps),
-    Org#?ORG{
-           triggers = Ps1
-          }.
-
 new() ->
-    Size = ?ENV(org_bucket_size, 50),
+    {ok, UUID} = ?NEW_LWW(<<>>),
+    {ok, Name} = ?NEW_LWW(<<>>),
     #?ORG{
-        uuid = vlwwregister:new(<<>>),
-        name = vlwwregister:new(<<>>),
-        triggers = vorsetg:new(Size),
+        uuid = UUID,
+        name = Name,
+        triggers = riak_dt_orswot:new(),
         metadata = statebox:new(fun jsxd:new/0)
        }.
 
-
 load(#?ORG{} = Org) ->
     Org;
+
+load(#organisation_0_1_0{
+        uuid = UUID,
+        name = Name,
+        triggers = Triggers,
+        metadata = Meta
+       }) ->
+    {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID)),
+    {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name)),
+    {ok, Triggers1} = ?CONVERT_VORSET(Triggers),
+    load(#organisation_0_1_1{
+            uuid = UUID1,
+            name = Name1,
+            triggers = Triggers1,
+            metadata = Meta
+           });
 
 load(OrgSB) ->
     Size = ?ENV(org_bucket_size, 50),
@@ -126,9 +123,9 @@ to_json(#?ORG{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, vlwwregister:value(UUID)},
-       {<<"name">>, vlwwregister:value(Name)},
-       {<<"triggers">>, [jsonify_trigger(T) || T <- vorsetg:value(Triggers)]},
+       {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
+       {<<"name">>, riak_dt_lwwreg:value(Name)},
+       {<<"triggers">>, [jsonify_trigger(T) || T <- riak_dt_orswot:value(Triggers)]},
        {<<"metadata">>, statebox:value(Metadata)}
       ]).
 
@@ -145,43 +142,37 @@ merge(#?ORG{
           metadata = Metadata2
          }) ->
     #?ORG{
-        uuid = vlwwregister:merge(UUID1, UUID2),
-        name = vlwwregister:merge(Name1, Name2),
-        triggers = vorsetg:merge(Triggers1, Triggers2),
+        uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
+        name = riak_dt_lwwreg:merge(Name1, Name2),
+        triggers = riak_dt_orswot:merge(Triggers1, Triggers2),
         metadata = statebox:merge([Metadata1, Metadata2])
        }.
 
 name(Org) ->
-    vlwwregister:value(Org#?ORG.name).
+    riak_dt_lwwreg:value(Org#?ORG.name).
 
 name(_, Name, Org) ->
-    Org#?ORG{
-           name = vlwwregister:assign(Name, Org#?ORG.name)
-          }.
+    {ok, V} = riak_dt_lwwreg:update({assign,Name}, none, Org#?ORG.name),
+    Org#?ORG{name = V}.
 
 uuid(Org) ->
-    vlwwregister:value(Org#?ORG.uuid).
+    riak_dt_lwwreg:value(Org#?ORG.uuid).
 
 uuid(_, UUID, Org) ->
-    Org#?ORG{
-           uuid = vlwwregister:assign(UUID, Org#?ORG.uuid)
-          }.
+    {ok, V} = riak_dt_lwwreg:update({assign, UUID}, none, Org#?ORG.uuid),
+    Org#?ORG{uuid = V}.
 
 triggers(Org) ->
-    vorsetg:value(Org#?ORG.triggers).
+    riak_dt_orswot:value(Org#?ORG.triggers).
 
 add_trigger(ID, Trigger, Org) ->
-    Org#?ORG{
-           triggers =
-               vorsetg:add(ID, Trigger, Org#?ORG.triggers)
-          }.
+    {ok, V} = riak_dt_orswot:update({add, Trigger}, ID, Org#?ORG.triggers),
+    Org#?ORG{triggers = V}.
 
 
 remove_trigger(ID, Trigger, Org) ->
-    Org#?ORG{
-           triggers =
-               vorsetg:remove(ID, Trigger, Org#?ORG.triggers)
-          }.
+    {ok, V} = riak_dt_orswot:update({remove, Trigger}, ID, Org#?ORG.triggers),
+    Org#?ORG{triggers = V}.
 
 metadata(Org) ->
     Org#?ORG.metadata.

@@ -35,7 +35,6 @@
               to_json/1
              ]).
 
-
 new() ->
     {ok, UUID} = ?NEW_LWW(<<>>),
     {ok, Name} = ?NEW_LWW(<<>>),
@@ -45,7 +44,6 @@ new() ->
         permissions = riak_dt_orswot:new(),
         metadata = statebox:new(fun jsxd:new/0)
        }.
-
 
 load(#?GROUP{} = Group) ->
     Group;

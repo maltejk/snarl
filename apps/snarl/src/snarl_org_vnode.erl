@@ -25,7 +25,6 @@
 %% Writes
 -export([
          add/4,
-         gc/4,
          set/4,
          import/4,
          delete/3,
@@ -35,7 +34,6 @@
 
 -ignore_xref([
               start_vnode/1,
-              gc/4,
               get/3,
               add/4,
               delete/3,
@@ -86,12 +84,6 @@ set(Preflist, ReqID, UUID, Attributes) ->
 import(Preflist, ReqID, UUID, Import) ->
     riak_core_vnode_master:command(Preflist,
                                    {import, ReqID, UUID, Import},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-gc(Preflist, ReqID, UUID, GCable) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {gc, ReqID, UUID, GCable},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
