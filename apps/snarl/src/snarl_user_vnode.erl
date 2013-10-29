@@ -249,11 +249,11 @@ handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
             H1 = snarl_user_state:load(H0),
             H2 = lists:foldr(
                    fun ({Attribute, Value}, H) ->
-                           snarl_user_state:set_metadata(Attribute, Value, H)
+                           snarl_user_state:set_metadata(Coordinator,
+                                                         Attribute, Value, H)
                    end, H1, Attributes),
-            H3 = snarl_user_state:expire(?STATEBOX_EXPIRE, H2),
             fifo_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H3, Coordinator, O)),
+                         snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),

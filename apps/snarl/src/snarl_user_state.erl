@@ -23,10 +23,9 @@
          groups/1, join/3, leave/3,
          join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
          add_key/4, revoke_key/3, keys/1,
-         metadata/1, set_metadata/3,
+         metadata/1, set_metadata/4,
          merge/2,
-         to_json/1,
-         expire/2
+         to_json/1
         ]).
 
 -ignore_xref([
@@ -38,11 +37,10 @@
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
               groups/1, join/3, leave/3,
               add_key/4, revoke_key/3, keys/1,
-              metadata/1, set_metadata/3,
+              metadata/1, set_metadata/4,
               join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
               merge/2,
-              to_json/1,
-              expire/2
+              to_json/1
              ]).
 
 load(#?USER{} = User) ->
@@ -158,7 +156,7 @@ new() ->
         permissions = riak_dt_orswot:new(),
         ssh_keys = riak_dt_orswot:new(),
         orgs = riak_dt_orswot:new(),
-        metadata = statebox:new(fun jsxd:new/0)
+        metadata = snarl_map:new()
        }.
 
 to_json(#?USER{
@@ -180,7 +178,7 @@ to_json(#?USER{
        {<<"keys">>, riak_dt_orswot:value(Keys)},
        {<<"org">>, riak_dt_lwwreg:value(Org)},
        {<<"orgs">>, riak_dt_orswot:value(Orgs)},
-       {<<"metadata">>, statebox:value(Metadata)}
+       {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
 merge(#?USER{
@@ -214,7 +212,7 @@ merge(#?USER{
         ssh_keys = riak_dt_orswot:merge(Keys1, Keys2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
         orgs = riak_dt_orswot:merge(Orgs1, Orgs2),
-        metadata = statebox:merge([Metadata1, Metadata2])
+        metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
 join_org(ID, Org, User) ->
@@ -317,25 +315,16 @@ leave(ID, Group, User) ->
 metadata(User) ->
     User#?USER.metadata.
 
-set_metadata(Attribute, delete, User) ->
-    User#?USER{
-            metadata =
-                statebox:modify({fun jsxd:delete/2,
-                                 [Attribute]}, User#?USER.metadata)
-           };
+set_metadata(ID, P, Value, User) when is_binary(P) ->
+    set_metadata(ID, snarl_map:split_path(P), Value, User);
 
-set_metadata(Attribute, Value, User) ->
-    User#?USER{
-            metadata =
-                statebox:modify({fun jsxd:set/3,
-                                 [Attribute, Value]}, User#?USER.metadata)
-           }.
+set_metadata(ID, Attribute, delete, User) ->
+    {ok, M1} = snarl_map:remove(Attribute, ID, User#?USER.metadata),
+    User#?USER{metadata = M1};
 
-expire(Timeout, User) ->
-    User#?USER{
-            metadata =
-                statebox:expire(Timeout, User#?USER.metadata)
-           }.
+set_metadata(ID, Attribute, Value, User) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, User#?USER.metadata),
+    User#?USER{metadata = M1}.
 
 -ifdef(TEST).
 
