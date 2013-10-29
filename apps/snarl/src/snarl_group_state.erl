@@ -19,10 +19,9 @@
          uuid/1, uuid/3,
          name/1, name/3,
          permissions/1, grant/3, revoke/3, revoke_prefix/3,
-         metadata/1, set_metadata/3,
+         metadata/1, set_metadata/4,
          merge/2,
-         to_json/1,
-         expire/2
+         to_json/1
         ]).
 
 -ignore_xref([
@@ -31,7 +30,7 @@
               uuid/1, uuid/2,
               name/1, name/2,
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
-              metadata/1, set_metadata/3,
+              metadata/1, set_metadata/4,
               to_json/1
              ]).
 
@@ -42,7 +41,7 @@ new() ->
         uuid = UUID,
         name = Name,
         permissions = riak_dt_orswot:new(),
-        metadata = statebox:new(fun jsxd:new/0)
+        metadata = snarl_map:new()
        }.
 
 load(#?GROUP{} = Group) ->
@@ -94,7 +93,7 @@ to_json(#?GROUP{
        {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
        {<<"name">>, riak_dt_lwwreg:value(Name)},
        {<<"permissions">>, riak_dt_orswot:value(Permissions)},
-       {<<"metadata">>, statebox:value(Metadata)}
+       {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
 merge(#?GROUP{
@@ -113,7 +112,7 @@ merge(#?GROUP{
         uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
         name = riak_dt_lwwreg:merge(Name1, Name2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
-        metadata = statebox:merge([Metadata1, Metadata2])
+        metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
 name(Group) ->
@@ -164,26 +163,16 @@ revoke_prefix(ID, Prefix, Group) ->
 metadata(Group) ->
     Group#?GROUP.metadata.
 
-set_metadata(Attribute, delete, Group) ->
-    Group#?GROUP{
-             metadata =
-                 statebox:modify({fun jsxd:delete/2,
-                                  [Attribute]}, Group#?GROUP.metadata)
-            };
+set_metadata(ID, P, Value, Group) when is_binary(P) ->
+    set_metadata(ID, snarl_map:split_path(P), Value, Group);
 
-set_metadata(Attribute, Value, Group) ->
-    Group#?GROUP{
-             metadata =
-                 statebox:modify({fun jsxd:set/3,
-                                  [Attribute, Value]}, Group#?GROUP.metadata)
+set_metadata(ID, Attribute, delete, Group) ->
+    {ok, M1} = snarl_map:remove(Attribute, ID, Group#?GROUP.metadata),
+    Group#?GROUP{metadata = M1};
 
-            }.
-
-expire(Timeout, Group) ->
-    Group#?GROUP{
-            metadata =
-                statebox:expire(Timeout, Group#?GROUP.metadata)
-           }.
+set_metadata(ID, Attribute, Value, Group) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, Group#?GROUP.metadata),
+    Group#?GROUP{metadata = M1}.
 
 -ifdef(TEST).
 mkid() ->

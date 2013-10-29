@@ -19,10 +19,9 @@
          uuid/1, uuid/3,
          name/1, name/3,
          triggers/1, add_trigger/3, remove_trigger/3,
-         metadata/1, set_metadata/3,
+         metadata/1, set_metadata/4,
          merge/2,
-         to_json/1,
-         expire/2
+         to_json/1
         ]).
 
 -ignore_xref([
@@ -31,10 +30,9 @@
               uuid/1, uuid/3,
               name/1, name/3,
               triggers/1, add_trigger/3, remove_trigger/3,
-              metadata/1, set_metadata/3,
+              metadata/1, set_metadata/4,
               merge/2,
-              to_json/1,
-              expire/2
+              to_json/1
              ]).
 
 new() ->
@@ -44,7 +42,7 @@ new() ->
         uuid = UUID,
         name = Name,
         triggers = riak_dt_orswot:new(),
-        metadata = statebox:new(fun jsxd:new/0)
+        metadata = snarl_map:new()
        }.
 
 load(#?ORG{} = Org) ->
@@ -126,7 +124,7 @@ to_json(#?ORG{
        {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
        {<<"name">>, riak_dt_lwwreg:value(Name)},
        {<<"triggers">>, [jsonify_trigger(T) || T <- riak_dt_orswot:value(Triggers)]},
-       {<<"metadata">>, statebox:value(Metadata)}
+       {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
 merge(#?ORG{
@@ -145,7 +143,7 @@ merge(#?ORG{
         uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
         name = riak_dt_lwwreg:merge(Name1, Name2),
         triggers = riak_dt_orswot:merge(Triggers1, Triggers2),
-        metadata = statebox:merge([Metadata1, Metadata2])
+        metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
 name(Org) ->
@@ -177,25 +175,16 @@ remove_trigger(ID, Trigger, Org) ->
 metadata(Org) ->
     Org#?ORG.metadata.
 
-set_metadata(Attribute, delete, Org) ->
-    Org#?ORG{
-           metadata =
-               statebox:modify({fun jsxd:delete/2,
-                                [Attribute]}, Org#?ORG.metadata)
-          };
+set_metadata(ID, P, Value, Org) when is_binary(P) ->
+    set_metadata(ID, snarl_map:split_path(P), Value, Org);
 
-set_metadata(Attribute, Value, Org) ->
-    Org#?ORG{
-           metadata =
-               statebox:modify({fun jsxd:set/3,
-                                [Attribute, Value]}, Org#?ORG.metadata)
-          }.
+set_metadata(ID, Attribute, delete, Org) ->
+    {ok, M1} = snarl_map:remove(Attribute, ID, Org#?ORG.metadata),
+    Org#?ORG{metadata = M1};
 
-expire(Timeout, Org) ->
-    Org#?ORG{
-           metadata =
-               statebox:expire(Timeout, Org#?ORG.metadata)
-          }.
+set_metadata(ID, Attribute, Value, Org) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, Org#?ORG.metadata),
+    Org#?ORG{metadata = M1}.
 
 -ifdef(TEST).
 mkid() ->
