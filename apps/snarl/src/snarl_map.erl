@@ -13,6 +13,7 @@
 -define(SET, riak_dt_orswot).
 -define(REG, riak_dt_lwwreg).
 -define(MAP, riak_dt_map).
+-define(COUNTER, riak_dt_pncounter).
 
 new() ->
     riak_dt_map:new().
@@ -125,12 +126,47 @@ nested_update([K | Ks], U) ->
     [{update, {K, ?MAP}, {update, nested_update(Ks, U)}}].
 
 nested_create([K], V) ->
-    Field = {K, ?REG},
-    [{add, Field}, {update, Field, {assign, V}}];
+    {Type, Us} = update_from_value(V),
+    Field = {K, Type},
+    [{add, Field} |
+     [{update, Field, U} || U <- Us]];
 
 nested_create([K | Ks], V) ->
     Field = {K, ?MAP},
     [{add, Field}, {update, Field, {update, nested_create(Ks, V)}}].
+
+update_from_value({custom, Type, Actions}) when is_list(Actions)->
+    {Type, Actions};
+
+update_from_value({custom, Type, Action}) ->
+    {Type, [Action]};
+
+update_from_value({reg, V}) ->
+    update_from_value({custom, ?REG, {assign, V}});
+
+update_from_value({set, V}) when is_list(V) ->
+    update_from_value({set, {add_all, V}});
+
+update_from_value({set, {add_all, V}}) ->
+    update_from_value({custom, ?SET, {add_all, V}});
+
+update_from_value({set, {add, V}}) ->
+    update_from_value({custom, ?SET, {add, V}});
+
+update_from_value({set, {remove, V}}) ->
+    update_from_value({custom, ?SET, {remove, V}});
+
+update_from_value({set, V}) ->
+    update_from_value({set, {add, V}});
+
+update_from_value({counter, V}) when V >= 0->
+    update_from_value({custom, ?COUNTER, {increment, V}});
+
+update_from_value({counter, V}) when V =< 0->
+    update_from_value({custom, ?COUNTER, {decrement, -V}});
+
+update_from_value(V) ->
+    update_from_value({reg, V}).
 
 value_(N) when is_number(N) ->
     N;
@@ -149,7 +185,7 @@ value_(V) ->
 
 -ifdef(TEST).
 
-set_test() ->
+reg_test() ->
     M = snarl_map:new(),
     {ok, M1} = snarl_map:set(k, v, a, M),
     {ok, M2} = snarl_map:set(k, v1, a, M1),
@@ -157,12 +193,41 @@ set_test() ->
     ?assertEqual(v1, snarl_map:get(k, M2)),
     ok.
 
-nested_set_test() ->
+counter_test() ->
+    M = snarl_map:new(),
+    {ok, M1} = snarl_map:set(k, {counter, 3}, a, M),
+    {ok, M2} = snarl_map:set(k, {counter, -2}, a, M1),
+    ?assertEqual(3, snarl_map:get(k, M1)),
+    ?assertEqual(1, snarl_map:get(k, M2)),
+    ok.
+
+set_test() ->
+    M = snarl_map:new(),
+    {ok, M1} = snarl_map:set(k, {set, 3}, a, M),
+    {ok, M2} = snarl_map:set(k, {set, 2}, a, M1),
+    {ok, M3} = snarl_map:set(k, {set, [1,4]}, a, M2),
+    {ok, M4} = snarl_map:set(k, {set, {remove, 3}}, a, M3),
+
+    ?assertEqual([3], snarl_map:get(k, M1)),
+    ?assertEqual([2,3], snarl_map:get(k, M2)),
+    ?assertEqual([1,2,3,4], snarl_map:get(k, M3)),
+    ?assertEqual([1,2,4], snarl_map:get(k, M4)),
+    ok.
+
+nested_reg_test() ->
     M = snarl_map:new(),
     {ok, M1} = snarl_map:set([o, k], v, a, M),
     {ok, M2} = snarl_map:set([o, k], v1, a, M1),
     ?assertEqual(v, snarl_map:get([o, k], M1)),
     ?assertEqual(v1, snarl_map:get([o, k], M2)),
+    ok.
+
+nested_counter_test() ->
+    M = snarl_map:new(),
+    {ok, M1} = snarl_map:set([o, k], {counter, 3}, a, M),
+    {ok, M2} = snarl_map:set([o, k], {counter, -2}, a, M1),
+    ?assertEqual(3, snarl_map:get([o, k], M1)),
+    ?assertEqual(1, snarl_map:get([o, k], M2)),
     ok.
 
 delete_test() ->

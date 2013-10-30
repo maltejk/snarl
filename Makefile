@@ -23,9 +23,12 @@ clean:
 distclean: clean devclean relclean
 	$(REBAR) delete-deps
 
-test: all
-	$(REBAR) skip_deps=true xref
+eunit: 
+	$(REBAR) skip_deps=true compile
 	$(REBAR) skip_deps=true eunit
+
+test:  eunit
+	$(REBAR) skip_deps=true xref
 
 rel: all zabbix
 	-rm -r rel/snarl/share
