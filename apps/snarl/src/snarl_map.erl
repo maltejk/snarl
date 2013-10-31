@@ -133,7 +133,8 @@ nested_create([K], V) ->
 
 nested_create([K | Ks], V) ->
     Field = {K, ?MAP},
-    [{add, Field}, {update, Field, {update, nested_create(Ks, V)}}].
+    [{add, Field},
+     {update, Field, {update, nested_create(Ks, V)}}].
 
 update_from_value({custom, Type, Actions}) when is_list(Actions)->
     {Type, Actions};
@@ -158,6 +159,12 @@ update_from_value({set, {remove, V}}) ->
 
 update_from_value({set, V}) ->
     update_from_value({set, {add, V}});
+
+update_from_value({counter, inc}) ->
+    update_from_value({custom, ?COUNTER, {increment, 1}});
+
+update_from_value({counter, dec}) ->
+    update_from_value({custom, ?COUNTER, {decrement, 1}});
 
 update_from_value({counter, V}) when V >= 0->
     update_from_value({custom, ?COUNTER, {increment, V}});
