@@ -51,17 +51,18 @@ load(#group_0_1_0{
         uuid = UUID,
         name = Name,
         permissions = Permissions,
-        metadata = Meta
+        metadata = Metadata
        }) ->
     {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID)),
     {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name)),
     {ok, Permissions1} = ?CONVERT_VORSET(Permissions),
-     load(#group_0_1_1{
+    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), none),
+    load(#group_0_1_1{
             uuid = UUID1,
             name = Name1,
             permissions = Permissions1,
-            metadata = Meta
-            });
+            metadata = Metadata1
+           });
 
 load(GroupSB) ->
     Size = ?ENV(group_bucket_size, 50),
@@ -80,7 +81,7 @@ load(GroupSB) ->
             name = vlwwregister:new(Name),
             permissions = Permissions,
             metadata = statebox:new(fun () -> Metadata end)
-       }).
+           }).
 
 to_json(#?GROUP{
             uuid = UUID,
@@ -97,10 +98,10 @@ to_json(#?GROUP{
       ]).
 
 merge(#?GROUP{
-            uuid = UUID1,
-            name = Name1,
-            permissions = Permissions1,
-            metadata = Metadata1
+          uuid = UUID1,
+          name = Name1,
+          permissions = Permissions1,
+          metadata = Metadata1
          },
       #?GROUP{
           uuid = UUID2,

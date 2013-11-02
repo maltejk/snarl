@@ -52,16 +52,17 @@ load(#organisation_0_1_0{
         uuid = UUID,
         name = Name,
         triggers = Triggers,
-        metadata = Meta
+        metadata = Metadata
        }) ->
     {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID)),
     {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name)),
     {ok, Triggers1} = ?CONVERT_VORSET(Triggers),
+    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), none),
     load(#organisation_0_1_1{
             uuid = UUID1,
             name = Name1,
             triggers = Triggers1,
-            metadata = Meta
+            metadata = Metadata1
            });
 
 load(OrgSB) ->

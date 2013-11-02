@@ -427,7 +427,6 @@ revoke(User, Permission) ->
 %%% Internal Functions
 %%%===================================================================
 
-
 do_write(User, Op) ->
     case snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op) of
         {ok, not_found} ->

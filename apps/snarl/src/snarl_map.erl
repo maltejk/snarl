@@ -1,7 +1,8 @@
 -module(snarl_map).
 
 
--export([new/0, merge/2, get/2, set/4, remove/3, value/1, split_path/1, from_orddict/2]).
+-export([new/0, merge/2, get/2, set/4, remove/3, value/1, split_path/1,
+         from_orddict/2]).
 
 -ignore_xref([get/2]).
 
@@ -84,6 +85,15 @@ remove(K, A, M) ->
 value(M) ->
     value_(riak_dt_map:value(M)).
 
+from_orddict(D, Actor) ->
+    lists:foldl(fun({Ks, V}, Map) ->
+                        {ok, M1} = set(Ks, V, Actor, Map),
+                        M1
+                end, new(), flatten_orddict(D)).
+
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
 
 split_path([K | Ks], Existing, M) ->
     io:format("~p~n", [M]),
@@ -194,12 +204,6 @@ value_(L) when is_list(L) ->
 value_(V) ->
     V.
 
-from_orddict(D, Actor) ->
-    lists:foldl(fun({Ks, V}, Map) ->
-                        {ok, M1} = set(Ks, V, Actor, Map),
-                        M1
-                end, new(), flatten_orddict(D)).
-
 flatten_orddict(D) ->
     [{lists:reverse(Ks), V} || {Ks, V} <- flatten_orddict([], D, [])].
 flatten_orddict(Prefix, [{K, [{_,_}|_] = V} | R], Acc) ->
@@ -210,9 +214,9 @@ flatten_orddict(Prefix, [{K, V} | R], Acc) ->
 flatten_orddict(_, [], Acc) ->
     Acc.
 
-
-
-
+%%%===================================================================
+%%% Tests
+%%%===================================================================
 
 -ifdef(TEST).
 

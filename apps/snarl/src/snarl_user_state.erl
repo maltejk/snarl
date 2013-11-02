@@ -64,6 +64,7 @@ load(#user_0_1_2{
     {ok, Groups1} = ?CONVERT_VORSET(Groups),
     {ok, Keys1} = ?CONVERT_VORSET(Keys),
     {ok, Orgs1} = ?CONVERT_VORSET(Orgs),
+    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), none),
     load(#user_0_1_3{
             uuid = UUID1,
             name = Name1,
@@ -73,7 +74,7 @@ load(#user_0_1_2{
             groups = Groups1,
             ssh_keys = Keys1,
             orgs = Orgs1,
-            metadata = Metadata
+            metadata = Metadata1
            });
 
 load(#user_0_1_1{
