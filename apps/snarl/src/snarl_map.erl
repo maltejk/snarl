@@ -1,7 +1,7 @@
 -module(snarl_map).
 
 
--export([new/0, merge/2, get/2, set/4, remove/3, value/1, split_path/1]).
+-export([new/0, merge/2, get/2, set/4, remove/3, value/1, split_path/1, from_orddict/2]).
 
 -ignore_xref([get/2]).
 
@@ -61,8 +61,11 @@ set(Ks, V, A, M) when is_list(Ks) ->
 set(K, V, A, M) ->
     set([K], V, A, M).
 
+split_path(P) when is_binary(P) ->
+    re:split(P, "\\.");
+
 split_path(P) ->
-    re:split(P, "\\.").
+    P.
 
 remove(Ks, A, M) when is_list(Ks) ->
     case remove_path(Ks, [], M) of
@@ -83,6 +86,7 @@ value(M) ->
 
 
 split_path([K | Ks], Existing, M) ->
+    io:format("~p~n", [M]),
     Keys = riak_dt_map:value(keyset, M),
     case orddict:find(K, Keys) of
         {ok, ?MAP} ->
@@ -190,7 +194,51 @@ value_(L) when is_list(L) ->
 value_(V) ->
     V.
 
+from_orddict(D, Actor) ->
+    lists:foldl(fun({Ks, V}, Map) ->
+                        {ok, M1} = set(Ks, V, Actor, Map),
+                        M1
+                end, new(), flatten_orddict(D)).
+
+flatten_orddict(D) ->
+    [{lists:reverse(Ks), V} || {Ks, V} <- flatten_orddict([], D, [])].
+flatten_orddict(Prefix, [{K, [{_,_}|_] = V} | R], Acc) ->
+    Acc1 = flatten_orddict([K | Prefix], V, Acc),
+    flatten_orddict(Prefix, R, Acc1);
+flatten_orddict(Prefix, [{K, V} | R], Acc) ->
+    flatten_orddict(Prefix, R, [{[K | Prefix], V} | Acc]);
+flatten_orddict(_, [], Acc) ->
+    Acc.
+
+
+
+
+
 -ifdef(TEST).
+
+flatten_orddict_test() ->
+    O1 = [{k, v}],
+    F1 = [{[k], v}],
+    O2 = [{k1, [{k11, v11}]}, {k2, v2}],
+    F2 = [{[k2], v2}, {[k1, k11], v11}],
+    O3 = [{k1, [{k11, [{k111, v111}]}]}, {k2, v2}],
+    F3 = [{[k2], v2}, {[k1, k11, k111], v111}],
+    ?assertEqual(F1, flatten_orddict(O1)),
+    ?assertEqual(F2, flatten_orddict(O2)),
+    ?assertEqual(F3, flatten_orddict(O3)),
+    ok.
+
+from_orddict_test() ->
+    O1 = [{k, v}],
+    M1 = from_orddict(O1, none),
+    O2 = [{k1, [{k11, v11}]}, {k2, v2}],
+    M2 = from_orddict(O2, none),
+    O3 = [{k1, [{k11, [{k111, v111}]}]}, {k2, v2}],
+    M3 = from_orddict(O3, none),
+    ?assertEqual(O1, value(M1)),
+    ?assertEqual(O2, value(M2)),
+    ?assertEqual(O3, value(M3)),
+    ok.
 
 reg_test() ->
     M = snarl_map:new(),
