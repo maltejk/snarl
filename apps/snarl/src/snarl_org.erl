@@ -14,11 +14,9 @@
          set/2,
          set/3,
          create/2,
-         gcable/1,
          import/2,
          trigger/3,
-         add_trigger/2, remove_trigger/2,
-         gc/2
+         add_trigger/2, remove_trigger/2
         ]).
 
 -ignore_xref([
@@ -32,11 +30,9 @@
               set/2,
               set/3,
               create/2,
-              gcable/1,
               import/2,
               trigger/3,
-              add_trigger/2, remove_trigger/2,
-              gc/2
+              add_trigger/2, remove_trigger/2
              ]).
 
 -ignore_xref([ping/0, create/2]).
@@ -135,35 +131,6 @@ lookup(OrgName) ->
         R ->
             R
     end.
-
--spec gcable(Org::fifo:org_id()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, [term()]}.
-gcable(Org) ->
-    case get_(Org) of
-        {ok, OrgObj} ->
-            {ok, snarl_org_state:gcable(OrgObj)};
-        R  ->
-            R
-    end.
-
--spec gc(Org::fifo:org_id(),
-         GCable::term()) ->
-                not_found |
-                {error, timeout} |
-                ok.
-gc(Org, GCable) ->
-    case get_(Org) of
-        {ok, OrgObj1} ->
-            do_write(Org, gc, GCable),
-            {ok, OrgObj2} = get_(Org),
-            {ok, byte_size(term_to_binary(OrgObj1)) -
-                 byte_size(term_to_binary(OrgObj2))};
-        R ->
-            R
-    end.
-
 
 -spec get(Org::fifo:org_id()) ->
                  not_found |

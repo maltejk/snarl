@@ -184,11 +184,11 @@ handle_command({set, {ReqID, Coordinator}, Group, Attributes}, _Sender, State) -
             H1 = snarl_group_state:load(H0),
             H2 = lists:foldr(
                    fun ({Attribute, Value}, H) ->
-                           snarl_group_state:set_metadata(Attribute, Value, H)
+                           snarl_group_state:set_metadata(Coordinator,
+                                                          Attribute, Value, H)
                    end, H1, Attributes),
-            H3 = snarl_group_state:expire(?STATEBOX_EXPIRE, H2),
             fifo_db:put(State#state.db, <<"group">>, Group,
-                         snarl_obj:update(H3, Coordinator, O)),
+                         snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[groups] tried to write to a non existing group: ~p", [R]),

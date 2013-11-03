@@ -19,8 +19,6 @@
 
 -export([add_group/1,
          delete_group/1,
-         gcable_group/1,
-         gc_group/1,
          join_group/1,
          leave_group/1,
          grant_group/1,
@@ -28,8 +26,6 @@
          revoke_group/1]).
 
 -export([add_user/1,
-         gc_user/1,
-         gcable_user/1,
          delete_user/1,
          list_user/1,
          grant_user/1,
@@ -39,8 +35,6 @@
 -ignore_xref([
               join/1,
               leave/1,
-              gcable_user/1,
-              gcable_group/1,
               delete_user/1,
               delete_group/1,
               remove/1,
@@ -62,9 +56,7 @@
               grant_user/1,
               revoke_user/1,
               revoke_group/1,
-              passwd/1,
-              gc_group/1,
-              gc_user/1
+              passwd/1
              ]).
 
 list_user([]) ->
@@ -87,138 +79,6 @@ list_group([]) ->
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
-
-
-gc_group(<<"all">>, Timeout) ->
-    {ok, UUIDs} = snarl_group:list(),
-    {Cnt, GCed, Size} =
-        lists:foldl(fun (UUID, {Cnt, GCed, Size}) ->
-                            case snarl_group:gcable(UUID) of
-                                {ok, A} ->
-                                    MinAge = ecrdt:timestamp_us() - Timeout,
-                                    A1 = [E || {{T,_},_} = E <- A, T < MinAge],
-                                    case A1 of
-                                        [] ->
-                                            {Cnt + 1, GCed, Size};
-                                        _ ->
-                                            {ok, Size1} =
-                                                snarl_group:gc(UUID, A1),
-                                            {Cnt + 1, GCed + 1, Size + Size1}
-                                    end;
-                                _ ->
-                                    {Cnt + 1, GCed, Size}
-                            end
-                    end, {0, 0, 0}, UUIDs),
-    io:format("Checked ~p objects, GCed ~p of them for a total of ~p bytes.~n",
-              [Cnt, GCed, Size]),
-    ok;
-
-gc_group(UUID, Timeout) ->
-    case snarl_group:gcable(UUID) of
-        {ok, A} ->
-            MinAge = ecrdt:timestamp_us() - Timeout,
-            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
-            {ok, Size} = snarl_group:gc(UUID, A1),
-            io:format("GC ~p bytes of memory.~n", [Size]),
-            ok;
-        _ ->
-            error
-    end.
-
-gc_group([UUID]) ->
-    {Time, Unit} = ?ENV(group_sync_timeout, {1, week}),
-    gc_group(list_to_binary(UUID), time_to_us(Time, atom_to_list(Unit)));
-
-gc_group([UUID, Secs]) ->
-    gc_group(list_to_binary(UUID), time_to_us(list_to_integer(Secs), "s"));
-
-gc_group([UUID, Time, Unit]) ->
-    gc_group(list_to_binary(UUID), time_to_us(list_to_integer(Time), Unit)).
-
-gc_user(<<"all">>, Timeout) ->
-    {ok, UUIDs} = snarl_user:list(),
-    {Cnt, GCed, Size} =
-        lists:foldl(fun (UUID, {Cnt, GCed, Size}) ->
-                            case snarl_user:gcable(UUID) of
-                                {ok, {A, B, C, D}} ->
-                                    MinAge = ecrdt:timestamp_us() - Timeout,
-                                    A1 = [E || {{T,_},_} = E <- A, T < MinAge],
-                                    B1 = [E || {{T,_},_} = E <- B, T < MinAge],
-                                    C1 = [E || {{T,_},_} = E <- C, T < MinAge],
-                                    D1 = [E || {{T,_},_} = E <- D, T < MinAge],
-                                    S = {A1, B1, C1, D1},
-                                    case S of
-                                        {[], [], [], []} ->
-                                            {Cnt + 1, GCed, Size};
-                                        _ ->
-                                            {ok, Size1} =
-                                                snarl_user:gc(UUID, S),
-                                            {Cnt + 1, GCed + 1, Size + Size1}
-                                    end;
-                                _ ->
-                                    {Cnt + 1, GCed, Size}
-                            end
-                    end, {0, 0, 0}, UUIDs),
-    io:format("Checked ~p objects, GCed ~p of them for a total of ~p bytes.~n",
-              [Cnt, GCed, Size]),
-    ok;
-
-gc_user(UUID, Timeout) ->
-    case snarl_user:gcable(UUID) of
-        {ok, {A, B, C, D}} ->
-            MinAge = ecrdt:timestamp_us() - Timeout,
-            A1 = [E || {{T,_},_} = E <- A, T < MinAge],
-            B1 = [E || {{T,_},_} = E <- B, T < MinAge],
-            C1 = [E || {{T,_},_} = E <- C, T < MinAge],
-            D1 = [E || {{T,_},_} = E <- D, T < MinAge],
-            S = {A1, B1, C1, D1},
-            {ok, Size} = snarl_user:gc(UUID, S),
-            io:format("GC ~p bytes of memory.~n", [Size]),
-            ok;
-        _ ->
-            error
-    end.
-
-
-gc_user([UUID]) ->
-    {Time, Unit} = ?ENV(user_sync_timeout, {1, week}),
-    gc_user(list_to_binary(UUID), time_to_us(Time, atom_to_list(Unit)));
-
-gc_user([UUID, Secs]) ->
-    gc_user(list_to_binary(UUID), time_to_us(list_to_integer(Secs), "s"));
-
-gc_user([UUID, Time, Unit]) ->
-    gc_user(list_to_binary(UUID), time_to_us(list_to_integer(Time), Unit)).
-
-time_to_us(Time, [$s | _]) ->
-    Time * ?SECOND;
-time_to_us(Time, [$m | _]) ->
-    Time * ?MINUTE;
-time_to_us(Time, [$h | _]) ->
-    Time * ?HOUER;
-time_to_us(Time, [$d | _]) ->
-    Time * ?DAY;
-time_to_us(Time, [$w | _]) ->
-    Time * ?WEEK.
-
-gcable_user([UUID]) ->
-    case snarl_user:gcable(list_to_binary(UUID)) of
-        {ok, {A, B, C, D}} ->
-            io:format("GCable buckets: ~p~n", [length(A) + length(B) +
-                                                   length(C) + length(D)]),
-            ok;
-        _ ->
-            error
-    end.
-
-gcable_group([UUID]) ->
-    case snarl_group:gcable(list_to_binary(UUID)) of
-        {ok, A} ->
-            io:format("GCable buckets ~p~n", [length(A)]),
-            ok;
-        _ ->
-            error
-    end.
 
 delete_user([User]) ->
     snarl_user:delete(list_to_binary(User)),

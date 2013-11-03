@@ -12,9 +12,7 @@
          set/2, set/3,
          create/2,
          revoke_prefix/2,
-         gcable/1,
-         import/2,
-         gc/2
+         import/2
         ]).
 
 -ignore_xref([ping/0, create/2]).
@@ -64,36 +62,6 @@ lookup_(Group) ->
         R ->
             R
     end.
-
-
--spec gcable(Group::fifo:group_id()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, [term()]}.
-gcable(Group) ->
-    case get_(Group) of
-        {ok, GroupObj} ->
-            {ok, snarl_group_state:gcable(GroupObj)};
-        R  ->
-            R
-    end.
-
--spec gc(Group::fifo:group_id(),
-         GCable::term()) ->
-                not_found |
-                {error, timeout} |
-                ok.
-gc(Group, GCable) ->
-    case get_(Group) of
-        {ok, GroupObj1} ->
-            do_write(Group, gc, GCable),
-            {ok, GroupObj2} = get_(Group),
-            {ok, byte_size(term_to_binary(GroupObj1)) -
-                 byte_size(term_to_binary(GroupObj2))};
-        R ->
-            R
-    end.
-
 
 -spec get(Group::fifo:group_id()) ->
                  not_found |
