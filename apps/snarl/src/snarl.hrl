@@ -129,5 +129,5 @@
 
 -define(CONVERT_VORSET(S),
         riak_dt_orswot:update(
-          {add_all, riak_dt_orswot:value(S)}, none,
+          {add_all, vorsetg:value(S)}, none,
           riak_dt_orswot:new())).
