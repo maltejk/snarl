@@ -96,7 +96,6 @@ from_orddict(D, Actor) ->
 %%%===================================================================
 
 split_path([K | Ks], Existing, M) ->
-    io:format("~p~n", [M]),
     Keys = riak_dt_map:value(keyset, M),
     case orddict:find(K, Keys) of
         {ok, ?MAP} ->
