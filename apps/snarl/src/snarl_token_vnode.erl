@@ -113,7 +113,7 @@ handle_command(ping, _Sender, State) ->
 
 handle_command({repair, Token, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
-    Tokens1 = dict:store({now(), Token}, Obj, Tokens0),
+    Tokens1 = dict:store(Token, {now(), Obj}, Tokens0),
     {noreply, State#state{tokens=Tokens1}};
 
 handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) ->
