@@ -46,7 +46,15 @@ get([K | Ks], M) ->
 get(K, M) ->
     get([K], M).
 
-set(Ks, V, A, M) when is_list(Ks) ->
+set(K, V, A, M) when not is_list(K) ->
+    set([K], V, A, M);
+
+set(Ks, [{_,_}|_] = D, A, M) ->
+    lists:foldl(fun({KsI, V}, {ok, MAcc}) ->
+                        set(Ks ++ KsI, V, A, MAcc)
+                end, {ok, M}, flatten_orddict(D));
+
+set(Ks, V, A, M) ->
     case split_path(Ks, [], M) of
         {ok, {[FirstNew | Missing], []}} ->
             Ops = nested_create([FirstNew | Missing], V),
@@ -57,10 +65,7 @@ set(Ks, V, A, M) when is_list(Ks) ->
             riak_dt_map:update({update, Ops}, A, M);
         E ->
             E
-    end;
-
-set(K, V, A, M) ->
-    set([K], V, A, M).
+    end.
 
 split_path(P) when is_binary(P) ->
     re:split(P, "\\.");
@@ -241,6 +246,13 @@ from_orddict_test() ->
     ?assertEqual(O1, value(M1)),
     ?assertEqual(O2, value(M2)),
     ?assertEqual(O3, value(M3)),
+    ok.
+
+adding_mapo_test() ->
+    M = snarl_map:new(),
+    {ok, M1} = snarl_map:set(k, [{k1, v1}], a, M),
+    ?assertEqual([{k, [{k1, v1}]}], snarl_map:value(M1)),
+    ?assertEqual(v1, snarl_map:get([k, k1], M1)),
     ok.
 
 reg_test() ->
