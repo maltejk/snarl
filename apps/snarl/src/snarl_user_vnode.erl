@@ -197,18 +197,17 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, User, _VClock, #snarl_obj{val = V} = Obj},
+handle_command({repair, User, _VClock, #snarl_obj{} = Obj},
                _Sender, State) ->
     case fifo_db:get(State#state.db, <<"user">>, User) of
-        {ok, #snarl_obj{val = V0}} ->
-            V1 = snarl_user_state:load(V0),
-            fifo_db:put(State#state.db, <<"user">>, User,
-                         Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
+        {ok, _O} when _O#snarl_obj.vclock =:= _VClock ->
+            fifo_db:put(State#state.db, <<"user">>, User, Obj);
         not_found ->
-            fifo_db:put(State#state.db, <<"user">>, User, Obj)
+            fifo_db:put(State#state.db, <<"user">>, User, Obj);
+        _ ->
+            lager:warning("[USR:~s] Could not read repair, user changed.", [User])
     end,
     {noreply, State};
-
 
 handle_command({get, ReqID, User}, _Sender, State) ->
     Res = case fifo_db:get(State#state.db, <<"user">>, User) of
