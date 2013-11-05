@@ -133,7 +133,7 @@ handle_command({repair, Org, _VClock, #snarl_obj{} = Obj},
         not_found ->
             fifo_db:put(State#state.db, <<"org">>, Org, Obj);
         _ ->
-            lager:warning("[ORG:~s] Could not read repair org changed.", [Org])
+            lager:warning("[ORG:~s] Could not read repair, org changed.", [Org])
     end,
     {noreply, State};
 
