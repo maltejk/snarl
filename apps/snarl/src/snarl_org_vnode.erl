@@ -171,7 +171,7 @@ handle_command({set, {ReqID, Coordinator}, Org, Attributes}, _Sender, State) ->
                                                         Attribute, Value, H)
                    end, H1, Attributes),
             fifo_db:put(State#state.db, <<"org">>, Org,
-                         snarl_obj:update(H2, Coordinator, O)),
+                        snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[orgs] tried to write to a non existing org: ~p", [R]),
@@ -184,7 +184,7 @@ handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender, State) 
     case fifo_db:get(State#state.db, <<"org">>, UUID) of
         {ok, O} ->
             fifo_db:put(State#state.db, <<"org">>, UUID,
-                         snarl_obj:update(H2, Coordinator, O)),
+                        snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         _R ->
             VC0 = vclock:fresh(),
@@ -237,7 +237,7 @@ handle_handoff_data(Data, State) ->
         {ok, #snarl_obj{val = V0}} ->
             V1 = snarl_org_state:load(V0),
             fifo_db:put(State#state.db, <<"org">>, Org,
-                         Obj#snarl_obj{val = snarl_org_state:merge(V, V1)});
+                        Obj#snarl_obj{val = snarl_org_state:merge(V, V1)});
         not_found ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(node(), VC0),
@@ -251,44 +251,44 @@ encode_handoff_item(Org, Data) ->
 
 is_empty(State) ->
     fifo_db:fold(State#state.db,
-                  <<"org">>,
-                  fun (_,_, _) ->
-                          {false, State}
-                  end, {true, State}).
+                 <<"org">>,
+                 fun (_,_, _) ->
+                         {false, State}
+                 end, {true, State}).
 
 delete(State) ->
     Trans = fifo_db:fold(State#state.db,
-                          <<"org">>,
-                          fun (K,_, A) ->
-                                  [{delete, <<"org", K/binary>>} | A]
-                          end, []),
+                         <<"org">>,
+                         fun (K,_, A) ->
+                                 [{delete, <<"org", K/binary>>} | A]
+                         end, []),
     fifo_db:transact(State#state.db, Trans),
     {ok, State}.
 
 handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
     Res = fifo_db:fold(State#state.db,
-                        <<"org">>,
-                        fun (UUID, #snarl_obj{val=G0}, not_found) ->
-                                G1 = snarl_org_state:load(G0),
-                                case snarl_org_state:name(G1) of
-                                    Name ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
+                       <<"org">>,
+                       fun (UUID, #snarl_obj{val=G0}, not_found) ->
+                               G1 = snarl_org_state:load(G0),
+                               case snarl_org_state:name(G1) of
+                                   Name ->
+                                       UUID;
+                                   _ ->
+                                       not_found
+                               end;
+                           (_U, _, Res) ->
+                               Res
+                       end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
 handle_coverage(list, _KeySpaces, {_, ReqID, _}, State) ->
     List = fifo_db:fold(State#state.db,
-                         <<"org">>,
-                         fun (K, _, L) ->
-                                 [K|L]
-                         end, []),
+                        <<"org">>,
+                        fun (K, _, L) ->
+                                [K|L]
+                        end, []),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, List},
      State};
@@ -298,15 +298,15 @@ handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
                      snarl_org_state:uuid(snarl_org_state:load(S0))
              end,
     List = fifo_db:fold(State#state.db,
-                         <<"org">>,
-                         fun (Key, E, C) ->
-                                 case rankmatcher:match(E, Getter, Requirements) of
-                                     false ->
-                                         C;
-                                     Pts ->
-                                         [{Pts, Key} | C]
-                                 end
-                         end, []),
+                        <<"org">>,
+                        fun (Key, E, C) ->
+                                case rankmatcher:match(E, Getter, Requirements) of
+                                    false ->
+                                        C;
+                                    Pts ->
+                                        [{Pts, Key} | C]
+                                end
+                        end, []),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, List},
      State};
@@ -332,7 +332,7 @@ change_org(Org, Action, Vals, Coordinator, State, ReqID) ->
                          snarl_org_state:Action(ID, Val1, Val2, H1)
                  end,
             fifo_db:put(State#state.db, <<"org">>, Org,
-                         snarl_obj:update(H2, Coordinator, O)),
+                        snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[orgs] tried to write to a non existing org: ~p", [R]),
