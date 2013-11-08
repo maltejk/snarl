@@ -213,9 +213,11 @@ dflt_env(N, D) ->
             V
     end.
 
-expire(#state{cnt = Cnt, timeout_limit = Limit} = State) when Limit < Cnt ->
+expire(#state{cnt = Cnt, timeout_limit = Limit} = State)
+  when Limit < Cnt ->
     State;
-expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State) when Cycle < Cnt ->
+expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State)
+  when Cycle < Cnt ->
     State;
 
 expire(#state{tokens = Tokens, timeout = Timeout} = State) ->
