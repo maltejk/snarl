@@ -21,8 +21,11 @@
          triggers/1, add_trigger/3, remove_trigger/3,
          metadata/1, set_metadata/4,
          merge/2,
-         to_json/1
+         to_json/1,
+         is_a/1
         ]).
+
+-export_type([organisation/0, any_organisation/0]).
 
 -ignore_xref([
               new/0,
@@ -35,6 +38,17 @@
               to_json/1
              ]).
 
+-opaque organisation() :: #?ORG{}.
+
+-opaque any_organisation() :: organisation() |
+                              #organisation_0_1_0{} |
+                              statebox:statebox().
+
+is_a(#?ORG{}) ->
+    true;
+is_a(_) ->
+    false.
+
 new() ->
     {ok, UUID} = ?NEW_LWW(<<>>),
     {ok, Name} = ?NEW_LWW(<<>>),
@@ -44,6 +58,8 @@ new() ->
         triggers = riak_dt_orswot:new(),
         metadata = snarl_map:new()
        }.
+
+-spec load(any_organisation()) -> organisation().
 
 load(#?ORG{} = Org) ->
     Org;
@@ -77,7 +93,7 @@ load(OrgSB) ->
                  fun (G, Acc) ->
                          vorsetg:add(ID0, G, Acc)
                  end, vorsetg:new(Size), Triggers0),
-    #?ORG{
+    #organisation_0_1_0{
         uuid = vlwwregister:new(UUID),
         name = vlwwregister:new(Name),
         triggers = Triggers,

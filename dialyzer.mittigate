@@ -17,6 +17,7 @@
 ^snarl_token_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_user_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
 ^snarl_org_vnode.erl:2: Callback info about the riak_core_vnode behaviour is not available$
+^snarl_coverage.erl:5: Callback info about the riak_core_coverage_fsm behaviour is not available
 ^snarl_tcp_handler.erl:199: Matching of pattern 
 ^snarl_tcp_handler.erl:211: Matching of pattern
 ^snarl_tcp_handler.erl:216: Matching of pattern

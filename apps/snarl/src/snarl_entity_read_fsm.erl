@@ -256,16 +256,30 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: #?USER{} | #?GROUP{}]) -> A :: #?USER{} | #?GROUP{}.
+-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) ->
+                       snarl_user_state:user() | snarl_user_state:group().
+%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) -> snarl_user_state:user();
+%%               ([A :: snarl_user_state:group()]) -> snarl_user_state:group().
 
 reconcile([V | Vs]) ->
-    reconcile(Vs, V).
+    case {snar_user_state:is_a(V),
+          snar_grou_state:is_a(V)} of
+        {true, _} ->
+            reconcile_user(Vs, V);
+        {_, true} ->
+            reconcile_group(Vs, V);
+        _ ->
+            V
+    end.
 
-reconcile([#?USER{} = U | R], Acc) ->
-    reconcile(R, snarl_user_state:merge(Acc, U));
-reconcile([#?GROUP{} = G | R], Acc) ->
-    reconcile(R, snarl_group_state:merge(Acc, G));
-reconcile(_, Acc) ->
+reconcile_group([G | R], Acc) ->
+    reconcile_group(R, snarl_group_state:merge(Acc, G));
+reconcile_group(_, Acc) ->
+    Acc.
+
+reconcile_user([U | R], Acc) ->
+    reconcile_user(R, snarl_user_state:merge(Acc, U));
+reconcile_user(_, Acc) ->
     Acc.
 
 %% @pure
