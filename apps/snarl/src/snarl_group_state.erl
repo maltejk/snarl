@@ -21,7 +21,8 @@
          permissions/1, grant/3, revoke/3, revoke_prefix/3,
          metadata/1, set_metadata/4,
          merge/2,
-         to_json/1
+         to_json/1,
+         is_a/1
         ]).
 
 -export_type([group/0, any_group/0]).
@@ -41,6 +42,12 @@
 -opaque any_group() :: group() |
                        #group_0_1_0{} |
                        statebox:statebox().
+
+is_a(#?GROUP{}) ->
+    true;
+is_a(_) ->
+    false.
+
 
 new() ->
     {ok, UUID} = ?NEW_LWW(<<>>),

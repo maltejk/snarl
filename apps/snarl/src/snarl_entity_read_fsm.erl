@@ -262,8 +262,8 @@ merge(Replies) ->
 %%               ([A :: snarl_user_state:group()]) -> snarl_user_state:group().
 
 reconcile([V | Vs]) ->
-    case {snar_user_state:is_a(V),
-          snar_grou_state:is_a(V)} of
+    case {snarl_user_state:is_a(V),
+          snarl_group_state:is_a(V)} of
         {true, _} ->
             reconcile_user(Vs, V);
         {_, true} ->
