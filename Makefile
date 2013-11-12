@@ -83,7 +83,7 @@ APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
 COMBO_PLT = $(HOME)/.snarl_combo_dialyzer_plt
 
 check_plt: deps compile
-	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) \
+	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) -pa deps/*/ebin \
 		deps/*/ebin apps/*/ebin
 
 build_plt: deps compile

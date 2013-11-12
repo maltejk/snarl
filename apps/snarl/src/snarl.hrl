@@ -80,15 +80,15 @@
          }).
 
 -record(user_0_1_3, {
-          uuid             :: riak_dt_lwwreg:lwwreg(),
-          name             :: riak_dt_lwwreg:lwwreg(),
-          password         :: riak_dt_lwwreg:lwwreg(),
-          active_org       :: riak_dt_lwwreg:lwwreg(),
-          permissions      :: riak_dt_orswot:orswot(),
-          groups           :: riak_dt_orswot:orswot(),
-          ssh_keys         :: riak_dt_orswot:orswot(),
-          orgs             :: riak_dt_orswot:orswot(),
-          metadata
+          uuid        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          name        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          password    = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          active_org  = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          permissions = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          groups      = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          ssh_keys    = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          orgs        = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          metadata    = riak_dt_map:new()    :: riak_dt_map:map()
          }).
 
 -record(group_0_1_0, {
@@ -99,10 +99,10 @@
          }).
 
 -record(group_0_1_1, {
-          uuid             :: riak_dt_lwwreg:lwwreg(),
-          name             :: riak_dt_lwwreg:lwwreg(),
-          permissions      :: riak_dt_orswot:orswot(),
-          metadata
+          uuid        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          name        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          permissions = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          metadata    = riak_dt_map:new()    :: riak_dt_map:map()
          }).
 
 -record(organisation_0_1_0, {
@@ -113,10 +113,10 @@
          }).
 
 -record(organisation_0_1_1, {
-          uuid             :: riak_dt_lwwreg:lwwreg(),
-          name             :: riak_dt_lwwreg:lwwreg(),
-          triggers         :: riak_dt_orswot:orswot(),
-          metadata
+          uuid        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          name        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          triggers    = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          metadata    = riak_dt_map:new()    :: riak_dt_map:map()
          }).
 
 -define(USER, user_0_1_3).
@@ -124,8 +124,9 @@
 -define(ORG, organisation_0_1_1).
 
 
--define(NEW_LWW(V), riak_dt_lwwreg:update({assign, V}, none,
-                                          riak_dt_lwwreg:new())).
+-define(NEW_LWW(V), riak_dt_lwwreg:update(
+                      {assign, V}, none,
+                      riak_dt_lwwreg:new())).
 
 -define(CONVERT_VORSET(S),
         riak_dt_orswot:update(

@@ -147,7 +147,7 @@ get(Org) ->
 -spec get_(Org::fifo:org_id()) ->
                   not_found |
                   {error, timeout} |
-                  {ok, Org::#?ORG{}}.
+                  {ok, Org::snarl_org_state:organisation()}.
 get_(Org) ->
     case snarl_entity_read_fsm:start(
            {snarl_org_vnode, snarl_org},

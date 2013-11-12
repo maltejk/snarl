@@ -25,8 +25,11 @@
          add_key/4, revoke_key/3, keys/1,
          metadata/1, set_metadata/4,
          merge/2,
-         to_json/1
+         to_json/1,
+         is_a/1
         ]).
+
+-export_type([user/0, any_user/0]).
 
 -ignore_xref([
               new/0,
@@ -42,6 +45,23 @@
               merge/2,
               to_json/1
              ]).
+
+-type user() :: #?USER{}.
+
+-type any_user() :: user() |
+                    #user_0_1_2{} |
+                    #user_0_1_1{} |
+                    #user_0_1_0{} |
+                    statebox:statebox().
+
+is_a(#?USER{}) ->
+    true;
+is_a(_) ->
+    false.
+
+
+-spec load(any_user()) ->
+                  user().
 
 load(#?USER{} = User) ->
     User;

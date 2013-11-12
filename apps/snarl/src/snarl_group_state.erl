@@ -24,6 +24,8 @@
          to_json/1
         ]).
 
+-export_type([group/0, any_group/0]).
+
 -ignore_xref([
               new/0,
               load/1,
@@ -34,6 +36,12 @@
               to_json/1
              ]).
 
+-opaque group() :: #?GROUP{}.
+
+-opaque any_group() :: group() |
+                       #group_0_1_0{} |
+                       statebox:statebox().
+
 new() ->
     {ok, UUID} = ?NEW_LWW(<<>>),
     {ok, Name} = ?NEW_LWW(<<>>),
@@ -43,6 +51,9 @@ new() ->
         permissions = riak_dt_orswot:new(),
         metadata = snarl_map:new()
        }.
+
+-spec load(any_group()) ->
+                  group().
 
 load(#?GROUP{} = Group) ->
     Group;
@@ -126,14 +137,16 @@ name(_, Name, Group) ->
 uuid(Group) ->
     riak_dt_lwwreg:value(Group#?GROUP.uuid).
 
-uuid(_, UUID, Group) ->
+-spec uuid(Actor::term(), UUID::binary(), Group) ->
+                  Group.
+uuid(_, UUID, Group = #?GROUP{}) ->
     {ok, V} = riak_dt_lwwreg:update({assign, UUID}, none, Group#?GROUP.uuid),
     Group#?GROUP{uuid = V}.
 
 permissions(Group) ->
     riak_dt_orswot:value(Group#?GROUP.permissions).
 
-grant(ID, Permission, Group) ->
+grant(ID, Permission, Group = #?GROUP{}) ->
     {ok, V} = riak_dt_orswot:update({add, Permission},
                                     ID, Group#?GROUP.permissions),
     Group#?GROUP{permissions = V}.
