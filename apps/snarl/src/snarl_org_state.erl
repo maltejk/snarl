@@ -35,7 +35,8 @@
               triggers/1, add_trigger/3, remove_trigger/3,
               metadata/1, set_metadata/4,
               merge/2,
-              to_json/1
+              to_json/1,
+              is_a/1
              ]).
 
 -opaque organisation() :: #?ORG{}.
