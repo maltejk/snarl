@@ -2,7 +2,10 @@ REBAR = $(shell pwd)/rebar
 
 .PHONY: deps rel stagedevrel version all
 
-all: deps compile
+all: cp-hooks deps compile
+
+cp-hooks:
+	cp hooks/* .git/hooks
 
 version:
 	echo "$(shell git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(shell git log --pretty=format:'%h, %ad' -1)" > snarl.version
@@ -29,6 +32,12 @@ eunit:
 
 test:  eunit
 	$(REBAR) skip_deps=true xref
+
+quick-xref:
+	$(REBAR) xref skip_deps=true
+
+quick-test:
+	$(REBAR) skip_deps=true eunit
 
 rel: all zabbix
 	-rm -r rel/snarl/share
