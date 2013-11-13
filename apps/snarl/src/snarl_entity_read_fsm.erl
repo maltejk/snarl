@@ -210,9 +210,9 @@ wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
 finalize(timeout, SD=#state{
-                    vnode=VNode,
-                    replies=Replies,
-                    entity=Entity}) ->
+                        vnode=VNode,
+                        replies=Replies,
+                        entity=Entity}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
@@ -256,16 +256,30 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: #?USER{} | #?GROUP{}]) -> A :: #?USER{} | #?GROUP{}.
+-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) ->
+                       snarl_user_state:user() | snarl_user_state:group().
+%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) -> snarl_user_state:user();
+%%               ([A :: snarl_user_state:group()]) -> snarl_user_state:group().
 
 reconcile([V | Vs]) ->
-    reconcile(Vs, V).
+    case {snarl_user_state:is_a(V),
+          snarl_group_state:is_a(V)} of
+        {true, _} ->
+            reconcile_user(Vs, V);
+        {_, true} ->
+            reconcile_group(Vs, V);
+        _ ->
+            V
+    end.
 
-reconcile([#?USER{} = U | R], Acc) ->
-    reconcile(R, snarl_user_state:merge(Acc, U));
-reconcile([#?GROUP{} = G | R], Acc) ->
-    reconcile(R, snarl_group_state:merge(Acc, G));
-reconcile(_, Acc) ->
+reconcile_group([G | R], Acc) ->
+    reconcile_group(R, snarl_group_state:merge(Acc, G));
+reconcile_group(_, Acc) ->
+    Acc.
+
+reconcile_user([U | R], Acc) ->
+    reconcile_user(R, snarl_user_state:merge(Acc, U));
+reconcile_user(_, Acc) ->
     Acc.
 
 %% @pure
@@ -309,7 +323,7 @@ unique(L) ->
 
 mk_reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
-	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 stat_name(snarl_user_vnode) ->
     "user";

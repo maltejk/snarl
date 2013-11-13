@@ -14,11 +14,9 @@
          set/2,
          set/3,
          create/2,
-         gcable/1,
          import/2,
          trigger/3,
-         add_trigger/2, remove_trigger/2,
-         gc/2
+         add_trigger/2, remove_trigger/2
         ]).
 
 -ignore_xref([
@@ -32,11 +30,9 @@
               set/2,
               set/3,
               create/2,
-              gcable/1,
               import/2,
               trigger/3,
-              add_trigger/2, remove_trigger/2,
-              gc/2
+              add_trigger/2, remove_trigger/2
              ]).
 
 -ignore_xref([ping/0, create/2]).
@@ -121,9 +117,9 @@ import(Org, Data) ->
                     {ok, Org::fifo:org()}.
 
 lookup(OrgName) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_org_vnode, snarl_org},
-                  lookup, OrgName),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {lookup, OrgName}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -135,35 +131,6 @@ lookup(OrgName) ->
         R ->
             R
     end.
-
--spec gcable(Org::fifo:org_id()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, [term()]}.
-gcable(Org) ->
-    case get_(Org) of
-        {ok, OrgObj} ->
-            {ok, snarl_org_state:gcable(OrgObj)};
-        R  ->
-            R
-    end.
-
--spec gc(Org::fifo:org_id(),
-         GCable::term()) ->
-                not_found |
-                {error, timeout} |
-                ok.
-gc(Org, GCable) ->
-    case get_(Org) of
-        {ok, OrgObj1} ->
-            do_write(Org, gc, GCable),
-            {ok, OrgObj2} = get_(Org),
-            {ok, byte_size(term_to_binary(OrgObj1)) -
-                 byte_size(term_to_binary(OrgObj2))};
-        R ->
-            R
-    end.
-
 
 -spec get(Org::fifo:org_id()) ->
                  not_found |
@@ -180,7 +147,7 @@ get(Org) ->
 -spec get_(Org::fifo:org_id()) ->
                   not_found |
                   {error, timeout} |
-                  {ok, Org::#?ORG{}}.
+                  {ok, Org::snarl_org_state:organisation()}.
 get_(Org) ->
     case snarl_entity_read_fsm:start(
            {snarl_org_vnode, snarl_org},
@@ -197,17 +164,16 @@ get_(Org) ->
                 {error, timeout}.
 
 list() ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_org_vnode, snarl_org},
-      list
-     ).
+    snarl_coverage:start(
+      snarl_org_vnode_master, snarl_org,
+      list).
 
 -spec list(Reqs::[fifo:matcher()]) ->
                   {ok, [IPR::fifo:group_id()]} | {error, timeout}.
 list(Requirements) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                 {snarl_org_vnode, snarl_org},
-                  list, Requirements),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 

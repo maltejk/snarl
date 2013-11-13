@@ -25,13 +25,11 @@
          set/3,
          import/2,
          cache/1,
-         gcable/1,
          add_key/3,
          revoke_key/2,
          keys/1,
          active/1,
-         orgs/1,
-         gc/2
+         orgs/1
         ]).
 
 -ignore_xref([
@@ -56,9 +54,9 @@ ping() ->
                       {error, timeout} |
                       {ok, User::fifo:user_id()}.
 find_key(KeyID) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  find_key, KeyID),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {find_key, KeyID}),
     lists:foldl(fun (not_found, Acc) ->
                         Acc;
                     (R, _) ->
@@ -134,9 +132,9 @@ lookup(User) ->
                      {error, timeout} |
                      {ok, User::#?USER{}}.
 lookup_(User) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  lookup, User),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {lookup, User}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -224,34 +222,6 @@ cache(User) ->
     end.
 
 
--spec gcable(User::fifo:user_id()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, {[term()], [term()], [term()], [term()]}}.
-gcable(User) ->
-    case get_(User) of
-        {ok, UserObj} ->
-            {ok, snarl_user_state:gcable(UserObj)};
-        R  ->
-            R
-    end.
-
--spec gc(User::fifo:user_id(),
-         GCable::{_, _, _, _}) ->
-                not_found |
-                {error, timeout} |
-                {ok, integer()}.
-gc(User, {_,_,_,_} = GCable) ->
-    case get_(User) of
-        {ok, UserObj1} ->
-            do_write(User, gc, GCable),
-            {ok, UserObj2} = get_(User),
-            {ok, byte_size(term_to_binary(UserObj1)) -
-                 byte_size(term_to_binary(UserObj2))};
-        R ->
-            R
-    end.
-
 -spec get(User::fifo:user_id()) ->
                  not_found |
                  {error, timeout} |
@@ -284,17 +254,16 @@ get_(User) ->
                   {error, timeout} |
                   {ok, Users::[fifo:user_id()]}.
 list() ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_user_vnode, snarl_user},
-      list
-     ).
+    snarl_coverage:start(
+      snarl_user_vnode_master, snarl_user,
+      list).
 
 -spec list(Reqs::[fifo:matcher()]) ->
                   {ok, [IPR::fifo:user_id()]} | {error, timeout}.
 list(Requirements) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_user_vnode, snarl_user},
-                  list, Requirements),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
@@ -457,7 +426,6 @@ revoke(User, Permission) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
 
 do_write(User, Op) ->
     case snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user}, User, Op) of

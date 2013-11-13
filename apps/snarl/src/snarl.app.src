@@ -2,13 +2,13 @@
 {application, snarl,
  [
   {description, "RBAC server"},
-  {vsn, "0.4.1"},
+  {vsn, "0.4.2"},
   {registered, []},
   {applications, [
                   kernel,
                   stdlib,
                   riak_core,
-                  hanoidb,
+                  fifo_db,
                   mdns_server_lib,
                   lager,
                   libsnarlmatch,

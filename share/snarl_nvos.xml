@@ -34,22 +34,15 @@
       <service_fmri value='svc:/system/filesystem/local'/>
     </dependency>
 
-    <dependency
-	name='epmd'
-	grouping='require_all'
-	restart_on='none' type='service'>
-      <service_fmri value='svc:/pkgsrc/epmd:default'/>
-    </dependency>
-
     <exec_method
       type='method'
       name='start'
-      exec='/opt/local/snarl/bin/snarl %m'
+      exec='/opt/local/fifo-snarl/bin/snarl %m'
       timeout_seconds='30'>
       <method_context>
 	<method_credential user='snarl' group='snarl' />
 	<method_environment>
-	  <envvar name='PATH' value='/opt/local/gnu/bin:/opt/local/bin:/opt/local/sbin:/usr/bin:/usr/sbin'/>
+	  <envvar name='PATH' value='/usr/gnu/bin:/usr/bin:/usr/sbin'/>
 	  <envvar name='HOME' value='/var/db/snarl'/>
 	</method_environment>
       </method_context>
@@ -58,12 +51,12 @@
     <exec_method
 	name='restart'
 	type='method'
-        exec='/opt/local/snarl/bin/snarl %m'
+        exec='/opt/local/fifo-snarl/bin/snarl %m'
 	timeout_seconds='60'>
       <method_context>
 	<method_credential user='snarl' group='snarl' />
 	<method_environment>
-	  <envvar name='PATH' value='/opt/local/gnu/bin:/opt/local/bin:/opt/local/sbin:/usr/bin:/usr/sbin'/>
+	  <envvar name='PATH' value='/usr/gnu/bin:/usr/bin:/usr/sbin'/>
 	  <envvar name='HOME' value='/var/db/snarl'/>
 	</method_environment>
       </method_context>
@@ -72,12 +65,12 @@
     <exec_method
 	name='stop'
 	type='method'
-        exec='/opt/local/snarl/bin/snarl %m'
+        exec='/opt/local/fifo-snarl/bin/snarl %m'
 	timeout_seconds='60'>
       <method_context>
 	<method_credential user='snarl' group='snarl' />
 	<method_environment>
-	  <envvar name='PATH' value='/opt/local/gnu/bin:/opt/local/bin:/opt/local/sbin:/usr/bin:/usr/sbin'/>
+	  <envvar name='PATH' value='/usr/gnu/bin:/usr/bin:/usr/sbin'/>
 	  <envvar name='HOME' value='/var/db/snarl'/>
 	</method_environment>
       </method_context>

@@ -52,19 +52,13 @@ init(_Args) ->
                 {snarl_entity_read_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [snarl_entity_read_fsm_sup]},
 
-    DB = {snarl_db_sup,
-          {snarl_db_sup, start_link, []},
-          permanent, infinity, supervisor, [snarl_db_sup]},
-
     {ok,
      {{one_for_one, 5, 10},
       [VMaster,
-       {snarl_gc_server, {snarl_gc_server, start_link, []},
-        permanent, 5000, worker, []},
        {statman_server, {statman_server, start_link, [1000]},
         permanent, 5000, worker, []},
        {statman_aggregator, {statman_aggregator, start_link, []},
         permanent, 5000, worker, []},
        GroupVMaster, UserVMaster, TokenVMaster,
        OrgVMaster,
-       ReadFSMs, WriteFSMs, CoverageFSMs, DB]}}.
+       ReadFSMs, WriteFSMs, CoverageFSMs]}}.

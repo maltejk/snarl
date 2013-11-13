@@ -111,9 +111,9 @@ init([Partition]) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#state.partition}, State};
 
-handle_command({repair, Group, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
+handle_command({repair, Token, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
-    Tokens1 = dict:store(Group, Obj, Tokens0),
+    Tokens1 = dict:store(Token, {now(), Obj}, Tokens0),
     {noreply, State#state{tokens=Tokens1}};
 
 handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) ->
@@ -213,9 +213,11 @@ dflt_env(N, D) ->
             V
     end.
 
-expire(#state{cnt = Cnt, timeout_limit = Limit} = State) when Limit < Cnt ->
+expire(#state{cnt = Cnt, timeout_limit = Limit} = State)
+  when Limit < Cnt ->
     State;
-expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State) when Cycle < Cnt ->
+expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State)
+  when Cycle < Cnt ->
     State;
 
 expire(#state{tokens = Tokens, timeout = Timeout} = State) ->

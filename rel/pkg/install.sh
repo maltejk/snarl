@@ -7,6 +7,13 @@ BACKUP_FILE=/var/db/snarl/backup_$DBID.tar.gz
 
 case $2 in
     PRE-INSTALL)
+        if grep '^Image: base64 13.2.*$' /etc/product
+        then
+            echo "Image version supported"
+        else
+            echo "This image version is not supported please use the base64 13.2.1 image."
+            exit 1
+        fi
 	if grep "^$GROUP:" /etc/group > /dev/null 2>&1
 	then
 	    echo "Group already exists, skipping creation."
@@ -48,21 +55,21 @@ case $2 in
 	    echo Service already existings ...
 	else
 	    echo Importing service ...
-	    svccfg import /opt/local/snarl/share/snarl.xml
+	    svccfg import /opt/local/fifo-snarl/share/snarl.xml
 	fi
 
 	echo Trying to guess configuration ...
 	IP=`ifconfig net0 | grep inet | awk -e '{print $2}'`
-	if [ ! -f /opt/local/snarl/etc/vm.args ]
+	if [ ! -f /opt/local/fifo-snarl/etc/vm.args ]
 	then
-	    cp /opt/local/snarl/etc/vm.args.example /opt/local/snarl/etc/vm.args
-	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/snarl/etc/vm.args
+	    cp /opt/local/fifo-snarl/etc/vm.args.example /opt/local/fifo-snarl/etc/vm.args
+	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/fifo-snarl/etc/vm.args
 	fi
-	if [ ! -f /opt/local/snarl/etc/app.config ]
+	if [ ! -f /opt/local/fifo-snarl/etc/app.config ]
 	then
-	    cp /opt/local/snarl/etc/app.config.example /opt/local/snarl/etc/app.config
-	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/snarl/etc/app.config
+	    cp /opt/local/fifo-snarl/etc/app.config.example /opt/local/fifo-snarl/etc/app.config
+	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/fifo-snarl/etc/app.config
 	fi
-	cp /opt/local/snarl/bin/snaadm /opt/local/sbin
+	cp /opt/local/fifo-snarl/bin/snaadm /opt/local/sbin
 	;;
 esac

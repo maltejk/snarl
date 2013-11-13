@@ -23,13 +23,13 @@
          groups/1, join/3, leave/3,
          join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
          add_key/4, revoke_key/3, keys/1,
-         metadata/1, set_metadata/3,
+         metadata/1, set_metadata/4,
          merge/2,
          to_json/1,
-         expire/2,
-         gc/3,
-         gcable/1
+         is_a/1
         ]).
+
+-export_type([user/0, any_user/0]).
 
 -ignore_xref([
               new/0,
@@ -40,59 +40,62 @@
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
               groups/1, join/3, leave/3,
               add_key/4, revoke_key/3, keys/1,
-              metadata/1, set_metadata/3,
+              metadata/1, set_metadata/4,
               join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
               merge/2,
-              to_json/1,
-              expire/2,
-              gc/3,
-              gcable/1
+              to_json/1
              ]).
 
-join_org(ID, Org, User) ->
-    User#?USER{
-            orgs =
-                vorsetg:add(ID, Org, User#?USER.orgs)
-           }.
+-type user() :: #?USER{}.
 
-leave_org(ID, Org, User) ->
-    User#?USER{
-            orgs =
-                vorsetg:remove(ID, Org, User#?USER.orgs)
-           }.
+-type any_user() :: user() |
+                    #user_0_1_2{} |
+                    #user_0_1_1{} |
+                    #user_0_1_0{} |
+                    statebox:statebox().
 
-select_org(_, Org, User) ->
-    User#?USER{
-            active_org = vlwwregister:assign(Org,
-                                             User#?USER.active_org)
-           }.
+is_a(#?USER{}) ->
+    true;
+is_a(_) ->
+    false.
 
-orgs(User) ->
-    vorsetg:value(User#?USER.orgs).
 
-active_org(User) ->
-    vlwwregister:value(User#?USER.active_org).
+-spec load(any_user()) ->
+                  user().
 
 load(#?USER{} = User) ->
     User;
 
-load(#user_0_1_0{
+load(#user_0_1_2{
         uuid = UUID,
         name = Name,
         password = Passwd,
         permissions = Permissions,
+        active_org = ActiveOrg,
         groups = Groups,
-        metadata = Metadata
-       }) ->
-    Size = ?ENV(user_bucket_size, 50),
-    load(#user_0_1_1{
-            uuid = UUID,
-            name = Name,
-            password = Passwd,
-            permissions = Permissions,
-            groups = Groups,
-            ssh_keys = vorsetg:new(Size),
-            metadata = Metadata});
+        ssh_keys = Keys,
+        orgs = Orgs,
+        metadata = Metadata}) ->
+    {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID)),
+    {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name)),
+    {ok, Passwd1} = ?NEW_LWW(vlwwregister:value(Passwd)),
+    {ok, ActiveOrg1} = ?NEW_LWW(vlwwregister:value(ActiveOrg)),
+    {ok, Permissions1} = ?CONVERT_VORSET(Permissions),
+    {ok, Groups1} = ?CONVERT_VORSET(Groups),
+    {ok, Keys1} = ?CONVERT_VORSET(Keys),
+    {ok, Orgs1} = ?CONVERT_VORSET(Orgs),
+    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), none),
+    load(#user_0_1_3{
+            uuid = UUID1,
+            name = Name1,
+            password = Passwd1,
+            active_org = ActiveOrg1,
+            permissions = Permissions1,
+            groups = Groups1,
+            ssh_keys = Keys1,
+            orgs = Orgs1,
+            metadata = Metadata1
+           });
 
 load(#user_0_1_1{
         uuid = UUID,
@@ -113,6 +116,25 @@ load(#user_0_1_1{
             groups = Groups,
             ssh_keys = Keys,
             orgs = vorsetg:new(Size),
+            metadata = Metadata
+           });
+
+load(#user_0_1_0{
+        uuid = UUID,
+        name = Name,
+        password = Passwd,
+        permissions = Permissions,
+        groups = Groups,
+        metadata = Metadata
+       }) ->
+    Size = ?ENV(user_bucket_size, 50),
+    load(#user_0_1_1{
+            uuid = UUID,
+            name = Name,
+            password = Passwd,
+            permissions = Permissions,
+            groups = Groups,
+            ssh_keys = vorsetg:new(Size),
             metadata = Metadata});
 
 load(UserSB) ->
@@ -141,46 +163,21 @@ load(UserSB) ->
             permissions = Permissions,
             metadata = statebox:new(fun() -> Metadata end)}).
 
-gcable(#?USER{
-           permissions = Permissions,
-           groups = Groups,
-           ssh_keys = Keys,
-           orgs = Orgs
-          }) ->
-    {vorsetg:gcable(Permissions), vorsetg:gcable(Groups),
-     vorsetg:gcable(Keys), vorsetg:gcable(Orgs)}.
-
-gc(_ID,
-   {Ps, Gs, Ks, Os},
-   #?USER{
-       permissions = Permissions,
-       groups = Groups,
-       ssh_keys = Keys,
-       orgs = Orgs
-      } = User) ->
-    Ps1 = lists:foldl(fun vorsetg:gc/2, Permissions, Ps),
-    Gs1 = lists:foldl(fun vorsetg:gc/2, Groups, Gs),
-    Ks1 = lists:foldl(fun vorsetg:gc/2, Keys, Ks),
-    Os1 = lists:foldl(fun vorsetg:gc/2, Orgs, Os),
-    User#?USER{
-            permissions = Ps1,
-            groups = Gs1,
-            ssh_keys = Ks1,
-            orgs = Os1
-           }.
-
 new() ->
-    Size = ?ENV(user_bucket_size, 50),
+    {ok, UUID} = ?NEW_LWW(<<>>),
+    {ok, Name} = ?NEW_LWW(<<>>),
+    {ok, Passwd} = ?NEW_LWW(<<>>),
+    {ok, ActiveOrg} = ?NEW_LWW(<<>>),
     #?USER{
-        uuid = vlwwregister:new(<<>>),
-        name = vlwwregister:new(<<>>),
-        password = vlwwregister:new(<<>>),
-        active_org = vlwwregister:new(<<>>),
-        groups = vorsetg:new(Size),
-        permissions = vorsetg:new(Size),
-        ssh_keys = vorsetg:new(Size),
-        orgs = vorsetg:new(Size),
-        metadata = statebox:new(fun jsxd:new/0)
+        uuid = UUID,
+        name = Name,
+        password = Passwd,
+        active_org = ActiveOrg,
+        groups = riak_dt_orswot:new(),
+        permissions = riak_dt_orswot:new(),
+        ssh_keys = riak_dt_orswot:new(),
+        orgs = riak_dt_orswot:new(),
+        metadata = snarl_map:new()
        }.
 
 to_json(#?USER{
@@ -195,14 +192,14 @@ to_json(#?USER{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, vlwwregister:value(UUID)},
-       {<<"name">>, vlwwregister:value(Name)},
-       {<<"groups">>, vorsetg:value(Groups)},
-       {<<"permissions">>, vorsetg:value(Permissions)},
-       {<<"keys">>, vorsetg:value(Keys)},
-       {<<"org">>, vlwwregister:value(Org)},
-       {<<"orgs">>, vorsetg:value(Orgs)},
-       {<<"metadata">>, statebox:value(Metadata)}
+       {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
+       {<<"name">>, riak_dt_lwwreg:value(Name)},
+       {<<"groups">>, riak_dt_orswot:value(Groups)},
+       {<<"permissions">>, riak_dt_orswot:value(Permissions)},
+       {<<"keys">>, riak_dt_orswot:value(Keys)},
+       {<<"org">>, riak_dt_lwwreg:value(Org)},
+       {<<"orgs">>, riak_dt_orswot:value(Orgs)},
+       {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
 merge(#?USER{
@@ -228,77 +225,84 @@ merge(#?USER{
           metadata = Metadata2
          }) ->
     #?USER{
-        uuid = vlwwregister:merge(UUID1, UUID2),
-        name = vlwwregister:merge(Name1, Name2),
-        password = vlwwregister:merge(Password1, Password2),
-        active_org = vlwwregister:merge(Org1, Org2),
-        groups = vorsetg:merge(Groups1, Groups2),
-        ssh_keys = vorsetg:merge(Keys1, Keys2),
-        permissions = vorsetg:merge(Permissions1, Permissions2),
-        orgs = vorsetg:merge(Orgs1, Orgs2),
-        metadata = statebox:merge([Metadata1, Metadata2])
+        uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
+        name = riak_dt_lwwreg:merge(Name1, Name2),
+        password = riak_dt_lwwreg:merge(Password1, Password2),
+        active_org = riak_dt_lwwreg:merge(Org1, Org2),
+        groups = riak_dt_orswot:merge(Groups1, Groups2),
+        ssh_keys = riak_dt_orswot:merge(Keys1, Keys2),
+        permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
+        orgs = riak_dt_orswot:merge(Orgs1, Orgs2),
+        metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
+join_org(ID, Org, User) ->
+    {ok, O1} = riak_dt_orswot:update({add, Org}, ID, User#?USER.orgs),
+    User#?USER{orgs = O1}.
+
+leave_org(ID, Org, User) ->
+    {ok, O1} = riak_dt_orswot:update({remove, Org}, ID, User#?USER.orgs),
+    User#?USER{orgs = O1}.
+
+select_org(_, Org, User) ->
+    {ok, O1} = riak_dt_lwwreg:update({assign, Org}, none, User#?USER.active_org),
+    User#?USER{active_org = O1}.
+
+orgs(User) ->
+    riak_dt_orswot:value(User#?USER.orgs).
+
+active_org(User) ->
+    riak_dt_lwwreg:value(User#?USER.active_org).
+
 add_key(ID, KeyID, Key, User) ->
-    User#?USER{
-            ssh_keys =
-                vorsetg:add(ID, {KeyID, Key}, User#?USER.ssh_keys)
-           }.
+    {ok, S1} = riak_dt_orswot:update({add, {KeyID, Key}}, ID, User#?USER.ssh_keys),
+    User#?USER{ssh_keys = S1}.
 
 revoke_key(ID, KeyID, User) ->
     case lists:keyfind(KeyID, 1, keys(User)) of
         false ->
             User;
         Tpl ->
-            User#?USER{
-                    ssh_keys =
-                        vorsetg:remove(ID, Tpl, User#?USER.ssh_keys)
-                   }
+            {ok, S1} = riak_dt_orswot:update({remove, Tpl}, ID,
+                                             User#?USER.ssh_keys),
+            User#?USER{ssh_keys = S1}
     end.
 
 keys(User) ->
-    vorsetg:value(User#?USER.ssh_keys).
+    riak_dt_orswot:value(User#?USER.ssh_keys).
 
 name(User) ->
-    vlwwregister:value(User#?USER.name).
+    riak_dt_lwwreg:value(User#?USER.name).
 
 name(_, Name, User) ->
-    User#?USER{
-            name = vlwwregister:assign(Name, User#?USER.name)
-           }.
+    {ok, Name1} = riak_dt_lwwreg:update({assign, Name}, none, User#?USER.name),
+    User#?USER{name = Name1}.
 
 uuid(User) ->
-    vlwwregister:value(User#?USER.uuid).
+    riak_dt_lwwreg:value(User#?USER.uuid).
 
 uuid(_, UUID, User) ->
-    User#?USER{
-            uuid = vlwwregister:assign(UUID, User#?USER.uuid)
-           }.
+    {ok, UUID1} = riak_dt_lwwreg:update({assign, UUID}, none, User#?USER.uuid),
+    User#?USER{uuid = UUID1}.
 
 password(User) ->
-    vlwwregister:value(User#?USER.password).
+    riak_dt_lwwreg:value(User#?USER.password).
 
 password(_, Hash, User) ->
-    User#?USER{
-            password = vlwwregister:assign(Hash,
-                                           User#?USER.password)
-           }.
+    {ok, PWD1} = riak_dt_lwwreg:update({assign, Hash}, none, User#?USER.password),
+    User#?USER{password = PWD1}.
 
 permissions(User) ->
-    vorsetg:value(User#?USER.permissions).
+    riak_dt_orswot:value(User#?USER.permissions).
 
-grant(ID, Permission, User) ->
-    User#?USER{
-            permissions =
-                vorsetg:add(ID, Permission, User#?USER.permissions)
-           }.
+grant(ID, P, User) ->
+    {ok, P1} = riak_dt_orswot:update({add, P}, ID, User#?USER.permissions),
+    User#?USER{permissions = P1}.
 
 
-revoke(ID, Permission, User) ->
-    User#?USER{
-            permissions =
-                vorsetg:remove(ID, Permission, User#?USER.permissions)
-           }.
+revoke(ID, P, User) ->
+    {ok, P1} = riak_dt_orswot:update({remove, P}, ID, User#?USER.permissions),
+    User#?USER{permissions = P1}.
 
 revoke_prefix(ID, Prefix, User) ->
     P0 = User#?USER.permissions,
@@ -306,7 +310,9 @@ revoke_prefix(ID, Prefix, User) ->
     P1 = lists:foldl(fun (P, PAcc) ->
                              case lists:prefix(Prefix, P) of
                                  true ->
-                                     vorsetg:remove(ID, P, PAcc);
+                                     {ok, R} = riak_dt_orswot:update(
+                                                 {remove, P}, ID, PAcc),
+                                     R;
                                  _ ->
                                      PAcc
                              end
@@ -316,43 +322,30 @@ revoke_prefix(ID, Prefix, User) ->
            }.
 
 groups(User) ->
-    vorsetg:value(User#?USER.groups).
+    riak_dt_orswot:value(User#?USER.groups).
 
 
 join(ID, Group, User) ->
-    User#?USER{
-            groups =
-                vorsetg:add(ID, Group, User#?USER.groups)
-           }.
+    {ok, G} = riak_dt_orswot:update({add, Group}, ID, User#?USER.groups),
+    User#?USER{groups = G}.
 
 leave(ID, Group, User) ->
-    User#?USER{
-            groups =
-                vorsetg:remove(ID, Group, User#?USER.groups)
-           }.
+    {ok, G} = riak_dt_orswot:update({remove, Group}, ID, User#?USER.groups),
+    User#?USER{groups = G}.
 
 metadata(User) ->
     User#?USER.metadata.
 
-set_metadata(Attribute, delete, User) ->
-    User#?USER{
-            metadata =
-                statebox:modify({fun jsxd:delete/2,
-                                 [Attribute]}, User#?USER.metadata)
-           };
+set_metadata(ID, P, Value, User) when is_binary(P) ->
+    set_metadata(ID, snarl_map:split_path(P), Value, User);
 
-set_metadata(Attribute, Value, User) ->
-    User#?USER{
-            metadata =
-                statebox:modify({fun jsxd:set/3,
-                                 [Attribute, Value]}, User#?USER.metadata)
-           }.
+set_metadata(ID, Attribute, delete, User) ->
+    {ok, M1} = snarl_map:remove(Attribute, ID, User#?USER.metadata),
+    User#?USER{metadata = M1};
 
-expire(Timeout, User) ->
-    User#?USER{
-            metadata =
-                statebox:expire(Timeout, User#?USER.metadata)
-           }.
+set_metadata(ID, Attribute, Value, User) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, User#?USER.metadata),
+    User#?USER{metadata = M1}.
 
 -ifdef(TEST).
 
@@ -361,14 +354,14 @@ mkid() ->
 
 to_json_test() ->
     User = new(),
-    UserJ = [{<<"groups">>,[]},
-             {<<"keys">>,[]},
-             {<<"metadata">>,[]},
-             {<<"name">>,<<>>},
-             {<<"org">>,<<>>},
-             {<<"orgs">>,[]},
-             {<<"permissions">>,[]},
-             {<<"uuid">>,<<>>}],
+    UserJ = [{<<"groups">>, []},
+             {<<"keys">>, []},
+             {<<"metadata">>, []},
+             {<<"name">>, <<>>},
+             {<<"org">>, <<>>},
+             {<<"orgs">>, []},
+             {<<"permissions">>, []},
+             {<<"uuid">>, <<>> }],
     ?assertEqual(UserJ, to_json(User)).
 
 name_test() ->

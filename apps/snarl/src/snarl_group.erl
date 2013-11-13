@@ -12,9 +12,7 @@
          set/2, set/3,
          create/2,
          revoke_prefix/2,
-         gcable/1,
-         import/2,
-         gc/2
+         import/2
         ]).
 
 -ignore_xref([ping/0, create/2]).
@@ -48,11 +46,11 @@ lookup(Group) ->
 -spec lookup_(Group::binary()) ->
                      not_found |
                      {error, timeout} |
-                     {ok, Group::#?GROUP{}}.
+                     {ok, Group::snarl_group_state:group()}.
 lookup_(Group) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_group_vnode, snarl_group},
-                  lookup, Group),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_group_vnode_master, snarl_group,
+                  {lookup, Group}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -64,36 +62,6 @@ lookup_(Group) ->
         R ->
             R
     end.
-
-
--spec gcable(Group::fifo:group_id()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, [term()]}.
-gcable(Group) ->
-    case get_(Group) of
-        {ok, GroupObj} ->
-            {ok, snarl_group_state:gcable(GroupObj)};
-        R  ->
-            R
-    end.
-
--spec gc(Group::fifo:group_id(),
-         GCable::term()) ->
-                not_found |
-                {error, timeout} |
-                ok.
-gc(Group, GCable) ->
-    case get_(Group) of
-        {ok, GroupObj1} ->
-            do_write(Group, gc, GCable),
-            {ok, GroupObj2} = get_(Group),
-            {ok, byte_size(term_to_binary(GroupObj1)) -
-                 byte_size(term_to_binary(GroupObj2))};
-        R ->
-            R
-    end.
-
 
 -spec get(Group::fifo:group_id()) ->
                  not_found |
@@ -110,7 +78,7 @@ get(Group) ->
 -spec get_(Group::fifo:group_id()) ->
                  not_found |
                  {error, timeout} |
-                 {ok, Group::#?GROUP{}}.
+                 {ok, Group::snarl_group_state:group()}.
 get_(Group) ->
     case snarl_entity_read_fsm:start(
            {snarl_group_vnode, snarl_group},
@@ -127,17 +95,17 @@ get_(Group) ->
                 {error, timeout}.
 
 list() ->
-    snarl_entity_coverage_fsm:start(
-      {snarl_group_vnode, snarl_group},
-      list
-     ).
+    snarl_coverage:start(
+      snarl_group_vnode_master, snarl_group,
+      list).
+
 
 -spec list(Reqs::[fifo:matcher()]) ->
                   {ok, [IPR::fifo:group_id()]} | {error, timeout}.
 list(Requirements) ->
-    {ok, Res} = snarl_entity_coverage_fsm:start(
-                  {snarl_group_vnode, snarl_group},
-                  list, Requirements),
+    {ok, Res} = snarl_coverage:start(
+                  snarl_group_vnode_master, snarl_group,
+                  {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 

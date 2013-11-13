@@ -2,7 +2,10 @@ REBAR = $(shell pwd)/rebar
 
 .PHONY: deps rel stagedevrel version all
 
-all: deps compile
+all: cp-hooks deps compile
+
+cp-hooks:
+	cp hooks/* .git/hooks
 
 version:
 	echo "$(shell git symbolic-ref HEAD 2> /dev/null | cut -b 12-)-$(shell git log --pretty=format:'%h, %ad' -1)" > snarl.version
@@ -23,11 +26,21 @@ clean:
 distclean: clean devclean relclean
 	$(REBAR) delete-deps
 
-test: all
+eunit: 
+	$(REBAR) skip_deps=true compile
+	$(REBAR) skip_deps=true eunit
+
+test:  eunit
 	$(REBAR) skip_deps=true xref
+
+quick-xref:
+	$(REBAR) xref skip_deps=true
+
+quick-test:
 	$(REBAR) skip_deps=true eunit
 
 rel: all zabbix
+	-rm -r rel/snarl/share
 	$(REBAR) generate
 
 relclean:
@@ -79,7 +92,7 @@ APPS = kernel stdlib sasl erts ssl tools os_mon runtime_tools crypto inets \
 COMBO_PLT = $(HOME)/.snarl_combo_dialyzer_plt
 
 check_plt: deps compile
-	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) \
+	dialyzer --check_plt --plt $(COMBO_PLT) --apps $(APPS) -pa deps/*/ebin \
 		deps/*/ebin apps/*/ebin
 
 build_plt: deps compile

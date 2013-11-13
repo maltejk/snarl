@@ -19,13 +19,13 @@
          uuid/1, uuid/3,
          name/1, name/3,
          permissions/1, grant/3, revoke/3, revoke_prefix/3,
-         metadata/1, set_metadata/3,
+         metadata/1, set_metadata/4,
          merge/2,
          to_json/1,
-         expire/2,
-         gcable/1,
-         gc/3
+         is_a/1
         ]).
+
+-export_type([group/0, any_group/0]).
 
 -ignore_xref([
               new/0,
@@ -33,39 +33,54 @@
               uuid/1, uuid/2,
               name/1, name/2,
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
-              metadata/1, set_metadata/3,
-              to_json/1,
-              gcable/1,
-              gc/3
+              metadata/1, set_metadata/4,
+              to_json/1
              ]).
 
-gcable(#?GROUP{
-           permissions = Permissions
-          }) ->
-    vorsetg:gcable(Permissions).
+-opaque group() :: #?GROUP{}.
 
-gc(_ID,
-   Ps,
-   #?GROUP{
-       permissions = Permissions
-      } = Group) ->
-    Ps1 = lists:foldl(fun vorsetg:gc/2, Permissions, Ps),
-    Group#?GROUP{
-            permissions = Ps1
-           }.
+-opaque any_group() :: group() |
+                       #group_0_1_0{} |
+                       statebox:statebox().
+
+is_a(#?GROUP{}) ->
+    true;
+is_a(_) ->
+    false.
+
 
 new() ->
-    Size = ?ENV(group_bucket_size, 50),
+    {ok, UUID} = ?NEW_LWW(<<>>),
+    {ok, Name} = ?NEW_LWW(<<>>),
     #?GROUP{
-        uuid = vlwwregister:new(<<>>),
-        name = vlwwregister:new(<<>>),
-        permissions = vorsetg:new(Size),
-        metadata = statebox:new(fun jsxd:new/0)
+        uuid = UUID,
+        name = Name,
+        permissions = riak_dt_orswot:new(),
+        metadata = snarl_map:new()
        }.
 
+-spec load(any_group()) ->
+                  group().
 
 load(#?GROUP{} = Group) ->
     Group;
+
+load(#group_0_1_0{
+        uuid = UUID,
+        name = Name,
+        permissions = Permissions,
+        metadata = Metadata
+       }) ->
+    {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID)),
+    {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name)),
+    {ok, Permissions1} = ?CONVERT_VORSET(Permissions),
+    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), none),
+    load(#group_0_1_1{
+            uuid = UUID1,
+            name = Name1,
+            permissions = Permissions1,
+            metadata = Metadata1
+           });
 
 load(GroupSB) ->
     Size = ?ENV(group_bucket_size, 50),
@@ -79,12 +94,12 @@ load(GroupSB) ->
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
                     end, vorsetg:new(Size), Permissions0),
-    #?GROUP{
-        uuid = vlwwregister:new(UUID),
-        name = vlwwregister:new(Name),
-        permissions = Permissions,
-        metadata = statebox:new(fun () -> Metadata end)
-       }.
+    load(#group_0_1_0{
+            uuid = vlwwregister:new(UUID),
+            name = vlwwregister:new(Name),
+            permissions = Permissions,
+            metadata = statebox:new(fun () -> Metadata end)
+           }).
 
 to_json(#?GROUP{
             uuid = UUID,
@@ -94,17 +109,17 @@ to_json(#?GROUP{
            }) ->
     jsxd:from_list(
       [
-       {<<"uuid">>, vlwwregister:value(UUID)},
-       {<<"name">>, vlwwregister:value(Name)},
-       {<<"permissions">>, vorsetg:value(Permissions)},
-       {<<"metadata">>, statebox:value(Metadata)}
+       {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
+       {<<"name">>, riak_dt_lwwreg:value(Name)},
+       {<<"permissions">>, riak_dt_orswot:value(Permissions)},
+       {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
 merge(#?GROUP{
-            uuid = UUID1,
-            name = Name1,
-            permissions = Permissions1,
-            metadata = Metadata1
+          uuid = UUID1,
+          name = Name1,
+          permissions = Permissions1,
+          metadata = Metadata1
          },
       #?GROUP{
           uuid = UUID2,
@@ -113,43 +128,41 @@ merge(#?GROUP{
           metadata = Metadata2
          }) ->
     #?GROUP{
-        uuid = vlwwregister:merge(UUID1, UUID2),
-        name = vlwwregister:merge(Name1, Name2),
-        permissions = vorsetg:merge(Permissions1, Permissions2),
-        metadata = statebox:merge([Metadata1, Metadata2])
+        uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
+        name = riak_dt_lwwreg:merge(Name1, Name2),
+        permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
+        metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
 name(Group) ->
-    vlwwregister:value(Group#?GROUP.name).
+    riak_dt_lwwreg:value(Group#?GROUP.name).
 
 name(_, Name, Group) ->
-    Group#?GROUP{
-             name = vlwwregister:assign(Name, Group#?GROUP.name)
-            }.
+    {ok, V} = riak_dt_lwwreg:update({assign, Name}, none, Group#?GROUP.name),
+    Group#?GROUP{name = V}.
 
 uuid(Group) ->
-    vlwwregister:value(Group#?GROUP.uuid).
+    riak_dt_lwwreg:value(Group#?GROUP.uuid).
 
-uuid(_, UUID, Group) ->
-    Group#?GROUP{
-             uuid = vlwwregister:assign(UUID, Group#?GROUP.uuid)
-            }.
+-spec uuid(Actor::term(), UUID::binary(), Group) ->
+                  Group.
+uuid(_, UUID, Group = #?GROUP{}) ->
+    {ok, V} = riak_dt_lwwreg:update({assign, UUID}, none, Group#?GROUP.uuid),
+    Group#?GROUP{uuid = V}.
 
 permissions(Group) ->
-    vorsetg:value(Group#?GROUP.permissions).
+    riak_dt_orswot:value(Group#?GROUP.permissions).
 
-grant(ID, Permission, Group) ->
-    Group#?GROUP{
-             permissions =
-                 vorsetg:add(ID, Permission, Group#?GROUP.permissions)
-            }.
+grant(ID, Permission, Group = #?GROUP{}) ->
+    {ok, V} = riak_dt_orswot:update({add, Permission},
+                                    ID, Group#?GROUP.permissions),
+    Group#?GROUP{permissions = V}.
 
 
 revoke(ID, Permission, Group) ->
-    Group#?GROUP{
-             permissions =
-                 vorsetg:remove(ID, Permission, Group#?GROUP.permissions)
-            }.
+    {ok, V} =  riak_dt_orswot:update({remove, Permission},
+                                     ID, Group#?GROUP.permissions),
+    Group#?GROUP{permissions = V}.
 
 revoke_prefix(ID, Prefix, Group) ->
     P0 = Group#?GROUP.permissions,
@@ -157,7 +170,9 @@ revoke_prefix(ID, Prefix, Group) ->
     P1 = lists:foldl(fun (P, PAcc) ->
                              case lists:prefix(Prefix, P) of
                                  true ->
-                                     vorsetg:remove(ID, P, PAcc);
+                                     {ok, V} =  riak_dt_orswot:update(
+                                                  {remove, P}, ID, PAcc),
+                                     V;
                                  _ ->
                                      PAcc
                              end
@@ -169,21 +184,16 @@ revoke_prefix(ID, Prefix, Group) ->
 metadata(Group) ->
     Group#?GROUP.metadata.
 
-set_metadata(Attribute, delete, Group) ->
-    Group#?GROUP{
-             metadata = jsxd:delete(Attribute, Group#?GROUP.metadata)
-            };
+set_metadata(ID, P, Value, Group) when is_binary(P) ->
+    set_metadata(ID, snarl_map:split_path(P), Value, Group);
 
-set_metadata(Attribute, Value, Group) ->
-    Group#?GROUP{
-             metadata = jsxd:set(Attribute, Value, Group#?GROUP.metadata)
-            }.
+set_metadata(ID, Attribute, delete, Group) ->
+    {ok, M1} = snarl_map:remove(Attribute, ID, Group#?GROUP.metadata),
+    Group#?GROUP{metadata = M1};
 
-expire(Timeout, Group) ->
-    Group#?GROUP{
-            metadata =
-                statebox:expire(Timeout, Group#?GROUP.metadata)
-           }.
+set_metadata(ID, Attribute, Value, Group) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, Group#?GROUP.metadata),
+    Group#?GROUP{metadata = M1}.
 
 -ifdef(TEST).
 mkid() ->
