@@ -2,7 +2,7 @@
 
 %% @doc The TCP endpoint that will be broadcasted.
 {mapping, "ip", "snarl.endpoint",
- [{default, {"127.0.0.1", 4223}},
+ [{default, {"{{snarl_ip}}", {{snarl_port}} }},
   {datatype, ip}]}.
 
 {translation,
