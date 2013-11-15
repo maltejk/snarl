@@ -50,25 +50,14 @@ case $2 in
     fi
 	;;
     POST-INSTALL)
-	if svcs svc:/network/snarl:default > /dev/null 2>&1
-	then
-	    echo Service already existings ...
-	else
-	    echo Importing service ...
-	    svccfg import /opt/local/fifo-snarl/share/snarl.xml
-	fi
-
+	echo Importing service ...
+	svccfg import /opt/local/fifo-snarl/share/snarl.xml
 	echo Trying to guess configuration ...
 	IP=`ifconfig net0 | grep inet | awk -e '{print $2}'`
-	if [ ! -f /opt/local/fifo-snarl/etc/vm.args ]
+	if [ ! -f /opt/local/fifo-snarl/etc/snarl.conf ]
 	then
-	    cp /opt/local/fifo-snarl/etc/vm.args.example /opt/local/fifo-snarl/etc/vm.args
-	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/fifo-snarl/etc/vm.args
-	fi
-	if [ ! -f /opt/local/fifo-snarl/etc/app.config ]
-	then
-	    cp /opt/local/fifo-snarl/etc/app.config.example /opt/local/fifo-snarl/etc/app.config
-	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/fifo-snarl/etc/app.config
+	    cp /opt/local/fifo-snarl/etc/snarl.conf.example /opt/local/fifo-snarl/etc/snarl.conf
+	    sed --in-place -e "s/127.0.0.1/${IP}/g" /opt/local/fifo-snarl/etc/snarl.conf
 	fi
 	cp /opt/local/fifo-snarl/bin/snaadm /opt/local/sbin
 	;;
