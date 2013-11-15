@@ -31,6 +31,7 @@
  end
 }.
 
+%% @doc The path data gets stored into.
 {mapping, "data_dir", "riak_core.platform_data_dir",
  [{default, "{{platform_data_dir}}"},
   {datatype, string}]}.
