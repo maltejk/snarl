@@ -252,7 +252,7 @@ handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
                                                          Attribute, Value, H)
                    end, H1, Attributes),
             fifo_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H2, Coordinator, O)),
+                        snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),
@@ -265,7 +265,7 @@ handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender, State) 
     case fifo_db:get(State#state.db, <<"user">>, UUID) of
         {ok, O} ->
             fifo_db:put(State#state.db, <<"user">>, UUID,
-                         snarl_obj:update(H2, Coordinator, O)),
+                        snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         _R ->
             VC0 = vclock:fresh(),
@@ -318,7 +318,7 @@ handle_handoff_data(Data, State) ->
         {ok, #snarl_obj{val = V0}} ->
             V1 = snarl_user_state:load(V0),
             fifo_db:put(State#state.db, <<"user">>, User,
-                         Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
+                        Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
         not_found ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(node(), VC0),
@@ -332,64 +332,64 @@ encode_handoff_item(User, Data) ->
 
 is_empty(State) ->
     fifo_db:fold(State#state.db,
-                  <<"user">>,
-                  fun (_,_, _) ->
-                          {false, State}
-                  end, {true, State}).
+                 <<"user">>,
+                 fun (_,_, _) ->
+                         {false, State}
+                 end, {true, State}).
 
 delete(State) ->
     Trans = fifo_db:fold(State#state.db,
-                          <<"user">>,
-                          fun (K,_, A) ->
-                                  [{delete, <<"user", K/binary>>} | A]
-                          end, []),
+                         <<"user">>,
+                         fun (K,_, A) ->
+                                 [{delete, <<"user", K/binary>>} | A]
+                         end, []),
     fifo_db:transact(State#state.db, Trans),
     {ok, State}.
 
 handle_coverage({find_key, KeyID}, _KeySpaces, {_, ReqID, _}, State) ->
     Res = fifo_db:fold(State#state.db,
-                        <<"user">>,
-                        fun (UUID, #snarl_obj{val=U0}, not_found) ->
-                                U1 = snarl_user_state:load(U0),
-                                Ks = snarl_user_state:keys(U1),
-                                Ks1 = [key_to_id(K) || {_, K} <- Ks],
-                                case lists:member(KeyID, Ks1) of
-                                    true ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
+                       <<"user">>,
+                       fun (UUID, #snarl_obj{val=U0}, not_found) ->
+                               U1 = snarl_user_state:load(U0),
+                               Ks = snarl_user_state:keys(U1),
+                               Ks1 = [key_to_id(K) || {_, K} <- Ks],
+                               case lists:member(KeyID, Ks1) of
+                                   true ->
+                                       UUID;
+                                   _ ->
+                                       not_found
+                               end;
+                           (_U, _, Res) ->
+                               Res
+                       end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
 handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
     Res = fifo_db:fold(State#state.db,
-                        <<"user">>,
-                        fun (UUID, #snarl_obj{val = U0}, not_found) ->
-                                U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:name(U1) of
-                                    Name ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
+                       <<"user">>,
+                       fun (UUID, #snarl_obj{val = U0}, not_found) ->
+                               U1 = snarl_user_state:load(U0),
+                               case snarl_user_state:name(U1) of
+                                   Name ->
+                                       UUID;
+                                   _ ->
+                                       not_found
+                               end;
+                           (_U, _, Res) ->
+                               Res
+                       end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
 
 handle_coverage(list, _KeySpaces, {_, ReqID, _}, State) ->
     List = fifo_db:fold(State#state.db,
-                         <<"user">>,
-                         fun (K, _, L) ->
-                                 [K|L]
-                         end, []),
+                        <<"user">>,
+                        fun (K, _, L) ->
+                                [K|L]
+                        end, []),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, List},
      State};
@@ -399,15 +399,15 @@ handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
                      snarl_user_state:uuid(snarl_user_state:load(S0))
              end,
     List = fifo_db:fold(State#state.db,
-                         <<"user">>,
-                         fun (Key, E, C) ->
-                                 case rankmatcher:match(E, Getter, Requirements) of
-                                     false ->
-                                         C;
-                                     Pts ->
-                                         [{Pts, Key} | C]
-                                 end
-                         end, []),
+                        <<"user">>,
+                        fun (Key, E, C) ->
+                                case rankmatcher:match(E, Getter, Requirements) of
+                                    false ->
+                                        C;
+                                    Pts ->
+                                        [{Pts, Key} | C]
+                                end
+                        end, []),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, List},
      State};
@@ -434,7 +434,7 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
                          snarl_user_state:Action(ID, Val1, Val2, H1)
                  end,
             fifo_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H2, Coordinator, O)),
+                        snarl_obj:update(H2, Coordinator, O)),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[users] tried to write to a non existing user: ~p", [R]),
