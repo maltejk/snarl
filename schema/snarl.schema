@@ -1,5 +1,25 @@
 %% -*- erlang -*-
 
+%% Slightly more complex mapping with translation layer
+%% @doc enable active anti-entropy subsystem
+{mapping, "anti_entropy", "riak_core.anti_entropy", [
+  {datatype, {enum, [on, off, debug]}},
+  {default, on}
+]}.
+
+{ translation,
+  "riak_core.anti_entropy",
+  fun(Conf) ->
+    Setting = cuttlefish_util:conf_get_value("anti_entropy", Conf),
+    case Setting of
+      on -> {on, []};
+      debug -> {on, [debug]};
+      off -> {off, []};
+      _Default -> {on, []}
+    end
+  end
+}.
+
 %% @doc The TCP endpoint that will be broadcasted.
 {mapping, "ip", "snarl.endpoint",
  [{default, {"{{snarl_ip}}", {{snarl_port}} }},
@@ -32,12 +52,12 @@
 }.
 
 %% @doc The path data gets stored into.
-{mapping, "data_dir", "riak_core.platform_data_dir",
+{mapping, "data_dir", "fifo_db.db_path",
  [{default, "{{platform_data_dir}}"},
   {datatype, string}]}.
 
 {translation,
- "fifo_db.db_path",
+ "riak_core.platform_data_dir",
  fun(Conf) ->
          cuttlefish_util:conf_get_value("data_dir", Conf)
  end
