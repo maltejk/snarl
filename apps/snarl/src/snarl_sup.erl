@@ -52,6 +52,26 @@ init(_Args) ->
                 {snarl_entity_read_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [snarl_entity_read_fsm_sup]},
 
+    riak_core_entropy_info:create_table(),
+
+    EntropyManagerUser =
+        {snarl_user_entropy_manager,
+         {riak_core_entropy_manager, start_link,
+          [snarl_user, snarl_user_vnode]},
+         permanent, 30000, worker, [riak_core_entropy_manager]},
+
+    EntropyManagerGroup =
+        {snarl_group_entropy_manager,
+         {riak_core_entropy_manager, start_link,
+          [snarl_group, snarl_group_vnode]},
+         permanent, 30000, worker, [riak_core_entropy_manager]},
+
+    EntropyManagerOrg =
+        {snarl_org_entropy_manager,
+         {riak_core_entropy_manager, start_link,
+          [snarl_org, snarl_org_vnode]},
+         permanent, 30000, worker, [riak_core_entropy_manager]},
+
     {ok,
      {{one_for_one, 5, 10},
       [VMaster,
@@ -61,4 +81,5 @@ init(_Args) ->
         permanent, 5000, worker, []},
        GroupVMaster, UserVMaster, TokenVMaster,
        OrgVMaster,
+       EntropyManagerUser, EntropyManagerGroup, EntropyManagerOrg,
        ReadFSMs, WriteFSMs, CoverageFSMs]}}.
