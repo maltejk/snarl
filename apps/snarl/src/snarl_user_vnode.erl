@@ -382,6 +382,10 @@ handle_command({Action, {ReqID, Coordinator}, User, Param1, Param2}, _Sender, St
 handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender, State) ->
     change_user(User, Action, [Param], Coordinator, State, ReqID);
 
+%%%===================================================================
+%%% AAE
+%%%===================================================================
+
 handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     lager:debug("Fold on ~p", [State#state.partition]),
     Acc = fifo_db:fold(State#state.db, <<"user">>,
@@ -575,6 +579,9 @@ change_user(User, Action, Vals, Coordinator, State, ReqID) ->
             {reply, {ok, ReqID, not_found}, State}
     end.
 
+%%%===================================================================
+%%% AAE
+%%%===================================================================
 -spec maybe_create_hashtrees(state()) -> state().
 maybe_create_hashtrees(State) ->
     maybe_create_hashtrees(riak_core_entropy_manager:enabled(), State).
