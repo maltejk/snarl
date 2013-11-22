@@ -482,9 +482,8 @@ handle_info({'DOWN', _, _, Pid, _}, State=#state{
                                              partition=Idx
                                             }) ->
     lager:debug("~p/~p hashtree ~p went down.", [?SERVICE, Idx, Pid]),
-    HT = riak_core_aae_vnode:maybe_create_hashtrees(?SERVICE, State#state.partition,
-                                                    undefined),
-    {ok, State#state{hashtrees = HT}};
+    erlang:send_after(1000, self(), retry_create_hashtree),
+    {ok, State#state{hashtrees = undefined}};
 handle_info({'DOWN', _, _, _, _}, State) ->
     {ok, State};
 handle_info(_, State) ->
