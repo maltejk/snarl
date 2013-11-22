@@ -39,9 +39,9 @@ start(_StartType, _StartArgs) ->
     end,
     case snarl_sup:start_link() of
         {ok, Pid} ->
-            ?SRV(snarl_user_vnode, snarl_user),
+            ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
             ?SRV_WITH_AAE(snarl_group_vnode, snarl_group),
-            ?SRV(snarl_org_vnode, snarl_org),
+            ?SRV_WITH_AAE(snarl_org_vnode, snarl_org),
 
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),
             ok = riak_core_node_watcher:service_up(snarl_token, self()),
