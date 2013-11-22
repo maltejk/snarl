@@ -61,11 +61,9 @@
 
 -record(state, {db, partition, node, hashtrees}).
 
--type state() :: #state{}.
+-define(SERVICE, sniffle_group).
 
 -define(MASTER, snarl_group_vnode_master).
-
--define(DEFAULT_HASHTREE_TOKENS, 90).
 
 %%%===================================================================
 %%% AAE
@@ -191,9 +189,10 @@ revoke_prefix(Preflist, ReqID, Group, Val) ->
 init([Partition]) ->
     DB = list_to_atom(integer_to_list(Partition)),
     fifo_db:start(DB),
-    State = #state{db = DB, node = node(), partition = Partition},
-    State2 = maybe_create_hashtrees(State),
-    {ok, State2}.
+    HT = riak_core_aae_vnode:maybe_create_hashtrees(?SERVICE,
+                                                    Partition,
+                                                    undefined),
+    {ok, #state{db = DB, hashtrees = HT, partition = Partition, node = node()}}.
 
 %% Sample command: respond to a ping
 handle_command(ping, _Sender, State) ->
@@ -217,17 +216,17 @@ handle_command({repair, Group, _VClock, #snarl_obj{} = Obj},
 
 handle_command({hashtree_pid, Node}, _, State=#state{hashtrees=HT}) ->
     %% Handle riak_core request forwarding during ownership handoff.
-    case node() of
-        Node ->
-            %% Following is necessary in cases where anti-entropy was enabled
-            %% after the vnode was already running
-            case HT of
-                undefined ->
-                    State2 = maybe_create_hashtrees(State),
-                    {reply, {ok, State2#state.hashtrees}, State2};
-                _ ->
-                    {reply, {ok, HT}, State}
-            end;
+    %% Following is necessary in cases where anti-entropy was enabled
+    %% after the vnode was already running
+    case {node(), HT} of
+        {Node, undefined} ->
+            HT1 =  riak_core_aae_vnode:maybe_create_hashtrees(
+                     ?SERVICE,
+                     State#state.partition,
+                     HT),
+            {reply, {ok, HT1}, State#state{hashtrees = HT1}};
+        {Node, _} ->
+            {reply, {ok, HT}, State};
         _ ->
             {reply, {error, wrong_node}, State}
     end;
@@ -235,12 +234,23 @@ handle_command({hashtree_pid, Node}, _, State=#state{hashtrees=HT}) ->
 handle_command({rehash, Key}, _, State=#state{db=DB}) ->
     case fifo_db:get(DB, <<"group">>, Key) of
         {ok, Term} ->
-            update_hashtree(Key, term_to_binary(Term), State);
+            riak_core_aae_vnode:update_hashtree(<<"group">>, Key,
+                                                term_to_binary(Term),
+                                                State#state.hashtrees);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
-            riak_core_index_hashtree:delete({<<"group">>, Key}, State#state.hashtrees)
+            riak_core_index_hashtree:delete({<<"group">>, Key},
+                                            State#state.hashtrees)
     end,
     {noreply, State};
+
+handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
+    lager:debug("Fold on ~p", [State#state.partition]),
+    Acc = fifo_db:fold(State#state.db, <<"group">>,
+                       fun(K, V, O) ->
+                               Fun({<<"group">>, K}, V, O)
+                       end, Acc0),
+    {reply, Acc, State};
 
 %%%===================================================================
 %%% General
@@ -309,14 +319,6 @@ handle_command({Action, {ReqID, Coordinator}, Group, Param1, Param2}, _Sender, S
 handle_command({Action, {ReqID, Coordinator}, Group, Param1}, _Sender, State) ->
     change_group(Group, Action, [Param1], Coordinator, State, ReqID);
 
-handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    lager:debug("Fold on ~p", [State#state.partition]),
-    Acc = fifo_db:fold(State#state.db, <<"group">>,
-                       fun(K, V, O) ->
-                               Fun({<<"group">>, K}, V, O)
-                       end, Acc0),
-    {reply, Acc, State};
-
 handle_command(Message, _Sender, State) ->
     lager:error("[group] Unknown message: ~p", [Message]),
     {noreply, State}.
@@ -368,34 +370,34 @@ encode_handoff_item(Group, Data) ->
 
 is_empty(State) ->
     fifo_db:fold(State#state.db,
-                  <<"group">>,
-                  fun (_,_, _) ->
-                          {false, State}
-                  end, {true, State}).
+                 <<"group">>,
+                 fun (_,_, _) ->
+                         {false, State}
+                 end, {true, State}).
 
 delete(State) ->
     Trans = fifo_db:fold(State#state.db,
-                          <<"group">>,
-                          fun (K,_, A) ->
-                                  [{delete, <<"group", K/binary>>} | A]
-                          end, []),
+                         <<"group">>,
+                         fun (K,_, A) ->
+                                 [{delete, <<"group", K/binary>>} | A]
+                         end, []),
     fifo_db:transact(State#state.db, Trans),
     {ok, State}.
 
 handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
     Res = fifo_db:fold(State#state.db,
-                        <<"group">>,
-                        fun (UUID, #snarl_obj{val=G0}, not_found) ->
-                                G1 = snarl_group_state:load(G0),
-                                case snarl_group_state:name(G1) of
-                                    Name ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
+                       <<"group">>,
+                       fun (UUID, #snarl_obj{val=G0}, not_found) ->
+                               G1 = snarl_group_state:load(G0),
+                               case snarl_group_state:name(G1) of
+                                   Name ->
+                                       UUID;
+                                   _ ->
+                                       not_found
+                               end;
+                           (_U, _, Res) ->
+                               Res
+                       end, not_found),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
      State};
@@ -405,57 +407,31 @@ handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
                      snarl_group_state:uuid(snarl_group_state:load(S0))
              end,
     List = fifo_db:fold(State#state.db,
-                           <<"group">>,
-                           fun (Key, E, C) ->
-                                   case rankmatcher:match(E, Getter, Requirements) of
-                                       false ->
-                                           C;
-                                       Pts ->
-                                           [{Pts, Key} | C]
-                                   end
-                           end, []),
+                        <<"group">>,
+                        fun (Key, E, C) ->
+                                case rankmatcher:match(E, Getter, Requirements) of
+                                    false ->
+                                        C;
+                                    Pts ->
+                                        [{Pts, Key} | C]
+                                end
+                        end, []),
     {reply,
      {ok, ReqID, {State#state.partition, State#state.node}, List},
      State};
 
 handle_coverage(list, _KeySpaces, {_, ReqID, _}, State) ->
     List = fifo_db:fold(State#state.db,
-                         <<"group">>,
-                         fun (K, _, L) ->
-                                 [K|L]
-                         end, []),
+                        <<"group">>,
+                        fun (K, _, L) ->
+                                [K|L]
+                        end, []),
     {reply,
      {ok, ReqID, {State#state.partition,State#state.node}, List},
      State};
 
-
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
     {stop, not_implemented, State}.
-
-%%%===================================================================
-%%% AAE
-%%%===================================================================
-
-handle_info(retry_create_hashtree, State=#state{hashtrees=undefined}) ->
-    State2 = maybe_create_hashtrees(State),
-    case State2#state.hashtrees of
-        undefined ->
-            ok;
-        _ ->
-            lager:info("riak_core/~p: successfully started index_hashtree on retry",
-                       [State#state.partition])
-    end,
-    {ok, State2};
-handle_info(retry_create_hashtree, State) ->
-    {ok, State};
-handle_info({'DOWN', _, _, Pid, _}, State=#state{hashtrees=Pid}) ->
-    State2 = State#state{hashtrees=undefined},
-    State3 = maybe_create_hashtrees(State2),
-    {ok, State3};
-handle_info({'DOWN', _, _, _, _}, State) ->
-    {ok, State};
-handle_info(_, State) ->
-    {ok, State}.
 
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.
@@ -488,70 +464,22 @@ change_group(Group, Action, Vals, Coordinator, State, ReqID) ->
 %%% AAE
 %%%===================================================================
 
--spec maybe_create_hashtrees(state()) -> state().
-maybe_create_hashtrees(State) ->
-    maybe_create_hashtrees(riak_core_entropy_manager:enabled(), State).
-
--spec maybe_create_hashtrees(boolean(), state()) -> state().
-maybe_create_hashtrees(false, State) ->
-    lager:info("snarl_group: Hashtree not enabled."),
-    State;
-
-maybe_create_hashtrees(true, State=#state{partition=Index}) ->
-    %% Only maintain a hashtree if a primary vnode
-    {ok, Ring} = riak_core_ring_manager:get_my_ring(),
-    lager:debug("snarl_group/~p: creating hashtree.", [Index]),
-    case riak_core_ring:vnode_type(Ring, Index) of
-        primary ->
-            RP = riak_core_util:responsible_preflists(Index),
-            case riak_core_index_hashtree:start(snarl_group, Index, RP, self(),
-                                                ?MODULE) of
-                {ok, Trees} ->
-                    lager:debug("snarl_group/~p: hashtree created: ~p.", [Index, Trees]),
-                    monitor(process, Trees),
-                    State#state{hashtrees=Trees};
-                Error ->
-                    lager:info("snarl_group/~p: unable to start index_hashtree: ~p",
-                               [Index, Error]),
-                    erlang:send_after(1000, self(), retry_create_hashtree),
-                    State#state{hashtrees=undefined}
-            end;
-        _ ->
-            lager:debug("snarl_group/~p: not primary", [Index]),
-            State
-    end.
-
--spec update_hashtree(binary(), binary(), state()) -> ok.
-update_hashtree(Key, Val, #state{hashtrees=Trees}) ->
-    case get_hashtree_token() of
-        true ->
-            riak_core_index_hashtree:async_insert_object({<<"group">>, Key}, Val, Trees),
-            ok;
-        false ->
-            riak_core_index_hashtree:insert_object({<<"group">>, Key}, Val, Trees),
-            put(hashtree_tokens, max_hashtree_tokens()),
-            ok
-    end.
-
-get_hashtree_token() ->
-    Tokens = get(hashtree_tokens),
-    case Tokens of
-        undefined ->
-            put(hashtree_tokens, max_hashtree_tokens() - 1),
-            true;
-        N when N > 0 ->
-            put(hashtree_tokens, Tokens - 1),
-            true;
-        _ ->
-            false
-    end.
+handle_info(retry_create_hashtree, State=#state{hashtrees=undefined}) ->
+    HT = riak_core_aae_vnode:maybe_create_hashtrees(?SERVICE, State#state.partition,
+                                                    undefined),
+    {ok, State#state{hashtrees = HT}};
+handle_info(retry_create_hashtree, State) ->
+    {ok, State};
+handle_info({'DOWN', _, _, Pid, _}, State=#state{hashtrees=Pid}) ->
+    HT = riak_core_aae_vnode:maybe_create_hashtrees(?SERVICE, State#state.partition,
+                                                    Pid),
+    {ok, State#state{hashtrees = HT}};
+handle_info({'DOWN', _, _, _, _}, State) ->
+    {ok, State};
+handle_info(_, State) ->
+    {ok, State}.
 
 do_put(Key, Obj, State) ->
     fifo_db:put(State#state.db, <<"group">>, Key, Obj),
-    update_hashtree(Key, term_to_binary(Obj), State).
-
--spec max_hashtree_tokens() -> pos_integer().
-max_hashtree_tokens() ->
-    app_helper:get_env(riak_core,
-                       anti_entropy_max_async,
-                       ?DEFAULT_HASHTREE_TOKENS).
+    riak_core_aae_vnode:update_hashtree(<<"group">>, Key, term_to_binary(Obj),
+                                        State#state.hashtrees).
