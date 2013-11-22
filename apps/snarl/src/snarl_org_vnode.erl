@@ -57,7 +57,7 @@
 
 -record(state, {db, partition, node, hashtrees}).
 
--define(SERVICE, sniffle_org).
+-define(SERVICE, snarl_org).
 
 -define(MASTER, snarl_org_vnode_master).
 

@@ -80,7 +80,7 @@
 
 -record(state, {db, partition, node, hashtrees}).
 
--define(SERVICE, sniffle_user).
+-define(SERVICE, snarl_user).
 
 -define(MASTER, snarl_user_vnode_master).
 

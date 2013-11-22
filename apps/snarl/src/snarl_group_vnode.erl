@@ -61,7 +61,7 @@
 
 -record(state, {db, partition, node, hashtrees}).
 
--define(SERVICE, sniffle_group).
+-define(SERVICE, snarl_group).
 
 -define(MASTER, snarl_group_vnode_master).
 
@@ -214,12 +214,15 @@ handle_command({repair, Group, _VClock, #snarl_obj{} = Obj},
 %%% AAE
 %%%===================================================================
 
-handle_command({hashtree_pid, Node}, _, State=#state{hashtrees=HT}) ->
+handle_command({hashtree_pid, Node}, _, State=#state{
+                                                 hashtrees=HT,
+                                                 partition=Idx}) ->
     %% Handle riak_core request forwarding during ownership handoff.
     %% Following is necessary in cases where anti-entropy was enabled
     %% after the vnode was already running
     case {node(), HT} of
         {Node, undefined} ->
+            lager:debug("~p/~p rehasing from", [?SERVICE, Idx]),
             HT1 =  riak_core_aae_vnode:maybe_create_hashtrees(
                      ?SERVICE,
                      State#state.partition,
@@ -464,15 +467,23 @@ change_group(Group, Action, Vals, Coordinator, State, ReqID) ->
 %%% AAE
 %%%===================================================================
 
-handle_info(retry_create_hashtree, State=#state{hashtrees=undefined}) ->
+handle_info(retry_create_hashtree, State=#state{
+                                            hashtrees=undefined,
+                                            partition=Idx
+                                           }) ->
+    lager:debug("~p/~p retrying to create a hash tree.", [?SERVICE, Idx]),
     HT = riak_core_aae_vnode:maybe_create_hashtrees(?SERVICE, State#state.partition,
                                                     undefined),
     {ok, State#state{hashtrees = HT}};
 handle_info(retry_create_hashtree, State) ->
     {ok, State};
-handle_info({'DOWN', _, _, Pid, _}, State=#state{hashtrees=Pid}) ->
+handle_info({'DOWN', _, _, Pid, _}, State=#state{
+                                             hashtrees=Pid,
+                                             partition=Idx
+                                            }) ->
+    lager:debug("~p/~p hashtree ~p went down.", [?SERVICE, Idx, Pid]),
     HT = riak_core_aae_vnode:maybe_create_hashtrees(?SERVICE, State#state.partition,
-                                                    Pid),
+                                                    undefined),
     {ok, State#state{hashtrees = HT}};
 handle_info({'DOWN', _, _, _, _}, State) ->
     {ok, State};
