@@ -50,9 +50,11 @@ init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
 
 process_results({ok, _ReqID, _IdxNode, Obj},
                 State = #state{replies = Replies}) ->
+    lager:info("Result: ~p -> ~p", [Obj, Replies]),
     Replies1 = lists:foldl(fun (Key, D) ->
-                                  dict:update_counter(Key, 1, D)
-                          end, Replies, Obj),
+                                   dict:update_counter(Key, 1, D)
+                           end, Replies, Obj),
+    lager:info("Result: ~p -> ~p", [Obj, Replies1]),
     {done, State#state{replies = Replies1}};
 
 process_results(Result, State) ->
@@ -66,9 +68,9 @@ finish(clean, State = #state{replies = Replies,
                                  (Key, _Count, Keys) ->
                                       [Key | Keys]
                               end, [], Replies),
-%%    statman_histogram:record_value(
-%%      {list_to_binary(stat_name(SD0#state.vnode) ++ "/list"), total},
-%%      SD0#state.start),
+    %%    statman_histogram:record_value(
+    %%      {list_to_binary(stat_name(SD0#state.vnode) ++ "/list"), total},
+    %%      SD0#state.start),
     From ! {ok, MergedReplies},
     {stop, normal, State};
 
@@ -82,4 +84,4 @@ finish(How, State) ->
 
 mk_reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
-	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.

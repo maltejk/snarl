@@ -72,7 +72,7 @@ start(VNodeInfo, Op, User) ->
     start(VNodeInfo, Op, User, undefined).
 
 start(VNodeInfo, Op, User, Val) ->
-    ReqID = mk_reqid(),
+    ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_read_fsm_sup:start_read_fsm(
       [ReqID, VNodeInfo, Op, self(), User, Val]
      ),
@@ -320,10 +320,6 @@ repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
 -spec unique([A::any()]) -> [A::any()].
 unique(L) ->
     sets:to_list(sets:from_list(L)).
-
-mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 stat_name(snarl_user_vnode) ->
     "user";
