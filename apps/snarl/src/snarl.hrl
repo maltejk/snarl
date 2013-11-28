@@ -6,6 +6,18 @@
                  EnvValue
          end)).
 
+-record(vstate, {
+          db,
+          partition,
+          service,
+          bucket,
+          node,
+          hashtrees,
+          internal,
+          state,
+          vnode
+        }).
+
 -define(N, ?ENV(n, 3)).
 -define(R, ?ENV(r, 2)).
 -define(W, ?ENV(w, 3)).
@@ -124,8 +136,8 @@
 -define(ORG, organisation_0_1_1).
 
 
--define(NEW_LWW(V), riak_dt_lwwreg:update(
-                      {assign, V}, none,
+-define(NEW_LWW(V, T), riak_dt_lwwreg:update(
+                      {assign, V, T}, none,
                       riak_dt_lwwreg:new())).
 
 -define(CONVERT_VORSET(S),

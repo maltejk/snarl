@@ -14,8 +14,8 @@
 -endif.
 
 -export([
-         new/0,
-         load/1,
+         new/1,
+         load/2,
          uuid/1, uuid/3,
          name/1, name/3,
          triggers/1, add_trigger/3, remove_trigger/3,
@@ -28,8 +28,8 @@
 -export_type([organisation/0, any_organisation/0]).
 
 -ignore_xref([
-              new/0,
-              load/1,
+              new/1,
+              load/2,
               uuid/1, uuid/3,
               name/1, name/3,
               triggers/1, add_trigger/3, remove_trigger/3,
@@ -50,9 +50,9 @@ is_a(#?ORG{}) ->
 is_a(_) ->
     false.
 
-new() ->
-    {ok, UUID} = ?NEW_LWW(<<>>),
-    {ok, Name} = ?NEW_LWW(<<>>),
+new({T, _ID}) ->
+    {ok, UUID} = ?NEW_LWW(<<>>, T),
+    {ok, Name} = ?NEW_LWW(<<>>, T),
     #?ORG{
         uuid = UUID,
         name = Name,
@@ -60,29 +60,31 @@ new() ->
         metadata = snarl_map:new()
        }.
 
--spec load(any_organisation()) -> organisation().
+-spec load({atom(), integer()}, any_organisation()) -> organisation().
 
-load(#?ORG{} = Org) ->
+load(_, #?ORG{} = Org) ->
     Org;
 
-load(#organisation_0_1_0{
+load({T, ID},
+     #organisation_0_1_0{
         uuid = UUID,
         name = Name,
         triggers = Triggers,
         metadata = Metadata
        }) ->
-    {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID)),
-    {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name)),
+    {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID), T),
+    {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name), T),
     {ok, Triggers1} = ?CONVERT_VORSET(Triggers),
-    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), none),
-    load(#organisation_0_1_1{
+    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), ID, T),
+    load({T, ID},
+         #organisation_0_1_1{
             uuid = UUID1,
             name = Name1,
             triggers = Triggers1,
             metadata = Metadata1
            });
 
-load(OrgSB) ->
+load({T, ID}, OrgSB) ->
     Size = ?ENV(org_bucket_size, 50),
     Org = statebox:value(OrgSB),
     {ok, Name} = jsxd:get([<<"name">>], Org),
@@ -94,12 +96,13 @@ load(OrgSB) ->
                  fun (G, Acc) ->
                          vorsetg:add(ID0, G, Acc)
                  end, vorsetg:new(Size), Triggers0),
-    #organisation_0_1_0{
-        uuid = vlwwregister:new(UUID),
-        name = vlwwregister:new(Name),
-        triggers = Triggers,
-        metadata = statebox:new(fun () -> Metadata end)
-       }.
+    load({T, ID},
+         #organisation_0_1_0{
+            uuid = vlwwregister:new(UUID),
+            name = vlwwregister:new(Name),
+            triggers = Triggers,
+            metadata = statebox:new(fun () -> Metadata end)
+           }).
 
 jsonify_trigger({Trigger, Action}) ->
     jsxd:set(<<"trigger">>, list_to_binary(atom_to_list(Trigger)),
@@ -167,41 +170,41 @@ merge(#?ORG{
 name(Org) ->
     riak_dt_lwwreg:value(Org#?ORG.name).
 
-name(_, Name, Org) ->
-    {ok, V} = riak_dt_lwwreg:update({assign,Name}, none, Org#?ORG.name),
+name({T, _ID}, Name, Org) ->
+    {ok, V} = riak_dt_lwwreg:update({assign, Name, T}, none, Org#?ORG.name),
     Org#?ORG{name = V}.
 
 uuid(Org) ->
     riak_dt_lwwreg:value(Org#?ORG.uuid).
 
-uuid(_, UUID, Org) ->
-    {ok, V} = riak_dt_lwwreg:update({assign, UUID}, none, Org#?ORG.uuid),
+uuid({T, _ID}, UUID, Org) ->
+    {ok, V} = riak_dt_lwwreg:update({assign, UUID, T}, none, Org#?ORG.uuid),
     Org#?ORG{uuid = V}.
 
 triggers(Org) ->
     riak_dt_orswot:value(Org#?ORG.triggers).
 
-add_trigger(ID, Trigger, Org) ->
+add_trigger({_T, ID}, Trigger, Org) ->
     {ok, V} = riak_dt_orswot:update({add, Trigger}, ID, Org#?ORG.triggers),
     Org#?ORG{triggers = V}.
 
 
-remove_trigger(ID, Trigger, Org) ->
+remove_trigger({_T, ID}, Trigger, Org) ->
     {ok, V} = riak_dt_orswot:update({remove, Trigger}, ID, Org#?ORG.triggers),
     Org#?ORG{triggers = V}.
 
 metadata(Org) ->
     Org#?ORG.metadata.
 
-set_metadata(ID, P, Value, Org) when is_binary(P) ->
-    set_metadata(ID, snarl_map:split_path(P), Value, Org);
+set_metadata({T, ID}, P, Value, Org) when is_binary(P) ->
+    set_metadata({T, ID}, snarl_map:split_path(P), Value, Org);
 
-set_metadata(ID, Attribute, delete, Org) ->
+set_metadata({_T, ID}, Attribute, delete, Org) ->
     {ok, M1} = snarl_map:remove(Attribute, ID, Org#?ORG.metadata),
     Org#?ORG{metadata = M1};
 
-set_metadata(ID, Attribute, Value, Org) ->
-    {ok, M1} = snarl_map:set(Attribute, Value, ID, Org#?ORG.metadata),
+set_metadata({T, ID}, Attribute, Value, Org) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Org#?ORG.metadata),
     Org#?ORG{metadata = M1}.
 
 -ifdef(TEST).
@@ -209,7 +212,7 @@ mkid() ->
     {ecrdt:timestamp_us(), test}.
 
 to_json_test() ->
-    Org = new(),
+    Org = new(mkid()),
     OrgJ = [{<<"metadata">>,[]},
             {<<"name">>,<<>>},
             {<<"triggers">>,[]},
@@ -218,7 +221,7 @@ to_json_test() ->
 
 name_test() ->
     Name0 = <<"Test0">>,
-    Org0 = new(),
+    Org0 = new(mkid()),
     Org1 = name(mkid(), Name0, Org0),
     Name1 = <<"Test1">>,
     Org2 = name(mkid(), Name1, Org1),

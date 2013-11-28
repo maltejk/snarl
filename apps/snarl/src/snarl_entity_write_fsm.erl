@@ -6,7 +6,7 @@
 -include("snarl.hrl").
 
 %% API
--export([start_link/5, start_link/6, mk_reqid/0, write/3, write/4]).
+-export([start_link/5, start_link/6, write/3, write/4]).
 
 %% Callbacks
 -export([init/1, code_change/4, handle_event/3, handle_info/3,
@@ -23,7 +23,6 @@
               handle_info/3,
               handle_sync_event/4,
               init/1,
-              mk_reqid/0,
               prepare/2,
               start_link/5,
               start_link/6,
@@ -72,7 +71,7 @@ write({VNode, System}, User, Op) ->
     write({VNode, System}, User, Op, undefined).
 
 write({VNode, System}, User, Op, Val) ->
-    ReqID = mk_reqid(),
+    ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_write_fsm_sup:start_write_fsm([{VNode, System}, ReqID, self(), User, Op, Val]),
     receive
         {ReqID, ok} ->
@@ -84,10 +83,6 @@ write({VNode, System}, User, Op, Val) ->
     after ?DEFAULT_TIMEOUT ->
             {error, timeout}
     end.
-
-mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-	(MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 %%%===================================================================
 %%% States
