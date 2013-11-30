@@ -263,11 +263,14 @@ merge(Replies) ->
 
 reconcile([V | Vs]) ->
     case {snarl_user_state:is_a(V),
-          snarl_group_state:is_a(V)} of
-        {true, _} ->
+          snarl_group_state:is_a(V),
+          snarl_org_state:is_a(V)} of
+        {true, _, _} ->
             reconcile_user(Vs, V);
-        {_, true} ->
+        {_, true, _} ->
             reconcile_group(Vs, V);
+        {_, _, true} ->
+            reconcile_org(Vs, V);
         _ ->
             V
     end.
@@ -280,6 +283,11 @@ reconcile_group(_, Acc) ->
 reconcile_user([U | R], Acc) ->
     reconcile_user(R, snarl_user_state:merge(Acc, U));
 reconcile_user(_, Acc) ->
+    Acc.
+
+reconcile_org([U | R], Acc) ->
+    reconcile_org(R, snarl_org_state:merge(Acc, U));
+reconcile_org(_, Acc) ->
     Acc.
 
 %% @pure
