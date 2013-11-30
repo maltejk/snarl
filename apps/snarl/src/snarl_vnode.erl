@@ -62,6 +62,15 @@ list_keys(Getter, Requirements, Sender, State) ->
                              C;
                          Pts ->
                              [{Pts, Key} | C]
+                     end;
+                 (Key, E, C) ->
+                     lager:error("[~s:~s] Not a snarl object!",
+                                 [State#vstate.bucket, Key]),
+                     case rankmatcher:match(E, Getter, Requirements) of
+                         false ->
+                             C;
+                         Pts ->
+                             [{Pts, Key} | C]
                      end
              end,
     fold(FoldFn, [], Sender, State).
@@ -110,14 +119,11 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
 %%% Callbacks
 %%%===================================================================
 lookup(Name, Sender, State=#vstate{state=Mod}) ->
-    lager:info("Lookup: ~p -> ~p", [Name, State]),
     FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
                      case Mod:name(V) of
                          AName when AName =:= Name ->
-                             lager:info("Found it: ~p", [AName]),
                              [U];
-                         Else ->
-                             lager:info("Not it: ~p =/= ~p", [Name, Else]),
+                         _ ->
                              [not_found]
                      end;
                  (_, O, Res) ->
@@ -139,7 +145,7 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#vstate.partition}, State};
 
-handle_command({repair, UUID, VClock, Obj}, _Sender, State) ->
+handle_command({repair, UUID, VClock, Obj = #snarl_obj{}}, _Sender, State) ->
     case get(UUID, State) of
         {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
             snarl_vnode:put(UUID, Obj, State);
@@ -247,7 +253,7 @@ handle_command({Action, ID, UUID, Param}, _Sender, State) ->
     change(UUID, Action, [Param], ID, State);
 
 handle_command(Message, _Sender, State) ->
-    lager:error("[vms] Unknown command: ~p", [Message]),
+    lager:error("[~s] Unknown command: ~p", [State#vstate.bucket, Message]),
     {noreply, State}.
 
 reply(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
