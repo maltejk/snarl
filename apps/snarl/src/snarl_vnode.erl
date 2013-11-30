@@ -56,16 +56,7 @@ list_keys(Sender, State=#vstate{db=DB, bucket=Bucket}) ->
     {async, {fold, AsyncWork, FinishFun}, Sender, State}.
 
 list_keys(Getter, Requirements, Sender, State) ->
-    FoldFn = fun (Key, #snarl_obj{val = E}, C) ->
-                     case rankmatcher:match(E, Getter, Requirements) of
-                         false ->
-                             C;
-                         Pts ->
-                             [{Pts, Key} | C]
-                     end;
-                 (Key, E, C) ->
-                     lager:error("[~s:~s] Not a snarl object!",
-                                 [State#vstate.bucket, Key]),
+    FoldFn = fun (Key, E, C) ->
                      case rankmatcher:match(E, Getter, Requirements) of
                          false ->
                              C;
