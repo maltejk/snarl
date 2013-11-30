@@ -216,7 +216,7 @@ handle_coverage(list, _KeySpaces, Sender, State) ->
 handle_coverage({list, Requirements}, _KeySpaces, Sender, State) ->
     ID = snarl_vnode:mkid(handoff),
     Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
-                     snarl_user_state:uuid(snarl_user_state:load(ID, S0))
+                     snarl_org_state:uuid(snarl_org_state:load(ID, S0))
              end,
     snarl_vnode:list_keys(Getter, Requirements, Sender, State);
 
