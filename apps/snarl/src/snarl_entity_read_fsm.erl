@@ -217,7 +217,7 @@ finalize(timeout, SD=#state{
     case needs_repair(MObj, Replies) of
         true ->
             Start = now(),
-            lager:error("[read] performing read repair on '~p'.", [Entity]),
+            lager:warning("[read] performing read repair on '~p'.", [Entity]),
             repair(VNode, Entity, MObj, Replies),
             statman_histogram:record_value(
               {list_to_binary(stat_name(SD#state.vnode) ++ "/repair"), total},
