@@ -224,13 +224,13 @@ case "$1" in
 
     reip)
         shift
-        run sniffle_console reip $@
+        run snarl_console reip $@
         ;;
 
     aae-status)
     aae_status)
         shift
-        run sniffle_console aae_status $@
+        run snarl_console aae_status $@
         ;;
 
     member-status)
