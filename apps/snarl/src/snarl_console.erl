@@ -8,6 +8,7 @@
          remove/1,
          down/1,
          reip/1,
+         aae_status/1,
          staged_join/1,
          ringready/1]).
 
@@ -44,6 +45,7 @@
               import_group/1,
               down/1,
               reip/1,
+              aae_status/1,
               staged_join/1,
               ringready/1,
               list_user/1,
@@ -401,6 +403,20 @@ down([Node]) ->
             error
     end.
 
+aae_status([]) ->
+    Services = [{snarl_user, "User"}, {snarl_group, "Group"},
+                {snarl_org, "Org"}],
+    [aae_status(E) || E <- Services];
+
+aae_status({System, Name}) ->
+    ExchangeInfo = riak_core_entropy_info:compute_exchange_info(System),
+    io:format("~s~n~n", [Name]),
+    aae_exchange_status(ExchangeInfo),
+    io:format("~n"),
+    aae_tree_status(System),
+    io:format("~n"),
+    aae_repair_status(ExchangeInfo).
+
 reip([OldNode, NewNode]) ->
     try
         %% reip is called when node is down (so riak_core_ring_manager is not running),
@@ -447,6 +463,57 @@ ringready([]) ->
             error
     end.
 
+%%%===================================================================
+%%% Private
+%%%===================================================================
 
 build_permission(P) ->
     lists:map(fun list_to_binary/1, P).
+
+aae_exchange_status(ExchangeInfo) ->
+    io:format("~s~n", [string:centre(" Exchanges ", 79, $=)]),
+    io:format("~-49s  ~-12s  ~-12s~n", ["Index", "Last (ago)", "All (ago)"]),
+    io:format("~79..-s~n", [""]),
+    [begin
+         Now = os:timestamp(),
+         LastStr = format_timestamp(Now, LastTS),
+         AllStr = format_timestamp(Now, AllTS),
+         io:format("~-49b  ~-12s  ~-12s~n", [Index, LastStr, AllStr]),
+         ok
+     end || {Index, LastTS, AllTS, _Repairs} <- ExchangeInfo],
+    ok.
+
+aae_repair_status(ExchangeInfo) ->
+    io:format("~s~n", [string:centre(" Keys Repaired ", 79, $=)]),
+    io:format("~-49s  ~s  ~s  ~s~n", ["Index",
+                                      string:centre("Last", 8),
+                                      string:centre("Mean", 8),
+                                      string:centre("Max", 8)]),
+    io:format("~79..-s~n", [""]),
+    [begin
+         io:format("~-49b  ~s  ~s  ~s~n", [Index,
+                                           string:centre(integer_to_list(Last), 8),
+                                           string:centre(integer_to_list(Mean), 8),
+                                           string:centre(integer_to_list(Max), 8)]),
+         ok
+     end || {Index, _, _, {Last,_Min,Max,Mean}} <- ExchangeInfo],
+    ok.
+
+aae_tree_status(System) ->
+    TreeInfo = riak_core_entropy_info:compute_tree_info(System),
+    io:format("~s~n", [string:centre(" Entropy Trees ", 79, $=)]),
+    io:format("~-49s  Built (ago)~n", ["Index"]),
+    io:format("~79..-s~n", [""]),
+    [begin
+         Now = os:timestamp(),
+         BuiltStr = format_timestamp(Now, BuiltTS),
+         io:format("~-49b  ~s~n", [Index, BuiltStr]),
+         ok
+     end || {Index, BuiltTS} <- TreeInfo],
+    ok.
+
+
+format_timestamp(_Now, undefined) ->
+    "--";
+format_timestamp(Now, TS) ->
+    riak_core_format:human_time_fmt("~.1f", timer:now_diff(Now, TS)).

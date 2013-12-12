@@ -222,6 +222,18 @@ case "$1" in
         run snarl_console remove $@
         ;;
 
+    reip)
+        shift
+        run sniffle_console reip $@
+        ;;
+
+    aae-status)
+    aae_status)
+        shift
+        run sniffle_console aae_status $@
+        ;;
+
+    member-status)
     member_status)
         if [ $# -ne 1 ]; then
             echo "Usage: $SCRIPT member_status"
@@ -232,6 +244,7 @@ case "$1" in
         run riak_core_console member_status $@
         ;;
 
+    ring-status)
     ring_status)
         if [ $# -ne 1 ]; then
             echo "Usage: $SCRIPT ring_status"
