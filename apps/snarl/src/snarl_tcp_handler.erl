@@ -307,7 +307,7 @@ status() ->
                        [];
                    {[], L} ->
                        W = jsxd:from_list(
-                             [{<<"category">>, <<"sniffle">>},
+                             [{<<"category">>, <<"snarl">>},
                               {<<"element">>, <<"handoff">>},
                               {<<"type">>, <<"info">>},
                               {<<"message">>, bin_fmt("~b handofs pending.",
@@ -317,7 +317,7 @@ status() ->
                        server_errors(S);
                    {S, L} ->
                        W = jsxd:from_list(
-                             [{<<"category">>, <<"sniffle">>},
+                             [{<<"category">>, <<"snarl">>},
                               {<<"element">>, <<"handoff">>},
                               {<<"type">>, <<"info">>},
                               {<<"message">>, bin_fmt("~b handofs pending.",
