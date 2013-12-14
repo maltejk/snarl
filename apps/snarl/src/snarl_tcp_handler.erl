@@ -291,6 +291,50 @@ message({group, revoke, Group, Permission}, State) ->
 message({group, revoke_prefix, Group, Prefix}, State) ->
     {reply, snarl_group:revoke_prefix(Group, Prefix), State};
 
+message({cloud, status}, State) ->
+    {reply,
+     status(),
+     State};
+
 message(Message, State) ->
     io:format("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
+
+
+status() ->
+    Warnings = case riak_core_status:transfers() of
+                   {[], []} ->
+                       [];
+                   {[], L} ->
+                       W = jsxd:from_list(
+                             [{<<"category">>, <<"sniffle">>},
+                              {<<"element">>, <<"handoff">>},
+                              {<<"type">>, <<"info">>},
+                              {<<"message">>, bin_fmt("~b handofs pending.",
+                                                      [length(L)])}]),
+                       [W];
+                   {S, []} ->
+                       server_errors(S);
+                   {S, L} ->
+                       W = jsxd:from_list(
+                             [{<<"category">>, <<"sniffle">>},
+                              {<<"element">>, <<"handoff">>},
+                              {<<"type">>, <<"info">>},
+                              {<<"message">>, bin_fmt("~b handofs pending.",
+                                                      [length(L)])}]),
+                       [W | server_errors(S)]
+               end,
+    {ok, {[], ordsets:from_list(Warnings)}}.
+
+
+server_errors(Servers) ->
+    lists:map(fun (Server) ->
+                      jsxd:from_list(
+                        [{<<"category">>, <<"snarl">>},
+                         {<<"element">>, list_to_binary(atom_to_list(Server))},
+                         {<<"type">>, <<"critical">>},
+                         {<<"message">>, bin_fmt("Snarl server ~s down.", [Server])}])
+              end, Servers).
+
+bin_fmt(F, L) ->
+    list_to_binary(io_lib:format(F, L)).
