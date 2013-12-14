@@ -302,6 +302,12 @@ message(Message, State) ->
 
 
 status() ->
+    {ok, Us} = snarl_user:list(),
+    {ok, Gs} = snarl_group:list(),
+    {ok, Os} = snarl_org:list(),
+    Resources = [{<<"users">>, length(Us)},
+                 {<<"groups">>, length(Gs)},
+                 {<<"orgs">>, length(Os)}],
     Warnings = case riak_core_status:transfers() of
                    {[], []} ->
                        [];
@@ -324,7 +330,7 @@ status() ->
                                                       [length(L)])}]),
                        [W | server_errors(S)]
                end,
-    {ok, {[], ordsets:from_list(Warnings)}}.
+    {ok, {ordsets:from_list(Resources), ordsets:from_list(Warnings)}}.
 
 
 server_errors(Servers) ->
