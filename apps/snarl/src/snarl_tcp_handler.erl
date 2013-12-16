@@ -300,7 +300,6 @@ message(Message, State) ->
     io:format("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
 
-
 status() ->
     {ok, Us} = snarl_user:list(),
     {ok, Gs} = snarl_group:list(),
