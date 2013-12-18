@@ -50,11 +50,9 @@ init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
 
 process_results({ok, _ReqID, _IdxNode, Obj},
                 State = #state{replies = Replies}) ->
-    lager:info("Result: ~p -> ~p", [Obj, Replies]),
     Replies1 = lists:foldl(fun (Key, D) ->
                                    dict:update_counter(Key, 1, D)
                            end, Replies, Obj),
-    lager:info("Result: ~p -> ~p", [Obj, Replies1]),
     {done, State#state{replies = Replies1}};
 
 process_results(Result, State) ->
