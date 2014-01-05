@@ -62,21 +62,40 @@
 %%%===================================================================
 
 start_link({VNode, System}, ReqID, From, Entity, Op) ->
-    start_link({VNode, System}, ReqID, From, Entity, Op, undefined).
+    start_link({node(), VNode, System}, ReqID, From, Entity, Op);
+
+start_link({Node, VNode, System}, ReqID, From, Entity, Op) ->
+    start_link({Node, VNode, System}, ReqID, From, Entity, Op, undefined).
 
 start_link({VNode, System}, ReqID, From, Entity, Op, Val) ->
-    gen_fsm:start_link(?MODULE, [{VNode, System}, ReqID, From, Entity, Op, Val], []).
+    start_link({node(), VNode, System}, ReqID, From, Entity, Op, Val);
+
+
+start_link({Node, VNode, System}, ReqID, From, Entity, Op, Val) ->
+    gen_fsm:start_link(?MODULE, [{Node, VNode, System}, ReqID, From, Entity, Op, Val], []).
 
 write({VNode, System}, User, Op) ->
-    write({VNode, System}, User, Op, undefined).
+    write({node(), VNode, System}, User, Op);
+
+write({Node, VNode, System}, User, Op) ->
+    write({Node, VNode, System}, User, Op, undefined).
 
 write({VNode, System}, User, Op, Val) ->
+    write({node(), VNode, System}, User, Op, Val);
+
+write({{remote, Node}, VNode, System}, User, Op, Val) ->
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{VNode, System}, ReqID, self(), User, Op, Val]),
+    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, undefined, User, Op, Val]);
+
+write({Node, VNode, System}, User, Op, Val) ->
+    ReqID = snarl_vnode:mk_reqid(),
+    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, self(), User, Op, Val]),
     receive
         {ReqID, ok} ->
+            snarl_sync:sync_op(Node, VNode, System, User, Op, Val),
             ok;
         {ReqID, ok, Result} ->
+            snarl_sync:sync_op(Node, VNode, System, User, Op, Val),
             {ok, Result};
         Other ->
             lager:error("Unknown write reply: ~p", [Other])
@@ -89,7 +108,8 @@ write({VNode, System}, User, Op, Val) ->
 %%%===================================================================
 
 %% @doc Initialize the state data.
-init([{VNode, System}, ReqID, From, Entity, Op, Val]) ->
+
+init([{Node, VNode, System}, ReqID, From, Entity, Op, Val]) ->
     {N, _R, W} = ?NRW(System),
     SD = #state{req_id=ReqID,
                 from=From,
@@ -100,7 +120,7 @@ init([{VNode, System}, ReqID, From, Entity, Op, Val]) ->
                 w = W,
                 n = N,
                 system=System,
-                cordinator=node(),
+                cordinator=Node,
                 val=Val},
     {ok, prepare, SD, 0}.
 
@@ -143,7 +163,12 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
             statman_histogram:record_value(
               {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
               SD0#state.start),
-            From ! {ReqID, ok},
+            case From of
+                undefined ->
+                    ok;
+                _ ->
+                    From ! {ReqID, ok}
+            end,
             {stop, normal, SD};
         true -> {next_state, waiting, SD}
     end;

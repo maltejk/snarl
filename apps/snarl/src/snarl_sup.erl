@@ -74,6 +74,8 @@ init(_Args) ->
         permanent, 5000, worker, []},
        {statman_aggregator, {statman_aggregator, start_link, []},
         permanent, 5000, worker, []},
+       {snarl_sync, {snarl_sync, start_link, []},
+        permanent, 5000, worker, []},
        GroupVMaster, UserVMaster, TokenVMaster,
        OrgVMaster,
        EntropyManagerUser, EntropyManagerGroup, EntropyManagerOrg,
