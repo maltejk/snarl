@@ -4,16 +4,16 @@
 %%% @doc
 %%%
 %%% @end
-%%% Created :  5 Jan 2014 by Heinz Nikolaus Gies <heinz@licenser.net>
+%%% Created :  6 Jan 2014 by Heinz Nikolaus Gies <heinz@licenser.net>
 %%%-------------------------------------------------------------------
--module(snarl_sync).
+-module(snarl_init).
 
 -behaviour(gen_server).
 
 %% API
--export([start/2, start_link/2, sync_op/6]).
+-export([start_link/0]).
 
--ignore_xref([start_link/2]).
+-ignore_xref([start_link/0]).
 
 %% gen_server callbacks
 -export([init/1, handle_call/3, handle_cast/2, handle_info/2,
@@ -21,7 +21,7 @@
 
 -define(SERVER, ?MODULE).
 
--record(state, {ip, port, socket, timeout}).
+-record(state, {}).
 
 %%%===================================================================
 %%% API
@@ -34,21 +34,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-
-start(IP, Port) ->
-    snarl_sync_sup:start_child(IP, Port).
-
-start_link(IP, Port) ->
-    gen_server:start_link({local, ?SERVER}, ?MODULE, [IP, Port], []).
-
-sync_op(Node, VNode, System, User, Op, Val) ->
-    gen_server:abcast(?SERVER, {write, Node, VNode, System, User, Op, Val}).
-
-reconnect() ->
-    reconnect(self()).
-
-reconnect(Pid) ->
-    gen_server:cast(Pid, reconnect).
+start_link() ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -65,23 +52,9 @@ reconnect(Pid) ->
 %%                     {stop, Reason}
 %% @end
 %%--------------------------------------------------------------------
-init([IP, Port]) ->
-    Timeout = case application:get_env(sync_recv_timeout) of
-                  {ok, T} ->
-                      T;
-                  _ ->
-                      1500
-              end,
-    case gen_tcp:connect(IP, Port,
-                         [binary, {active,false}, {packet,4}],
-                         Timeout) of
-        {ok, Socket} ->
-            {ok, #state{socket=Socket, ip=IP, port=Port, timeout=Timeout}};
-        E ->
-            lager:error("[sync] Initialization failed: ~p.", [E]),
-            reconnect(self()),
-            {ok, #state{ip=IP, port=Port, timeout=Timeout}}
-    end.
+init([]) ->
+    lager:debug("Starting init procedure, waiting 10s before proceeding."),
+    {ok, #state{}, 10000}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -111,33 +84,6 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=undefined}) ->
-    lager:debug("[sync] ~p", [{write, Node, VNode, System, User, Op, Val}]),
-    {noreply, State};
-handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=Socket}) ->
-    Command = {write, Node, VNode, System, User, Op, Val},
-    case gen_tcp:send(Socket, term_to_binary(Command)) of
-        ok ->
-            ok;
-        E ->
-            lager:error("[sync] Error: ~p", [E]),
-            reconnect()
-    end,
-    {noreply, State};
-
-handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
-    timer:sleep(500),
-    case gen_tcp:connect(IP, Port,
-                         [binary, {active,false}, {packet,4}],
-                         Timeout) of
-        {ok, Socket} ->
-            {ok, State = #state{socket=Socket}};
-        E ->
-            lager:error("[sync] Initialization failed: ~p.", [E]),
-            reconnect(self()),
-            {ok, State}
-    end;
-
 handle_cast(_Msg, State) ->
     {noreply, State}.
 
@@ -151,6 +97,14 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(timeout, State) ->
+    case application:get_env(sync_partners) of
+        {ok, Ps} ->
+            [snarl_sync:start(IP, Port) || {IP, Port} <- Ps],
+            {noreply, State};
+        _ ->
+            {noreply, State, 10000}
+    end;
 handle_info(_Info, State) ->
     {noreply, State}.
 

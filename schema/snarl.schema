@@ -1,6 +1,30 @@
 %% -*- erlang -*-
 
-%% Slightly more complex mapping with translation layer
+%% @doc Enable or disable the sync client
+{mapping, "sync", "snarl.sync", [
+  {datatype, {enum, [on, off, debug]}},
+  {default, off}
+]}.
+
+%% @doc Enable or disable the sync client
+{mapping, "sync.ip", "snarl.sync_ip",
+ [{commented, {"{{snarl_ip}}", {{snarl_sync_port}} }},
+  {datatype, ip}]}.
+
+
+%% @doc Enable or disable the sync client
+{mapping, "sync.partner.$name", "snarl.sync_partners",
+ [{commented, {"10.20.30.40", {{snarl_sync_port}} }},
+  {datatype, ip}]}.
+
+{translation,
+ "snarl.sync_partners",
+ fun(Conf) ->
+         Partner = cuttlefish_variable:filter_by_prefix("sync.partner", Conf),
+         [ IP || {_, IP} <- Partner]
+ end
+}.
+
 %% @doc enable active anti-entropy subsystem
 {mapping, "anti_entropy", "riak_core.anti_entropy", [
   {datatype, {enum, [on, off, debug]}},
