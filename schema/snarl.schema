@@ -20,7 +20,7 @@
 {translation,
  "snarl.sync_partners",
  fun(Conf) ->
-         Partner = cuttlefish_variable:filter_by_prefix("sync.partner", Conf),
+         Partner = cuttlefish_util:filter_by_variable_starts_with("sync.partner", Conf),
          [ IP || {_, IP} <- Partner]
  end
 }.
