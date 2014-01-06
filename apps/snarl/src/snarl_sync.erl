@@ -76,6 +76,7 @@ init([IP, Port]) ->
                          [binary, {active,false}, {packet,4}],
                          Timeout) of
         {ok, Socket} ->
+            lager:info("[sync] Connected to: ~s:~p.", [IP, Port]),
             {ok, #state{socket=Socket, ip=IP, port=Port, timeout=Timeout}};
         E ->
             lager:error("[sync] Initialization failed: ~p.", [E]),

@@ -58,11 +58,11 @@ start(_StartType, _StartArgs) ->
                     newrelic_poller:start_link(fun newrelic_statman:poll/0)
             end,
             case application:get_env(snarl, sync) of
-                {ok, enabled} ->
+                {ok, on} ->
                     {ok, {IP, Port}} = application:get_env(snarl, sync_ip),
-                    [A, B, C, D] = [list_to_integer(binary_to_list(P)) || P <- re:split(IP, "[.]")],
-                    {ok, _} = ranch:start_listener(mdns_server, 1,
-                                                   ranch_tcp, [{port, Port}, {ip, {A, B, C, D}}], snarl_sync_protocol, []);
+                    {ok, _} = ranch:start_listener(
+                                snarl, 1, ranch_tcp, [{port, Port}, {ip, IP}],
+                                snarl_sync_protocol, []);
                 _ ->
                     ok
             end,
