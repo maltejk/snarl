@@ -44,6 +44,9 @@ start_link(IP, Port) ->
 sync_op(Node, VNode, System, User, Op, Val) ->
     gen_server:abcast(?SERVER, {write, Node, VNode, System, User, Op, Val}).
 
+reconnect() ->
+    reconnect(self()).
+
 reconnect(Pid) ->
     gen_server:cast(Pid, reconnect).
 
@@ -111,8 +114,15 @@ handle_call(_Request, _From, State) ->
 handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=undefined}) ->
     lager:debug("[sync] ~p", [{write, Node, VNode, System, User, Op, Val}]),
     {noreply, State};
-handle_cast({write, Node, VNode, System, User, Op, Val}, State) ->
-    lager:debug("[sync] ~p", [{write, Node, VNode, System, User, Op, Val}]),
+handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=Socket}) ->
+    Command = {write, Node, VNode, System, User, Op, Val},
+    case gen_tcp:send(Socket, term_to_binary(Command)) of
+        ok ->
+            ok;
+        E ->
+            lager:error("[sync] Error: ~p", [E]),
+            reconnect()
+    end,
     {noreply, State};
 
 handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
