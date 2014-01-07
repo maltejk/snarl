@@ -344,13 +344,21 @@ handle_info(Msg, State) ->
 
 -ifndef(old_hash).
 key_to_id(Key) ->
-    [_, ID0, _] = re:split(Key, " "),
-    ID1 = base64:decode(ID0),
-    crypto:hash(md5,ID1).
+    case re:split(Key, " ") of
+        [_, ID0, _] ->
+            ID1 = base64:decode(ID0),
+            crypto:hash(md5,ID1);
+        _ ->
+            <<>>
+    end.
 -else.
 key_to_id(Key) ->
-    [_, ID0, _] = re:split(Key, " "),
-    ID1 = base64:decode(ID0),
-    crypto:md5(ID1).
+    case re:split(Key, " ") of
+        [_, ID0, _] ->
+            ID1 = base64:decode(ID0),
+            crypto:md5(ID1);
+        _ ->
+            <<>>
+    end.
 -endif.
 

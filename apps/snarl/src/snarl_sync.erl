@@ -112,10 +112,12 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=undefined}) ->
+handle_cast({write, Node, VNode, System, User, Op, Val},
+            State = #state{socket=undefined}) ->
     lager:debug("[sync] ~p", [{write, Node, VNode, System, User, Op, Val}]),
     {noreply, State};
-handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=Socket}) ->
+handle_cast({write, Node, VNode, System, User, Op, Val},
+            State = #state{socket=Socket}) ->
     Command = {write, Node, VNode, System, User, Op, Val},
     case gen_tcp:send(Socket, term_to_binary(Command)) of
         ok ->
@@ -127,16 +129,16 @@ handle_cast({write, Node, VNode, System, User, Op, Val}, State = #state{socket=S
     {noreply, State};
 
 handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
-    timer:sleep(500),
     case gen_tcp:connect(IP, Port,
                          [binary, {active,false}, {packet,4}],
                          Timeout) of
         {ok, Socket} ->
-            {ok, State = #state{socket=Socket}};
+            {noreply, State#state{socket=Socket}};
         E ->
             lager:error("[sync] Initialization failed: ~p.", [E]),
-            reconnect(self()),
-            {ok, State}
+            timer:sleep(500),
+            reconnect(),
+            {noreply, State}
     end;
 
 handle_cast(_Msg, State) ->
