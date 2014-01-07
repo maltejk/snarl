@@ -7,12 +7,13 @@
 -endif.
 
 -export([
+         sync_repair/2,
          ping/0,
          list/0,
          list/1,
          auth/2,
          find_key/1,
-         get_/1, get/1,
+         get_/1, get/1, raw/1,
          lookup_/1, lookup/1,
          add/1, add/2,
          delete/1,
@@ -35,12 +36,15 @@
 -ignore_xref([
               join_org/2, leave_org/2, select_org/2,
               lookup_/1,
-              ping/0
+              ping/0, raw/1, sync_repair/2
              ]).
 
 -define(TIMEOUT, 5000).
 
 %% Public API
+
+sync_repair(UUID, Obj) ->
+    do_write(UUID, sync_repair, Obj).
 
 %% @doc Pings a random vnode to make sure communication is functional
 ping() ->
@@ -249,6 +253,9 @@ get_(User) ->
             R
     end.
 
+raw(User) ->
+    snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
+                                User, undefined, true).
 
 -spec list() ->
                   {error, timeout} |

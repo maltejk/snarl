@@ -36,7 +36,7 @@
          import/4,
          delete/3,
          add_trigger/4, remove_trigger/4,
-         repair/4
+         repair/4, sync_repair/4
         ]).
 
 -ignore_xref([
@@ -48,7 +48,7 @@
               add_trigger/4, remove_trigger/4,
               set/4,
               import/4,
-              repair/4
+              repair/4, sync_repair/4
              ]).
 
 -define(SERVICE, snarl_org).
@@ -96,6 +96,12 @@ get(Preflist, ReqID, Org) ->
 %%%===================================================================
 %%% API - writes
 %%%===================================================================
+
+sync_repair(Preflist, ReqID, UUID, Obj) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {sync_repair, ReqID, UUID, Obj},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 set(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,

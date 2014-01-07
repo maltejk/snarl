@@ -3,11 +3,13 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
+         sync_repair/2,
          ping/0,
          list/0,
          list/1,
          get/1,
          get_/1,
+         raw/1,
          lookup/1,
          add/1,
          delete/1,
@@ -32,7 +34,7 @@
               create/2,
               import/2,
               trigger/3,
-              add_trigger/2, remove_trigger/2
+              add_trigger/2, remove_trigger/2, raw/1, sync_repair/2
              ]).
 
 -ignore_xref([ping/0, create/2]).
@@ -41,6 +43,9 @@
 
 -type template() :: [binary()|placeholder].
 %% Public API
+
+sync_repair(UUID, Obj) ->
+    do_write(UUID, sync_repair, Obj).
 
 %% @doc Pings a random vnode to make sure communication is functional
 ping() ->
@@ -158,6 +163,10 @@ get_(Org) ->
         R ->
             R
     end.
+
+raw(Org) ->
+    snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
+                                Org, undefined, true).
 
 -spec list() -> {ok, [fifo:org_id()]} |
                 not_found |

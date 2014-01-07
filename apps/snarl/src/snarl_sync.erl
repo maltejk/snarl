@@ -10,6 +10,10 @@
 
 -behaviour(gen_server).
 
+-ifdef(TEST).
+-include_lib("eunit/include/eunit.hrl").
+-endif.
+
 %% API
 -export([start/2, start_link/2, sync_op/6]).
 
@@ -20,6 +24,8 @@
          terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
+
+-define(SYNC_IVAL, 1000*60).
 
 -record(state, {ip, port, socket, timeout}).
 
@@ -34,7 +40,6 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-
 start(IP, Port) ->
     snarl_sync_sup:start_child(IP, Port).
 
@@ -66,22 +71,28 @@ reconnect(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([IP, Port]) ->
+    %% SegmetPath = "/var/db/snarl/sync/" ++ IP,
+    %% Opts = [{segment_path, SegmetPath}],
+    %% {ok, Tree} =  hashtree:new({0,0}, Opts),
     Timeout = case application:get_env(sync_recv_timeout) of
                   {ok, T} ->
                       T;
                   _ ->
                       1500
               end,
+    State = #state{ip=IP, port=Port, timeout=Timeout},
+    %% Every oen hour we want to regenerate.
+    timer:send_interval(?SYNC_IVAL, sync),
     case gen_tcp:connect(IP, Port,
                          [binary, {active,false}, {packet,4}],
                          Timeout) of
         {ok, Socket} ->
             lager:info("[sync] Connected to: ~s:~p.", [IP, Port]),
-            {ok, #state{socket=Socket, ip=IP, port=Port, timeout=Timeout}};
+            {ok, State#state{socket=Socket}, 0};
         E ->
             lager:error("[sync] Initialization failed: ~p.", [E]),
             reconnect(self()),
-            {ok, #state{ip=IP, port=Port, timeout=Timeout}}
+            {ok, State, 0}
     end.
 
 %%--------------------------------------------------------------------
@@ -116,17 +127,23 @@ handle_cast({write, Node, VNode, System, User, Op, Val},
             State = #state{socket=undefined}) ->
     lager:debug("[sync] ~p", [{write, Node, VNode, System, User, Op, Val}]),
     {noreply, State};
-handle_cast({write, Node, VNode, System, User, Op, Val},
+handle_cast({write, Node, VNode, System, ID, Op, Val},
             State = #state{socket=Socket}) ->
-    Command = {write, Node, VNode, System, User, Op, Val},
-    case gen_tcp:send(Socket, term_to_binary(Command)) of
-        ok ->
-            ok;
-        E ->
-            lager:error("[sync] Error: ~p", [E]),
-            reconnect()
-    end,
-    {noreply, State};
+    Command = {write, Node, VNode, System, ID, Op, Val},
+    State0 = case gen_tcp:send(Socket, term_to_binary(Command)) of
+                 ok ->
+                     State;
+                 E ->
+                     lager:error("[sync] Error: ~p", [E]),
+                     reconnect(),
+                     State#state{socket=undefined}
+             end,
+    case Op of
+        delete ->
+            handle_cast({delete, System, ID}, State0);
+        _ ->
+            {noreply, State0}
+    end;
 
 handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
     case gen_tcp:connect(IP, Port,
@@ -138,7 +155,7 @@ handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
             lager:error("[sync] Initialization failed: ~p.", [E]),
             timer:sleep(500),
             reconnect(),
-            {noreply, State}
+            {noreply, State#state{socket=undefined}}
     end;
 
 handle_cast(_Msg, State) ->
@@ -154,6 +171,28 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(sync, State = #state{socket = undefined}) ->
+    lager:warning("[sync] Can't syncing not connected"),
+    {noreply, State};
+handle_info(sync, State = #state{socket = Socket, timeout = Timeout}) ->
+    State0 = case gen_tcp:send(Socket, term_to_binary(get_tree)) of
+                 ok ->
+                     case gen_tcp:recv(Socket, 0, Timeout) of
+                         {error, E} ->
+                             lager:error("[sync] Error: ~p", [E]),
+                             reconnect(),
+                             State#state{socket=undefined};
+                         {ok, Bin} ->
+                             {ok, LTree} = snarl_sync_tree:get_tree(),
+                             {ok, RTree} = binary_to_term(Bin),
+                             sync_trees(LTree, RTree, State)
+                     end;
+                 E ->
+                     lager:error("[sync] Error: ~p", [E]),
+                     reconnect(),
+                     State#state{socket=undefined}
+             end,
+    {noreply, State0};
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -185,3 +224,67 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+sync_trees(LTree, RTree, State) ->
+    {Diff, Get, Push} =split_trees(LTree, RTree),
+    lager:debug("[sync] We need to diff: ~p", [Diff]),
+    lager:debug("[sync] We need to get: ~p", [Get]),
+    lager:debug("[sync] We need to push: ~p", [Push]),
+    State.
+
+
+split_trees(L, R) ->
+    split_trees(L, R, [], [], []).
+
+split_trees([K | LR], [K | RR], Diff, Get, Push) ->
+    split_trees(LR, RR, Diff, Get, Push);
+
+split_trees([{K, _} | LR], [{K, _} | RR] , Diff, Get, Push) ->
+    split_trees(LR, RR, [K | Diff], Get, Push);
+
+split_trees([{K, _} = L | LR], [_Kr | _] = R , Diff, Get, Push) when L < R ->
+    split_trees(LR, R, Diff, Get, [K | Push]);
+
+split_trees(L, [{K, _} | RR] , Diff, Get, Push) ->
+    split_trees(L, RR, Diff, [K | Get], Push);
+
+split_trees(L, [] , Diff, Get, Push) ->
+    {Diff, Get, Push ++ [K || {K, _} <- L]};
+
+split_trees([], R , Diff, Get, Push) ->
+    {Diff, Get ++ [K || {K, _} <- R], Push}.
+
+
+
+-ifdef(TEST).
+split_tree_empty_test() ->
+    L = [],
+    R = [],
+    ?assertEqual({[], [], []}, split_trees(L, R)).
+
+split_tree_equal_test() ->
+    L = [{a, 1}],
+    R = [{a, 1}],
+    ?assertEqual({[], [], []}, split_trees(L, R)).
+
+split_tree_diff_test() ->
+    L = [{a, 1}],
+    R = [{a, 2}],
+    ?assertEqual({[a], [], []}, split_trees(L, R)).
+
+split_tree_get_test() ->
+    L = [{a, 1}],
+    R = [{a, 1}, {b, 1}],
+    ?assertEqual({[], [b], []}, split_trees(L, R)).
+
+split_tree_push_test() ->
+    L = [{a, 1}, {b, 1}],
+    R = [{a, 1}],
+    ?assertEqual({[], [], [b]}, split_trees(L, R)).
+
+split_tree_test() ->
+    L = [{a, 1}, {b, 2}, {c, 1}, {d, 1}],
+    R = [{a, 1}, {b, 1}, {d, 1}, {e, 1}],
+    ?assertEqual({[b], [e], [c]}, split_trees(L, R)).
+
+-endif.

@@ -35,6 +35,7 @@
 %% Writes
 -export([
          add/4,
+         sync_repair/4,
          import/4,
          repair/4,
          add_key/4,
@@ -49,6 +50,7 @@
 
 -ignore_xref([
               add/4,
+              sync_repair/4,
               add_key/4,
               find_key/3,
               delete/3,
@@ -118,6 +120,13 @@ get(Preflist, ReqID, User) ->
 %%%===================================================================
 %%% API - writes
 %%%===================================================================
+
+
+sync_repair(Preflist, ReqID, UUID, Obj) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {sync_repair, ReqID, UUID, Obj},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 add(Preflist, ReqID, UUID, User) ->
     riak_core_vnode_master:command(Preflist,

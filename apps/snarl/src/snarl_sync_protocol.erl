@@ -38,6 +38,10 @@ handle_info({_OK, Socket, BinData}, State = #state{
         ping ->
             Transport:send(Socket, term_to_binary(pong)),
             {noreply, State};
+        get_tree ->
+            {ok, Tree} = snarl_sync_tree:get_tree(),
+            Transport:send(Socket, term_to_binary({ok, Tree})),
+            {noreply, State};
         {write, Node, VNode, System, Entity, Op, Val} ->
             NVS = {{remote, Node}, VNode, System},
             snarl_entity_write_fsm:write(NVS, Entity, Op, Val)

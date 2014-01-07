@@ -8,7 +8,7 @@
 -include("snarl_dtrace.hrl").
 
 %% API
--export([start_link/6, start/2, start/3, start/4]).
+-export([start_link/7, start/2, start/3, start/4, start/5]).
 
 
 -export([reconcile/1, different/1, needs_repair/2, repair/4, unique/1]).
@@ -35,14 +35,15 @@
               repair/4,
               start/2,
               start/4,
-              start_link/6,
+              start_link/7,
               terminate/3,
               unique/1,
               wait_for_n/2,
               waiting/2
              ]).
 
--record(state, {req_id,
+-record(state, {raw = false ::boolean(),
+                req_id,
                 from,
                 entity,
                 start,
@@ -62,8 +63,8 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqID, {VNode, System}, Op, From, Entity, Val) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val], []).
+start_link(ReqID, {VNode, System}, Op, From, Entity, Val, Raw) ->
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val, Raw], []).
 
 start(VNodeInfo, Op) ->
     start(VNodeInfo, Op, undefined).
@@ -72,9 +73,12 @@ start(VNodeInfo, Op, User) ->
     start(VNodeInfo, Op, User, undefined).
 
 start(VNodeInfo, Op, User, Val) ->
+    start(VNodeInfo, Op, User, Val, false).
+
+start(VNodeInfo, Op, User, Val, Raw) ->
     ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_read_fsm_sup:start_read_fsm(
-      [ReqID, VNodeInfo, Op, self(), User, Val]
+      [ReqID, VNodeInfo, Op, self(), User, Val, Raw]
      ),
     receive
         {ReqID, ok} ->
@@ -90,10 +94,11 @@ start(VNodeInfo, Op, User, Val) ->
 %%%===================================================================
 
 %% Intiailize state data.
-init([ReqId, {VNode, System}, Op, From, Entity, Val]) ->
+init([ReqId, {VNode, System}, Op, From, Entity, Val, Raw]) ->
     ?DT_READ_ENTRY(Entity, Op),
     {N, R, _W} = ?NRW(System),
-    SD = #state{req_id=ReqId,
+    SD = #state{raw = Raw,
+                req_id=ReqId,
                 from=From,
                 op=Op,
                 n = N,
@@ -176,11 +181,16 @@ waiting({ok, ReqID, IdxNode, Obj},
                       SD0#state.start),
                     From ! {ReqID, ok, not_found};
                 Merged ->
-                    Reply = snarl_obj:val(Merged),
                     ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
                     statman_histogram:record_value(
                       {list_to_binary(stat_name(SD0#state.vnode) ++ "/read"), total},
                       SD0#state.start),
+                    Reply = case SD#state.raw of
+                                false ->
+                                    snarl_obj:val(Merged);
+                                true ->
+                                    Merged
+                            end,
                     From ! {ReqID, ok, Reply}
             end,
             if
