@@ -94,6 +94,15 @@ init([IP, Port, Diff, Get, Push]) ->
 %% @end
 %%--------------------------------------------------------------------
 
+vnode(snarl_group) -> snarl_group_vnode;
+vnode(snarl_user) -> snarl_user_vnode;
+vnode(snarl_org) -> snarl_org_vnode.
+
+write(Sys, UUID, Op) ->
+    write(Sys, UUID, Op, undefined).
+write(Sys, UUID, Op, Val) ->
+    term_to_binary({write, {remote, node()}, vnode(Sys), Sys, UUID, Op, Val}).
+
 sync_diff(_, State = #state{
                         socket=Socket,
                         timeout=Timeout,
@@ -113,8 +122,8 @@ sync_diff(_, State = #state{
                                     Objs = [RObj, LObj],
                                     Merged = snarl_obj:merge(snarl_entity_read_fsm, Objs),
                                     Sys:sync_repair(UUID, Merged),
-                                    Msg = {repair, Sys, UUID, Merged},
-                                    case gen_tcp:send(Socket, term_to_binary(Msg)) of
+                                    Msg = write(Sys, UUID, sync_repair, Merged),
+                                    case gen_tcp:send(Socket, Msg) of
                                         ok ->
                                             {next_state, sync_get, State#state{diff=R}, 0};
                                         E ->
@@ -170,11 +179,11 @@ sync_push(_, State = #state{
     lager:info("[sync-exchange] Push: ~p", [{Sys, UUID}]),
     Msg  = case Sys:raw(UUID) of
                {ok, Obj} ->
-                   {repair, Sys, UUID, Obj};
+                   write(Sys, UUID, sync_repair, Obj);
                not_found ->
-                   {delete, Sys, UUID}
+                   write(Sys, UUID, delete)
            end,
-    case gen_tcp:send(Socket, term_to_binary(Msg)) of
+    case gen_tcp:send(Socket, Msg) of
         ok ->
             {next_state, sync_get, State#state{push=R}, 0};
         E ->

@@ -54,7 +54,8 @@ handle_info({_OK, Socket, BinData}, State = #state{
             {noreply, State};
         {write, Node, VNode, System, Entity, Op, Val} ->
             NVS = {{remote, Node}, VNode, System},
-            snarl_entity_write_fsm:write(NVS, Entity, Op, Val)
+            snarl_entity_write_fsm:write(NVS, Entity, Op, Val),
+            {noreply, State}
     end;
 
 handle_info(Info, State) ->
