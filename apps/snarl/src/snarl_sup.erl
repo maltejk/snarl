@@ -78,6 +78,8 @@ init(_Args) ->
         permanent, 5000, supervisor, []},
        {snarl_sync_read_sup, {snarl_sync_read_sup, start_link, []},
         permanent, 5000, supervisor, []},
+       {snarl_sync_exchange_sup, {snarl_sync_exchange_sup, start_link, []},
+        permanent, 5000, supervisor, []},
        {snarl_init, {snarl_init, start_link, []},
         permanent, 5000, worker, []},
        {snarl_sync_tree, {snarl_sync_tree, start_link, []},

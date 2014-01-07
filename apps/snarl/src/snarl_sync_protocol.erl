@@ -42,6 +42,16 @@ handle_info({_OK, Socket, BinData}, State = #state{
             {ok, Tree} = snarl_sync_tree:get_tree(),
             Transport:send(Socket, term_to_binary({ok, Tree})),
             {noreply, State};
+        {raw, System, UUID} ->
+            Data = System:raw(UUID),
+            Transport:send(Socket, term_to_binary(Data)),
+            {noreply, State};
+        {repair, System, UUID, Obj} ->
+            System:sync_repair(UUID, Obj),
+            {noreply, State};
+        {delete, System, UUID} ->
+            System:delete(UUID),
+            {noreply, State};
         {write, Node, VNode, System, Entity, Op, Val} ->
             NVS = {{remote, Node}, VNode, System},
             snarl_entity_write_fsm:write(NVS, Entity, Op, Val)

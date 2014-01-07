@@ -225,11 +225,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%% Internal functions
 %%%===================================================================
 
-sync_trees(LTree, RTree, State) ->
+sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     {Diff, Get, Push} =split_trees(LTree, RTree),
     lager:debug("[sync] We need to diff: ~p", [Diff]),
     lager:debug("[sync] We need to get: ~p", [Get]),
     lager:debug("[sync] We need to push: ~p", [Push]),
+    snarl_sync_exchange_fsm:start(IP, Port, Diff, Get, Push),
     State.
 
 
