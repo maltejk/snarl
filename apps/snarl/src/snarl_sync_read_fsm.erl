@@ -36,6 +36,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+update(_System, _Vsn, [], _From) ->
+    ok;
 update(System, Vsn, List, From) ->
     snarl_sync_read_sup:start_child(System, Vsn, List, From).
 
@@ -180,5 +182,4 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 
 hash(BKey, RObj) ->
-    lager:debug("Hashing Key: ~p", [BKey]),
     list_to_binary(integer_to_list(erlang:phash2({BKey, RObj}))).
