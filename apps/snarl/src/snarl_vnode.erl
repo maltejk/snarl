@@ -136,7 +136,7 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#vstate.partition}, State};
 
-handle_command({sync_repair, ReqID, UUID, Obj = #snarl_obj{}}, _Sender, State) ->
+handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender, State) ->
     case get(UUID, State) of
         {ok, Old} ->
             Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old, Obj]),

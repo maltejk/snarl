@@ -94,9 +94,44 @@ init([IP, Port, Diff, Get, Push]) ->
 %% @end
 %%--------------------------------------------------------------------
 
-sync_diff(_, State = #state{diff=[D|R]}) ->
-    lager:info("[sync-exchange] Diff: ~p", [D]),
-    {next_state, sync_diff, State#state{diff=R}, 0};
+sync_diff(_, State = #state{
+                        socket=Socket,
+                        timeout=Timeout,
+                        diff=[{Sys, UUID}|R]}) ->
+    lager:info("[sync-exchange] Diff: ~p", [{Sys, UUID}]),
+    case gen_tcp:send(Socket, term_to_binary({raw, Sys, UUID})) of
+        ok ->
+            case gen_tcp:recv(Socket, 0, Timeout) of
+                {error, E} ->
+                    lager:error("[sync-exchange] Error: ~p", [E]),
+                    {stop, recv, State};
+                {ok, Bin} ->
+                    case binary_to_term(Bin) of
+                        {ok, RObj} ->
+                            case Sys:raw(UUID) of
+                                {ok, LObj} ->
+                                    Objs = [RObj, LObj],
+                                    Merged = snarl_obj:merge(snarl_entity_read_fsm, Objs),
+                                    Sys:sync_repair(UUID, Merged),
+                                    Msg = {repair, Sys, UUID, Merged},
+                                    case gen_tcp:send(Socket, term_to_binary(Msg)) of
+                                        ok ->
+                                            {next_state, sync_get, State#state{diff=R}, 0};
+                                        E ->
+                                            lager:error("[sync-exchange] Error: ~p", [E]),
+                                            {stop, recv, State}
+                                    end;
+                                _ ->
+                                    {next_state, sync_get, State#state{diff=R}, 0}
+                            end;
+                        not_found ->
+                            {next_state, sync_get, State#state{diff=R}, 0}
+                    end
+            end;
+        E ->
+            lager:error("[sync-exchange] Error: ~p", [E]),
+            {stop, recv, State}
+    end;
 
 sync_diff(_, State = #state{diff=[]}) ->
     {next_state, sync_get, State, 0}.
@@ -106,7 +141,7 @@ sync_get(_, State = #state{
                        timeout=Timeout,
                        get=[{Sys, UUID}|R]}) ->
     lager:info("[sync-exchange] Get: ~p", [{Sys, UUID}]),
-    case gen_tcp:send(Socket, term_to_binary({get, Sys, UUID})) of
+    case gen_tcp:send(Socket, term_to_binary({raw, Sys, UUID})) of
         ok ->
             case gen_tcp:recv(Socket, 0, Timeout) of
                 {error, E} ->
