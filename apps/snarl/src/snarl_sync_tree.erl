@@ -1,0 +1,184 @@
+%%%-------------------------------------------------------------------
+%%% @author Heinz Nikolaus Gies <heinz@licenser.net>
+%%% @copyright (C) 2014, Heinz Nikolaus Gies
+%%% @doc
+%%%
+%%% @end
+%%% Created :  7 Jan 2014 by Heinz Nikolaus Gies <heinz@licenser.net>
+%%%-------------------------------------------------------------------
+-module(snarl_sync_tree).
+
+-behaviour(gen_server).
+
+%% API
+-export([start_link/0, insert/5, done/3, delete/3, get_tree/0]).
+
+-ignore_xref([start_link/0]).
+
+%% gen_server callbacks
+-export([init/1, handle_call/3, handle_cast/2, handle_info/2,
+         terminate/2, code_change/3]).
+
+-define(SERVER, ?MODULE).
+%%-define(RECHECK_IVAL, 1000*60*60).
+-define(RECHECK_IVAL, 1000*60).
+
+-record(state, {tree=[], version=0}).
+
+%%%===================================================================
+%%% API
+%%%===================================================================
+
+%%--------------------------------------------------------------------
+%% @doc
+%% Starts the server
+%%
+%% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
+%% @end
+%%--------------------------------------------------------------------
+start_link() ->
+    gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
+
+get_tree() ->
+    gen_server:call(?SERVER, get).
+
+delete(PID, System, ID) ->
+    gen_server:cast(PID, {delete, System, ID}).
+
+done(PID, System, Vsn) ->
+    gen_server:cast(PID, {done, System, Vsn}).
+
+insert(PID, System, Vsn, ID, H) ->
+    gen_server:cast(PID, {insert, System, Vsn, ID, H}).
+
+%%%===================================================================
+%%% gen_server callbacks
+%%%===================================================================
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Initializes the server
+%%
+%% @spec init(Args) -> {ok, State} |
+%%                     {ok, State, Timeout} |
+%%                     ignore |
+%%                     {stop, Reason}
+%% @end
+%%--------------------------------------------------------------------
+init([]) ->
+    timer:send_interval(?RECHECK_IVAL, timeout),
+    {ok, #state{}, 0}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Handling call messages
+%%
+%% @spec handle_call(Request, From, State) ->
+%%                                   {reply, Reply, State} |
+%%                                   {reply, Reply, State, Timeout} |
+%%                                   {noreply, State} |
+%%                                   {noreply, State, Timeout} |
+%%                                   {stop, Reason, Reply, State} |
+%%                                   {stop, Reason, State}
+%% @end
+%%--------------------------------------------------------------------
+handle_call(get, _From, State = #state{tree = Tree}) ->
+    Tree1 = [{{S, Id}, H} || {{S, Id}, {_, H}} <- Tree],
+    {reply, {ok, Tree1}, State};
+handle_call(_Request, _From, State) ->
+    Reply = ok,
+    {reply, Reply, State}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Handling cast messages
+%%
+%% @spec handle_cast(Msg, State) -> {noreply, State} |
+%%                                  {noreply, State, Timeout} |
+%%                                  {stop, Reason, State}
+%% @end
+%%--------------------------------------------------------------------
+handle_cast({delete, Sys, ID}, State = #state{tree = Tree}) ->
+    Tree1 = [E || E = {{S, Id}, _} <- Tree, S =/= Sys andalso ID =/= Id],
+    {noreply, State#state{tree=Tree1}};
+handle_cast({done, Sys, Version}, State = #state{tree = Tree}) ->
+    Tree1 = [E || E = {{S, _}, {V, _}} <- Tree, V >= Version orelse S =/= Sys],
+    {noreply, State#state{tree=Tree1}};
+handle_cast({insert, Sys, Vsn, ID, Hash}, State) ->
+    lager:debug("[sync] Insert: ~p(~p) <- ~s(~s)", [Sys, Vsn, ID, Hash]),
+    {noreply, update_tree(Sys, ID, Hash, Vsn, State)};
+handle_cast(_Msg, State) ->
+    {noreply, State}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Handling all non call/cast messages
+%%
+%% @spec handle_info(Info, State) -> {noreply, State} |
+%%                                   {noreply, State, Timeout} |
+%%                                   {stop, Reason, State}
+%% @end
+%%--------------------------------------------------------------------
+handle_info(timeout, State = #state{version = Vsn}) ->
+    Vsn1 = Vsn + 1,
+    Us = case snarl_user:list() of
+             {ok, UsX} ->
+                 UsX;
+             _ ->
+                 []
+         end,
+    Gs = case snarl_group:list() of
+             {ok, GsX} ->
+                 GsX;
+             _ ->
+                 ok
+         end,
+    Os = case snarl_org:list() of
+             {ok, OsX} ->
+                 OsX;
+             _ ->
+                 ok
+         end,
+    snarl_sync_read_fsm:update(snarl_user, Vsn1, Us, self()),
+    snarl_sync_read_fsm:update(snarl_group, Vsn1, Gs, self()),
+    snarl_sync_read_fsm:update(snarl_org, Vsn1, Os, self()),
+    {noreply, State#state{version = Vsn1}};
+handle_info(_Info, State) ->
+    {noreply, State}.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% This function is called by a gen_server when it is about to
+%% terminate. It should be the opposite of Module:init/1 and do any
+%% necessary cleaning up. When it returns, the gen_server terminates
+%% with Reason. The return value is ignored.
+%%
+%% @spec terminate(Reason, State) -> void()
+%% @end
+%%--------------------------------------------------------------------
+terminate(_Reason, _State) ->
+    ok.
+
+%%--------------------------------------------------------------------
+%% @private
+%% @doc
+%% Convert process state when code is changed
+%%
+%% @spec code_change(OldVsn, State, Extra) -> {ok, NewState}
+%% @end
+%%--------------------------------------------------------------------
+code_change(_OldVsn, State, _Extra) ->
+    {ok, State}.
+
+%%%===================================================================
+%%% Internal functions
+%%%===================================================================
+update_tree(Sys, ID, H, Vsn, State = #state{tree=Tree}) ->
+    Tree1 = orddict:store({Sys, ID}, {Vsn, H}, Tree),
+    lager:debug("[sync] Tree is: ~p", [Tree1]),
+    State#state{tree=Tree1}.

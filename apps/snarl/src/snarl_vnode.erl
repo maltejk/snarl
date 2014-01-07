@@ -136,6 +136,19 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#vstate.partition}, State};
 
+handle_command({sync_repair, ReqID, UUID, Obj = #snarl_obj{}}, _Sender, State) ->
+    case get(UUID, State) of
+        {ok, Old} ->
+            Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old, Obj]),
+            snarl_vnode:put(UUID, Merged, State);
+        not_found ->
+            snarl_vnode:put(UUID, Obj, State);
+        _ ->
+            lager:error("[~s] Read repair failed, data was updated too recent.",
+                        [State#vstate.bucket])
+    end,
+    {reply, {ok, ReqID}, State};
+
 handle_command({repair, UUID, VClock, Obj = #snarl_obj{}}, _Sender, State) ->
     case get(UUID, State) of
         {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
