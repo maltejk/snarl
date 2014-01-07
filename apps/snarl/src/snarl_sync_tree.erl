@@ -11,7 +11,7 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, insert/5, done/3, delete/3, get_tree/0]).
+-export([start_link/0, insert/5, done/3, delete/3, get_tree/0, update/3]).
 
 -ignore_xref([start_link/0]).
 
@@ -50,6 +50,9 @@ done(PID, System, Vsn) ->
 
 insert(PID, System, Vsn, ID, H) ->
     gen_server:cast(PID, {insert, System, Vsn, ID, H}).
+
+update(System, ID, Obj) ->
+    gen_server:cast(?SERVER, {update, System, ID, Obj}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -101,6 +104,8 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_cast({update, Sys, ID, Obj}, State = #state{version =Vsn}) ->
+    {noreply, update_tree(Sys, ID, hash(ID, Obj), Vsn-1, State)};
 handle_cast({delete, Sys, ID}, State = #state{tree = Tree}) ->
     Tree1 = [E || E = {{S, Id}, _} <- Tree, S =/= Sys andalso ID =/= Id],
     {noreply, State#state{tree=Tree1}};
@@ -182,3 +187,6 @@ update_tree(Sys, ID, H, Vsn, State = #state{tree=Tree}) ->
     Tree1 = orddict:store({Sys, ID}, {Vsn, H}, Tree),
     lager:debug("[sync] Tree is: ~p", [Tree1]),
     State#state{tree=Tree1}.
+
+hash(BKey, RObj) ->
+    list_to_binary(integer_to_list(erlang:phash2({BKey, RObj}))).

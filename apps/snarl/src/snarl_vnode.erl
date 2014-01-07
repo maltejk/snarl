@@ -83,6 +83,7 @@ fold(Fun, Acc0, Sender, State=#vstate{db=DB, bucket=Bucket}) ->
 
 put(Key, Obj, State) ->
     fifo_db:put(State#vstate.db, State#vstate.bucket, Key, Obj),
+    snarl_sync_tree:update(State#vstate.service, Key, Obj),
     riak_core_aae_vnode:update_hashtree(
       State#vstate.bucket, Key, term_to_binary(Obj), State#vstate.hashtrees).
 
