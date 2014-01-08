@@ -62,8 +62,14 @@ start_link(System, Vsn, List, From) ->
 %% @end
 %%--------------------------------------------------------------------
 init([System, Vsn, List, From]) ->
+    IVal = case application:get_env(sync_read_delay) of
+               {ok, IValX} ->
+                   IValX;
+               _ ->
+                   100
+           end,
     lager:debug("[sync] updating ~p(~p) from ~p", [System, Vsn, List]),
-    {ok, read, #state{system=System, list=List, from=From, version=Vsn}, 0}.
+    {ok, read, #state{system=System, list=List, from=From, version=Vsn, delay=IVal}, 0}.
 
 %%--------------------------------------------------------------------
 %% @private

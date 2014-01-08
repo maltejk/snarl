@@ -20,8 +20,7 @@
          terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
-%%-define(RECHECK_IVAL, 1000*60*60).
--define(RECHECK_IVAL, 1000*60).
+-define(RECHECK_IVAL, 1000*60*60).
 
 -record(state, {tree=[], version=0}).
 
@@ -70,7 +69,13 @@ update(System, ID, Obj) ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    timer:send_interval(?RECHECK_IVAL, timeout),
+    IVal = case application:get_env(sync_build_interval) of
+               {ok, IValX} ->
+                   IValX;
+               _ ->
+                   ?RECHECK_IVAL
+           end,
+    timer:send_interval(IVal, timeout),
     {ok, #state{}, 0}.
 
 %%--------------------------------------------------------------------

@@ -1,5 +1,34 @@
 %% -*- erlang -*-
 
+
+%% @doc Interval between full rebuilds of the sync data.
+{mapping, "sync.build_interval", "snarl.sync_build_interval",
+ [{default, "1h"},
+  {commented, "1h"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc Interval between syncs with remote snarls.
+{mapping, "sync.interval", "snarl.sync_interval",
+ [{default, "15m"},
+  {commented, "15m"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc Timeout befeore a sync connection is considered dead.
+{mapping, "sync.recv_timeout", "snarl.sync_recv_timeout",
+ [{default, "1s"},
+  {commented, "1s"},
+  {datatype, {duration, ms}}]
+]}.
+
+%% @doc Delay between reads on a sync data rebuild.
+{mapping, "sync.read_delay", "snarl.sync_read_delay",
+ [{default, "50ms"},
+  {commented, "50ms"},
+  {datatype, {duration, ms}}]
+]}.
+
 %% @doc Enable or disable the sync client
 {mapping, "sync", "snarl.sync", [
   {datatype, {enum, [on, off, debug]}},
