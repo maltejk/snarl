@@ -6,7 +6,7 @@
          sync_repair/2,
          ping/0,
          list/0,
-         list/1,
+         list/2,
          get/1,
          get_/1,
          raw/1,
@@ -186,6 +186,15 @@ list(Requirements) ->
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
+-spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
+
+list(Requirements, true) ->
+    {ok, Ls} = list(Requirements),
+    Ls1 = [{V, {UUID, ?MODULE:get(UUID)}} || {V, UUID} <- Ls],
+    Ls2 = [{V, {UUID, D}} || {V, {UUID, {ok, D}}} <- Ls1],
+    {ok,  Ls2};
+list(Requirements, false) ->
+    list(Requirements).
 
 -spec add(Org::binary()) ->
                  {ok, UUID::fifo:org_id()} |
