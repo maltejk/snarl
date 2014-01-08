@@ -140,9 +140,11 @@ handle_command(ping, _Sender, State) ->
 handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender, State) ->
     case get(UUID, State) of
         {ok, Old} ->
+            lager:info("[sync-repair:~s] Merging with old object", [UUID]),
             Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old, Obj]),
             snarl_vnode:put(UUID, Merged, State);
         not_found ->
+            lager:info("[sync-repair:~s] Writing new object", [UUID]),
             snarl_vnode:put(UUID, Obj, State);
         _ ->
             lager:error("[~s] Read repair failed, data was updated too recent.",

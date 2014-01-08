@@ -101,7 +101,7 @@ vnode(snarl_org) -> snarl_org_vnode.
 write(Sys, UUID, Op) ->
     write(Sys, UUID, Op, undefined).
 write(Sys, UUID, Op, Val) ->
-    term_to_binary({write, {remote, node()}, vnode(Sys), Sys, UUID, Op, Val}).
+    term_to_binary({write, node(), vnode(Sys), Sys, UUID, Op, Val}).
 
 sync_diff(_, State = #state{
                         socket=Socket,
@@ -121,7 +121,9 @@ sync_diff(_, State = #state{
                                 {ok, LObj} ->
                                     Objs = [RObj, LObj],
                                     Merged = snarl_obj:merge(snarl_entity_read_fsm, Objs),
-                                    Sys:sync_repair(UUID, Merged),
+                                    lager:info("[sync-exchange] Merge: ~p + ~p -> ~p", [RObj, LObj, Merged]),
+                                    NVS = {{remote, node()}, vnode(Sys), Sys},
+                                    snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Merged),
                                     Msg = write(Sys, UUID, sync_repair, Merged),
                                     case gen_tcp:send(Socket, Msg) of
                                         ok ->
@@ -157,11 +159,13 @@ sync_get(_, State = #state{
                     lager:error("[sync-exchange] Error: ~p", [E]),
                     {stop, recv, State};
                 {ok, Bin} ->
+                    NVS = {{remote, node()}, vnode(Sys), Sys},
                     case binary_to_term(Bin) of
                         {ok, Obj} ->
-                            Sys:sync_repair(UUID, Obj);
+                            lager:info("[sync-exchange] repairing(~p): ~p", [NVS, Obj]),
+                            snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Obj);
                         not_found ->
-                            Sys:delete(UUID)
+                            snarl_entity_write_fsm:write(NVS, UUID, delete, undefined)
                     end,
                     {next_state, sync_get, State#state{get=R}, 0}
             end;
