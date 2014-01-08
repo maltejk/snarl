@@ -36,6 +36,8 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+start(_IP, _Port, [], [], []) ->
+    ok;
 start(IP, Port, Diff, Get, Push) ->
     snarl_sync_exchange_sup:start_child(IP, Port, Diff, Get, Push).
 

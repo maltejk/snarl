@@ -25,7 +25,7 @@
 
 -define(SERVER, ?MODULE).
 
--define(SYNC_IVAL, 1000*60).
+-define(SYNC_IVAL, 1000*60*15).
 
 -record(state, {ip, port, socket, timeout}).
 
@@ -80,9 +80,16 @@ init([IP, Port]) ->
                   _ ->
                       1500
               end,
+
+    IVal = case application:get_env(sync_interval) of
+               {ok, IValX} ->
+                   IValX;
+               _ ->
+                   ?SYNC_IVAL
+           end,
     State = #state{ip=IP, port=Port, timeout=Timeout},
     %% Every oen hour we want to regenerate.
-    timer:send_interval(?SYNC_IVAL, sync),
+    timer:send_interval(IVal, sync),
     case gen_tcp:connect(IP, Port,
                          [binary, {active,false}, {packet,4}],
                          Timeout) of
