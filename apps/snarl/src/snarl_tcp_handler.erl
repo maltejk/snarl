@@ -110,6 +110,25 @@ message({user, keys, revoke, User, KeyId}, State) when
      snarl_user:revoke_key(User, KeyId),
      State};
 
+
+message({user, yubikeys, get, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:yubikeys(User),
+     State};
+
+message({user, yubikeys, add, User, OTP}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add_yubikey(User, OTP),
+     State};
+
+message({user, yubikeys, revoke, User, KeyId}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:remove_yubikey(User, KeyId),
+     State};
+
 message({user, set, User, Attribute, Value}, State) when
       is_binary(User) ->
     {reply,
@@ -156,7 +175,13 @@ message({user, add, Creator, User}, State) when
 message({user, auth, User, Pass}, State) when
       is_binary(User),
       is_binary(Pass) ->
-    Res = case snarl_user:auth(User, Pass) of
+    message({user, auth, User, Pass, <<>>}, State);
+
+message({user, auth, User, Pass, OTP}, State) when
+      is_binary(User),
+      is_binary(Pass),
+      is_binary(OTP) ->
+    Res = case snarl_user:auth(User, Pass, OTP) of
               not_found ->
                   {error, not_found};
               {ok, UUID}  ->

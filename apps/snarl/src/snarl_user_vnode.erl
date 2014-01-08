@@ -39,6 +39,8 @@
          import/4,
          repair/4,
          add_key/4,
+         add_yubikey/4,
+         remove_yubikey/4,
          delete/3,
          grant/4, revoke/4, revoke_prefix/4,
          join/4, leave/4,
@@ -49,6 +51,8 @@
         ]).
 
 -ignore_xref([
+              add_yubikey/4,
+              remove_yubikey/4,
               add/4,
               sync_repair/4,
               add_key/4,
@@ -143,6 +147,18 @@ add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
 revoke_key(Preflist, ReqID, UUID, KeyId) ->
     riak_core_vnode_master:command(Preflist,
                                    {revoke_key, ReqID, UUID, KeyId},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+add_yubikey(Preflist, ReqID, UUID, OTP) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {add_yubikey, ReqID, UUID, OTP},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+remove_yubikey(Preflist, ReqID, UUID, KeyId) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {remove_yubikey, ReqID, UUID, KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
