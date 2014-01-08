@@ -23,6 +23,7 @@
          join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
          add_key/4, revoke_key/3, keys/1,
          metadata/1, set_metadata/4,
+         add_yubikey/3, yubikeys/1, remove_yubikey/3,
          merge/2,
          to_json/1,
          is_a/1
@@ -41,6 +42,7 @@
               add_key/4, revoke_key/3, keys/1,
               metadata/1, set_metadata/4,
               join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
+              add_yubikey/3, yubikeys/1, remove_yubikey/3,
               merge/2,
               to_json/1
              ]).
@@ -48,6 +50,8 @@
 -type user() :: #?USER{}.
 
 -type any_user() :: user() |
+                    #user_0_1_4{} |
+                    #user_0_1_3{} |
                     #user_0_1_2{} |
                     #user_0_1_1{} |
                     #user_0_1_0{} |
@@ -64,6 +68,31 @@ is_a(_) ->
 
 load(_, #?USER{} = User) ->
     User;
+
+load({_T, _ID},
+     #user_0_1_3{
+            uuid = UUID1,
+            name = Name1,
+            password = Passwd1,
+            active_org = ActiveOrg1,
+            permissions = Permissions1,
+            groups = Groups1,
+            ssh_keys = Keys1,
+            orgs = Orgs1,
+            metadata = Metadata1
+           }) ->
+    #user_0_1_4{
+       uuid = UUID1,
+       name = Name1,
+       password = Passwd1,
+       active_org = ActiveOrg1,
+       permissions = Permissions1,
+       groups = Groups1,
+       ssh_keys = Keys1,
+       orgs = Orgs1,
+       yubikeys = riak_dt_orswot:new(),
+       metadata = Metadata1
+      };
 
 load({T, ID},
      #user_0_1_2{
@@ -276,6 +305,17 @@ revoke_key({_T, ID}, KeyID, User) ->
 
 keys(User) ->
     riak_dt_orswot:value(User#?USER.ssh_keys).
+
+add_yubikey({_T, ID}, KeyID, User) ->
+    {ok, S1} = riak_dt_orswot:update({add, KeyID}, ID, User#?USER.yubikeys),
+    User#?USER{yubikeys = S1}.
+
+remove_yubikey({_T, ID}, KeyID, User) ->
+    {ok, S1} = riak_dt_orswot:update({remove, KeyID}, ID, User#?USER.yubikeys),
+    User#?USER{yubikeys = S1}.
+
+yubikeys(User) ->
+    riak_dt_orswot:value(User#?USER.yubikeys).
 
 name(User) ->
     riak_dt_lwwreg:value(User#?USER.name).

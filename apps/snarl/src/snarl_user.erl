@@ -11,7 +11,7 @@
          ping/0,
          list/0,
          list/1,
-         auth/2,
+         auth/3,
          find_key/1,
          get_/1, get/1, raw/1,
          lookup_/1, lookup/1,
@@ -26,9 +26,8 @@
          set/3,
          import/2,
          cache/1,
-         add_key/3,
-         revoke_key/2,
-         keys/1,
+         add_key/3, revoke_key/2, keys/1,
+         add_yubikey/2, remove_yubikey/2, yubikeys/1,
          active/1,
          orgs/1
         ]).
@@ -66,25 +65,51 @@ find_key(KeyID) ->
                     (R, _) ->
                         {ok, R}
                 end, not_found, Res).
--spec auth(User::binary(), Passwd::binary()) ->
+
+-ifndef(old_hash).
+hash(Hash, Salt, Passwd) ->
+    crypto:hash(Hash, [Salt, Passwd]).
+-else.
+hash(sha512, Salt, Passwd) ->
+    crypto:sha512([Salt, Passwd]);
+hash(sha, Salt, Pass) ->
+    crypto:sha([User, Passwd]).
+-endif
+
+-spec auth(User::binary(), Passwd::binary(), OTP::binary()) ->
                   not_found |
                   {error, timeout} |
                   {ok, User::fifo:user()}.
 
--ifndef(old_hash).
-auth(User, Passwd) ->
+auth(User, Passwd, OTP) ->
     case lookup_(User) of
         {ok, UserR} ->
             case snarl_user_state:password(UserR) of
                 {Salt, Hash} ->
-                    case crypto:hash(sha512, [Salt, Passwd]) of
+                    case hash(sha512, Salt, Passwd) of
                         Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
+                            case snarl_user_state:yubikeys(UserR) of
+                                [] ->
+                                    {ok, snarl_user_state:uuid(UserR)};
+                                Ks ->
+                                    YID = snarl_yubico:id(OTP),
+                                    case lists:member(YID, Ks) of
+                                        false ->
+                                            not_found;
+                                        true ->
+                                            case snarl_yubico:verify(OTP) of
+                                                {auth, ok} ->
+                                                    {ok, snarl_user_state:uuid(UserR)};
+                                                _ ->
+                                                    not_found
+                                            end
+                                    end
+                            end;
                         _ ->
                             not_found
                     end;
                 Hash ->
-                    case crypto:hash(sha, [User, Passwd]) of
+                    case hash(sha, User, Passwd) of
                         Hash ->
                             {ok, snarl_user_state:uuid(UserR)};
                         _ ->
@@ -94,30 +119,6 @@ auth(User, Passwd) ->
         E ->
             E
     end.
--else.
-auth(User, Passwd) ->
-    case lookup_(User) of
-        {ok, UserR} ->
-            case snarl_user_state:password(UserR) of
-                {Salt, Hash} ->
-                    case crypto:sha512([Salt, Passwd]) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
-                    end;
-                Hash ->
-                    case crypto:sha([User, Passwd]) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
-                    end
-            end;
-        E ->
-            E
-    end.
--endif.
 
 -spec lookup(User::binary()) ->
                     not_found |
@@ -182,6 +183,21 @@ keys(User) ->
     case get_(User) of
         {ok, UserObj} ->
             {ok, snarl_user_state:keys(UserObj)};
+        E ->
+            E
+    end.
+
+add_yubikey(User, OTP) ->
+    KeyID = snarl_yubico:id(OTP),
+    do_write(User, add_yubikey, KeyID).
+
+remove_yubikey(User, KeyID) ->
+    do_write(User, remove_yubikey, KeyID).
+
+yubikeys(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:yubikeys(UserObj)};
         E ->
             E
     end.
