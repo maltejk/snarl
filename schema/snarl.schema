@@ -2,6 +2,18 @@
 
 
 %% @doc Interval between full rebuilds of the sync data.
+{mapping, "yubico.client_id", "snarl.yubico_client_id",
+ [{commented, "123"},
+  {datatype, string}]
+}.
+
+%% @doc Interval between full rebuilds of the sync data.
+{mapping, "yubico.secret_key", "snarl.yubico_secret_key",
+ [{commented, "..."},
+  {datatype, string}]
+}.
+
+%% @doc Interval between full rebuilds of the sync data.
 {mapping, "sync.build_interval", "snarl.sync_build_interval",
  [{default, "1h"},
   {commented, "1h"},
@@ -20,14 +32,14 @@
  [{default, "1s"},
   {commented, "1s"},
   {datatype, {duration, ms}}]
-]}.
+}.
 
 %% @doc Delay between reads on a sync data rebuild.
 {mapping, "sync.read_delay", "snarl.sync_read_delay",
  [{default, "50ms"},
   {commented, "50ms"},
   {datatype, {duration, ms}}]
-]}.
+}.
 
 %% @doc Enable or disable the sync client
 {mapping, "sync", "snarl.sync", [
