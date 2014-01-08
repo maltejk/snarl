@@ -86,7 +86,7 @@ read(_Event, State=#state{list=[E|R], system=Sys, version=Vsn,
     case Sys:raw(E) of
         {ok, O} ->
             lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, E]),
-            snarl_sync_tree:insert(F, Sys, Vsn, E, hash(E, O));
+            snarl_sync_tree:insert(F, Sys, Vsn, E, snarl_sync:hash(E, O));
         not_found ->
             lager:debug("[sync] delete  ~p(~p) <- ~p", [Sys, Vsn, E]),
             snarl_sync_tree:delete(F, Sys, E);
@@ -180,6 +180,3 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
-
-hash(BKey, RObj) ->
-    list_to_binary(integer_to_list(erlang:phash2({BKey, RObj}))).
