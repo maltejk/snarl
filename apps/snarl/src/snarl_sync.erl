@@ -15,7 +15,7 @@
 -endif.
 
 %% API
--export([start/2, start_link/2, sync_op/6]).
+-export([start/2, start_link/2, sync_op/6, hash/2]).
 
 -ignore_xref([start_link/2]).
 
@@ -224,6 +224,9 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+hash(BKey, Obj) ->
+    list_to_binary(integer_to_list(erlang:phash2({BKey, snarl_obj:vclock(Obj)}))).
 
 sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     {Diff, Get, Push} =split_trees(LTree, RTree),
