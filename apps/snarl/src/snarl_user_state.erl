@@ -223,6 +223,7 @@ to_json(#?USER{
             permissions = Permissions,
             active_org = Org,
             orgs = Orgs,
+            yubikeys = YubiKeys,
             metadata = Metadata
            }) ->
     jsxd:from_list(
@@ -231,6 +232,7 @@ to_json(#?USER{
        {<<"name">>, riak_dt_lwwreg:value(Name)},
        {<<"groups">>, riak_dt_orswot:value(Groups)},
        {<<"permissions">>, riak_dt_orswot:value(Permissions)},
+       {<<"yubikeys">>, riak_dt_orswot:value(YubiKeys)},
        {<<"keys">>, riak_dt_orswot:value(Keys)},
        {<<"org">>, riak_dt_lwwreg:value(Org)},
        {<<"orgs">>, riak_dt_orswot:value(Orgs)},
@@ -407,7 +409,8 @@ to_json_test() ->
              {<<"org">>, <<>>},
              {<<"orgs">>, []},
              {<<"permissions">>, []},
-             {<<"uuid">>, <<>> }],
+             {<<"uuid">>, <<>> },
+             {<<"yubikeys">>, []}],
     ?assertEqual(UserJ, to_json(User)).
 
 name_test() ->
@@ -418,6 +421,12 @@ name_test() ->
     User2 = name(mkid(), Name1, User1),
     ?assertEqual(Name0, name(User1)),
     ?assertEqual(Name1, name(User2)).
+
+yubikey_test() ->
+    Key = <<"Test0">>,
+    User0 = new(mkid()),
+    User1 = add_yubikey(mkid(), Key, User0),
+    ?assertEqual([<<"Test0">>], yubikeys(User1)).
 
 password_test() ->
     Name = "Test",
