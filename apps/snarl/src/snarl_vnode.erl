@@ -111,8 +111,9 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
 %%% Callbacks
 %%%===================================================================
 lookup(Name, Sender, State=#vstate{state=Mod}) ->
+    ID = snarl_vnode:mkid(lookup),
     FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
-                     case Mod:name(V) of
+                     case Mod:name(Mod:load(ID, V)) of
                          AName when AName =:= Name ->
                              [U];
                          _ ->
