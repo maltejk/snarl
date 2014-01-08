@@ -84,6 +84,7 @@ write({VNode, System}, User, Op, Val) ->
     write({node(), VNode, System}, User, Op, Val);
 
 write({{remote, Node}, VNode, System}, User, Op, Val) ->
+    lager:info("[sync-write:~p] executing sync write", [System]),
     ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, undefined, User, Op, Val]);
 
