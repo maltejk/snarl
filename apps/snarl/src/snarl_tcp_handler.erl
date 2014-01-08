@@ -30,7 +30,10 @@ message({org, list}, State) ->
     {reply, snarl_org:list(), State};
 
 message({org, list, Requirements}, State) ->
-    {reply, snarl_org:list(Requirements), State};
+    message({org, list, Requirements, false}, State);
+
+message({org, list, Requirements, Full}, State) ->
+    {reply, snarl_org:list(Requirements, Full), State};
 
 message({org, get, Org}, State) ->
     {reply, snarl_org:get(Org), State};
@@ -70,7 +73,10 @@ message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
 message({user, list, Requirements}, State) ->
-    {reply, snarl_user:list(Requirements), State};
+    message({user, list, Requirements, false}, State);
+
+message({user, list, Requirements, Full}, State) ->
+    {reply, snarl_user:list(Requirements, Full), State};
 
 message({user, get, {token, Token}}, State) ->
     case snarl_token:get(Token) of
@@ -282,7 +288,10 @@ message({group, list}, State) ->
     {reply, snarl_group:list(), State};
 
 message({group, list, Requirements}, State) ->
-    {reply, snarl_group:list(Requirements), State};
+    message({group, list, Requirements, false}, State);
+
+message({group, list, Requirements, Full}, State) ->
+    {reply, snarl_group:list(Requirements, Full), State};
 
 message({group, get, Group}, State) ->
     {reply, snarl_group:get(Group), State};
