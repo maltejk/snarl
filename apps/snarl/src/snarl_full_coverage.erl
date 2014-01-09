@@ -112,5 +112,9 @@ merge([{_Score1, V} | R], _Score2, Vs) when _Score1 =/= _Score2->
 merge_obj(Vs) ->
     case snarl_obj:merge(snarl_entity_read_fsm, Vs) of
         #snarl_obj{val = V = #?USER{}} ->
-            snarl_user_state:to_json(V)
+            snarl_user_state:to_json(V);
+        #snarl_obj{val = V = #?ORG{}} ->
+            snarl_org_state:to_json(V);
+        #snarl_obj{val = V = #?GROUP{}} ->
+            snarl_group_state:to_json(V)
     end.
