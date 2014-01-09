@@ -82,42 +82,48 @@ hash(sha, Salt, Pass) ->
                   {ok, User::fifo:user()}.
 
 auth(User, Passwd, OTP) ->
-    case lookup_(User) of
-        {ok, UserR} ->
-            case snarl_user_state:password(UserR) of
-                {Salt, Hash} ->
-                    case hash(sha512, Salt, Passwd) of
-                        Hash ->
-                            case snarl_user_state:yubikeys(UserR) of
-                                [] ->
-                                    {ok, snarl_user_state:uuid(UserR)};
-                                Ks ->
-                                    YID = snarl_yubico:id(OTP),
-                                    case lists:member(YID, Ks) of
-                                        false ->
-                                            not_found;
-                                        true ->
-                                            case snarl_yubico:verify(OTP) of
-                                                {auth, ok} ->
-                                                    {ok, snarl_user_state:uuid(UserR)};
-                                                _ ->
-                                                    not_found
-                                            end
-                                    end
-                            end;
-                        _ ->
-                            not_found
-                    end;
-                Hash ->
-                    case hash(sha, User, Passwd) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
+    Res1 = case lookup_(User) of
+               {ok, UserR} ->
+                   case snarl_user_state:password(UserR) of
+                       {Salt, Hash} ->
+                           case hash(sha512, Salt, Passwd) of
+                               Hash ->
+                                   UserR;
+                               _ ->
+                                   not_found
+                           end;
+                       Hash ->
+                           case hash(sha, User, Passwd) of
+                               Hash ->
+                                   UserR;
+                               _ ->
+                                   not_found
+                           end
+                   end;
+               E ->
+                   E
+           end,
+    case Res1 of
+        not_found ->
+            not_found;
+        UserR1 ->
+            case snarl_user_state:yubikeys(UserR1) of
+                [] ->
+                    {ok, snarl_user_state:uuid(UserR1)};
+                Ks ->
+                    YID = snarl_yubico:id(OTP),
+                    case lists:member(YID, Ks) of
+                        false ->
+                            not_found;
+                        true ->
+                            case snarl_yubico:verify(OTP) of
+                                {auth, ok} ->
+                                    {ok, snarl_user_state:uuid(UserR1)};
+                                _ ->
+                                    not_found
+                            end
                     end
-            end;
-        E ->
-            E
+            end
     end.
 
 -spec lookup(User::binary()) ->
