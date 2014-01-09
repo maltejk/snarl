@@ -129,7 +129,7 @@ message({user, yubikeys, add, User, OTP}, State) when
      snarl_user:add_yubikey(User, OTP),
      State};
 
-message({user, yubikeys, revoke, User, KeyId}, State) when
+message({user, yubikeys, remove, User, KeyId}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:remove_yubikey(User, KeyId),
