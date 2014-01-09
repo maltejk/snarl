@@ -4,16 +4,14 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([init/5,
-         list_keys/2,
-         list_keys/4,
          is_empty/1,
          delete/1,
          %%fold_with_bucket/4,
-         lookup/3,
          put/3,
          change/5,
          fold/4,
          handle_command/3,
+         handle_coverage/4,
          handle_info/2,
          mkid/0,
          mkid/1,
@@ -66,6 +64,17 @@ list_keys(Getter, Requirements, Sender, State) ->
              end,
     fold(FoldFn, [], Sender, State).
 
+list(Getter, Requirements, Sender, State) ->
+    FoldFn = fun (Key, E, C) ->
+                     case rankmatcher:match(E, Getter, Requirements) of
+                         false ->
+                             C;
+                         Pts ->
+                             [{Pts, {Key, E}} | C]
+                     end
+             end,
+    fold(FoldFn, [], Sender, State).
+
 fold_with_bucket(Fun, Acc0, Sender, State) ->
     FoldFn = fun(K, V, O) ->
                      Fun({State#vstate.bucket, K}, V, O)
@@ -110,20 +119,6 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
 %%%===================================================================
 %%% Callbacks
 %%%===================================================================
-lookup(Name, Sender, State=#vstate{state=Mod}) ->
-    ID = snarl_vnode:mkid(lookup),
-    FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
-                     case Mod:name(Mod:load(ID, V)) of
-                         AName when AName =:= Name ->
-                             [U];
-                         _ ->
-                             [not_found]
-                     end;
-                 (_, O, Res) ->
-                     lager:info("Oops: ~p", [O]),
-                     Res
-             end,
-    fold(FoldFn, [not_found], Sender, State).
 
 is_empty(State=#vstate{db=DB, bucket=Bucket}) ->
     FoldFn = fun (_, _) -> {false, State} end,
@@ -137,6 +132,40 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
 
 load_obj(ID, Mod, Obj = #snarl_obj{val = V}) ->
     Obj#snarl_obj{val = Mod:load(ID, V)}.
+
+handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
+    ID = snarl_vnode:mkid(lookup),
+    FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
+                     case Mod:name(Mod:load(ID, V)) of
+                         AName when AName =:= Name ->
+                             [U];
+                         _ ->
+                             [not_found]
+                     end;
+                 (_, O, Res) ->
+                     lager:info("Oops: ~p", [O]),
+                     Res
+             end,
+    fold(FoldFn, [not_found], Sender, State);
+
+handle_coverage(list, _KeySpaces, Sender, State) ->
+    list_keys(Sender, State);
+
+handle_coverage({list, Requirements}, _KeySpaces, Sender, State) ->
+    handle_coverage({list, Requirements, false}, _KeySpaces, Sender, State);
+
+handle_coverage({list, Requirements, Full}, _KeySpaces, Sender,
+                State = #vstate{state=Mod}) ->
+    case Full of
+        true ->
+            list(fun Mod:getter/2, Requirements, Sender, State);
+        false ->
+            list_keys(fun Mod:getter/2, Requirements, Sender, State)
+    end;
+handle_coverage(Req, _KeySpaces, _Sender, State) ->
+    lager:warning("Unknown coverage request: ~p", [Req]),
+    {stop, not_implemented, State}.
+
 
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#vstate.partition}, State};
@@ -225,7 +254,6 @@ handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender,
             snarl_vnode:put(UUID, Obj, State),
             {reply, {ok, ReqID}, State}
     end;
-
 
 %%%===================================================================
 %%% AAE

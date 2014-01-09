@@ -108,14 +108,6 @@ list() ->
       list).
 
 
--spec list(Reqs::[fifo:matcher()]) ->
-                  {ok, [IPR::fifo:group_id()]} | {error, timeout}.
-list(Requirements) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_group_vnode_master, snarl_group,
-                  {list, Requirements}),
-    Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)}.
 
 %%--------------------------------------------------------------------
 %% @doc Lists all vm's and fiters by a given matcher set.
@@ -124,12 +116,18 @@ list(Requirements) ->
 -spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
 
 list(Requirements, true) ->
-    {ok, Ls} = list(Requirements),
-    Ls1 = [{V, {UUID, ?MODULE:get(UUID)}} || {V, UUID} <- Ls],
-    Ls2 = [{V, {UUID, D}} || {V, {UUID, {ok, D}}} <- Ls1],
-    {ok,  Ls2};
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, Requirements, true}),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)};
+
 list(Requirements, false) ->
-    list(Requirements).
+    {ok, Res} = snarl_coverage:start(
+                  snarl_group_vnode_master, snarl_group,
+                  {list, Requirements}),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)}.
 
 -spec add(Group::binary()) ->
                  {ok, UUID::fifo:group_id()} |

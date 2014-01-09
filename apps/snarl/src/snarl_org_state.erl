@@ -22,6 +22,7 @@
          metadata/1, set_metadata/4,
          merge/2,
          to_json/1,
+         getter/2,
          is_a/1
         ]).
 
@@ -36,6 +37,7 @@
               metadata/1, set_metadata/4,
               merge/2,
               to_json/1,
+              getter/2,
               is_a/1
              ]).
 
@@ -44,6 +46,10 @@
 -opaque any_organisation() :: organisation() |
                               #organisation_0_1_0{} |
                               statebox:statebox().
+
+getter(#snarl_obj{val=S0}, <<"uuid">>) ->
+    ID = snarl_vnode:mkid(getter),
+    uuid(snarl_org_state:load(ID, S0)).
 
 is_a(#?ORG{}) ->
     true;
