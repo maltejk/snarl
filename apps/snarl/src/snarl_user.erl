@@ -84,29 +84,23 @@ hash(sha, Salt, Pass) ->
 auth(User, Passwd, OTP) ->
     Res1 = case lookup_(User) of
                {ok, UserR} ->
-                   case snarl_user_state:password(UserR) of
-                       {Salt, Hash} ->
-                           case hash(sha512, Salt, Passwd) of
-                               Hash ->
-                                   UserR;
-                               _ ->
-                                   not_found
-                           end;
-                       Hash ->
-                           case hash(sha, User, Passwd) of
-                               Hash ->
-                                   UserR;
-                               _ ->
-                                   not_found
-                           end
+                   {T, S, H} = case snarl_user_state:password(UserR) of
+                                   {Salt, Hash} ->
+                                       {sha512, Salt, Hash};
+                                   Hash ->
+                                       {sha, User, Hash}
+                               end,
+                   case hash(T, S, Passwd) of
+                       H ->
+                           {ok, UserR};
+                       _ ->
+                           not_found
                    end;
                E ->
                    E
            end,
     case Res1 of
-        not_found ->
-            not_found;
-        UserR1 ->
+        {ok, UserR1} ->
             case snarl_user_state:yubikeys(UserR1) of
                 [] ->
                     {ok, snarl_user_state:uuid(UserR1)};
@@ -123,7 +117,9 @@ auth(User, Passwd, OTP) ->
                                     not_found
                             end
                     end
-            end
+            end;
+        E1 ->
+            E1
     end.
 
 -spec lookup(User::binary()) ->
@@ -287,25 +283,21 @@ list() ->
       snarl_user_vnode_master, snarl_user,
       list).
 
--spec list(Reqs::[fifo:matcher()]) ->
-                  {ok, [IPR::fifo:user_id()]} | {error, timeout}.
-list(Requirements) ->
+-spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
+
+list(Requirements, true) ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, Requirements, true}),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)};
+
+list(Requirements, false) ->
     {ok, Res} = snarl_coverage:start(
                   snarl_user_vnode_master, snarl_user,
                   {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
-
-
--spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
-
-list(Requirements, true) ->
-    {ok, Ls} = list(Requirements),
-    Ls1 = [{V, {UUID, ?MODULE:get(UUID)}} || {V, UUID} <- Ls],
-    Ls2 = [{V, {UUID, D}} || {V, {UUID, {ok, D}}} <- Ls1],
-    {ok,  Ls2};
-list(Requirements, false) ->
-    list(Requirements).
 
 -spec add(Creator::fifo:user_id(),
           UserName::binary()) ->

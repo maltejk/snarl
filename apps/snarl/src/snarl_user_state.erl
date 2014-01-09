@@ -26,7 +26,7 @@
          add_yubikey/3, yubikeys/1, remove_yubikey/3,
          merge/2,
          to_json/1,
-         is_a/1
+         is_a/1, getter/2
         ]).
 
 -export_type([user/0, any_user/0]).
@@ -43,7 +43,7 @@
               metadata/1, set_metadata/4,
               join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
               add_yubikey/3, yubikeys/1, remove_yubikey/3,
-              merge/2,
+              merge/2, getter/2,
               to_json/1
              ]).
 
@@ -57,11 +57,14 @@
                     #user_0_1_0{} |
                     statebox:statebox().
 
+getter(#snarl_obj{val=S0}, <<"uuid">>) ->
+    ID = snarl_vnode:mkid(getter),
+    uuid(snarl_user_state:load(ID, S0)).
+
 is_a(#?USER{}) ->
     true;
 is_a(_) ->
     false.
-
 
 -spec load({atom(), integer()}, any_user()) ->
                   user().

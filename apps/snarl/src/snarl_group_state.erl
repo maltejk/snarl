@@ -22,6 +22,7 @@
          metadata/1, set_metadata/4,
          merge/2,
          to_json/1,
+         getter/2,
          is_a/1
         ]).
 
@@ -34,6 +35,7 @@
               name/1, name/2,
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
               metadata/1, set_metadata/4,
+              getter/2,
               to_json/1
              ]).
 
@@ -42,6 +44,10 @@
 -opaque any_group() :: group() |
                        #group_0_1_0{} |
                        statebox:statebox().
+
+getter(#snarl_obj{val=S0}, <<"uuid">>) ->
+    ID = snarl_vnode:mkid(getter),
+    uuid(snarl_group_state:load(ID, S0)).
 
 is_a(#?GROUP{}) ->
     true;

@@ -230,22 +230,8 @@ is_empty(State) ->
 delete(State) ->
     snarl_vnode:delete(State).
 
-handle_coverage({lookup, Name}, _KeySpaces, Sender, State) ->
-    snarl_vnode:lookup(Name, Sender, State);
-
-handle_coverage(list, _KeySpaces, Sender, State) ->
-    snarl_vnode:list_keys(Sender, State);
-
-handle_coverage({list, Requirements}, _KeySpaces, Sender, State) ->
-    ID = snarl_vnode:mkid(findkey),
-    Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
-                     snarl_group_state:uuid(snarl_group_state:load(ID, S0))
-             end,
-    snarl_vnode:list_keys(Getter, Requirements, Sender, State);
-
-handle_coverage(Req, _KeySpaces, _Sender, State) ->
-    lager:warning("Unknown coverage request: ~p", [Req]),
-    {stop, not_implemented, State}.
+handle_coverage(Req, KeySpaces, Sender, State) ->
+    snarl_vnode:handle_coverage(Req, KeySpaces, Sender, State).
 
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.

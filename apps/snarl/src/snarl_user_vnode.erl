@@ -336,24 +336,8 @@ handle_coverage({find_key, KeyID}, _KeySpaces, Sender, State) ->
              end,
     snarl_vnode:fold(FoldFn, [not_found], Sender, State);
 
-handle_coverage({lookup, Name}, _KeySpaces, Sender, State) ->
-    snarl_vnode:lookup(Name, Sender, State);
-
-handle_coverage(list, _KeySpaces, Sender, State) ->
-    snarl_vnode:list_keys(Sender, State);
-
-handle_coverage({list, Requirements}, _KeySpaces, Sender, State) ->
-    ID = snarl_vnode:mkid(findkey),
-    Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
-                     snarl_user_state:uuid(snarl_user_state:load(ID, S0));
-                (_, _) ->
-                     undefined
-             end,
-    snarl_vnode:list_keys(Getter, Requirements, Sender, State);
-
-handle_coverage(Req, _KeySpaces, _Sender, State) ->
-    lager:warning("Unknown coverage request: ~p", [Req]),
-    {stop, not_implemented, State}.
+handle_coverage(Req, KeySpaces, Sender, State) ->
+    snarl_vnode:handle_coverage(Req, KeySpaces, Sender, State).
 
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.
