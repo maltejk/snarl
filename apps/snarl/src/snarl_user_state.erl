@@ -69,7 +69,7 @@ is_a(_) ->
 load(_, #?USER{} = User) ->
     User;
 
-load({_T, _ID},
+load({_, _},
      #user_0_1_3{
             uuid = UUID1,
             name = Name1,
@@ -210,6 +210,7 @@ new({T, _ID}) ->
         active_org = ActiveOrg,
         groups = riak_dt_orswot:new(),
         permissions = riak_dt_orswot:new(),
+        yubikeys = riak_dt_orswot:new(),
         ssh_keys = riak_dt_orswot:new(),
         orgs = riak_dt_orswot:new(),
         metadata = snarl_map:new()
@@ -248,6 +249,7 @@ merge(#?USER{
           ssh_keys = Keys1,
           active_org = Org1,
           orgs = Orgs1,
+          yubikeys = YubiKeys1,
           metadata = Metadata1
          },
       #?USER{
@@ -259,6 +261,7 @@ merge(#?USER{
           ssh_keys = Keys2,
           active_org = Org2,
           orgs = Orgs2,
+          yubikeys = YubiKeys2,
           metadata = Metadata2
          }) ->
     #?USER{
@@ -268,6 +271,7 @@ merge(#?USER{
         active_org = riak_dt_lwwreg:merge(Org1, Org2),
         groups = riak_dt_orswot:merge(Groups1, Groups2),
         ssh_keys = riak_dt_orswot:merge(Keys1, Keys2),
+        yubikeys = riak_dt_orswot:merge(YubiKeys1, YubiKeys2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
         orgs = riak_dt_orswot:merge(Orgs1, Orgs2),
         metadata = snarl_map:merge(Metadata1, Metadata2)
