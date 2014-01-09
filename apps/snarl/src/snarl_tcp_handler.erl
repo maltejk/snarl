@@ -331,7 +331,7 @@ message({cloud, status}, State) ->
      State};
 
 message(Message, State) ->
-    io:format("Unsuppored TCP message: ~p", [Message]),
+    lager:warning("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
 
 status() ->

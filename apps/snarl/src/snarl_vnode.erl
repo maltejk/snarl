@@ -135,14 +135,20 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
     fifo_db:transact(State#vstate.db, Trans),
     {ok, State}.
 
+load_obj(ID, Mod, Obj = #snarl_obj{val = V}) ->
+    Obj#snarl_obj{val = Mod:load(ID, V)}.
+
 handle_command(ping, _Sender, State) ->
     {reply, {pong, State#vstate.partition}, State};
 
-handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender, State) ->
+handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender,
+               State=#vstate{state=Mod}) ->
     case get(UUID, State) of
         {ok, Old} ->
+            ID = snarl_vnode:mkid(),
+            Old1 = load_obj(ID, Mod, Old),
             lager:info("[sync-repair:~s] Merging with old object", [UUID]),
-            Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old, Obj]),
+            Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
             snarl_vnode:put(UUID, Merged, State);
         not_found ->
             lager:info("[sync-repair:~s] Writing new object", [UUID]),
@@ -153,10 +159,14 @@ handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender, Sta
     end,
     {reply, {ok, ReqID}, State};
 
-handle_command({repair, UUID, VClock, Obj = #snarl_obj{}}, _Sender, State) ->
+handle_command({repair, UUID, _VClock, Obj = #snarl_obj{}}, _Sender,
+               State=#vstate{state=Mod}) ->
     case get(UUID, State) of
-        {ok, #snarl_obj{vclock = VC1}} when VC1 =:= VClock ->
-            snarl_vnode:put(UUID, Obj, State);
+        {ok, Old} ->
+            ID = snarl_vnode:mkid(),
+            Old1 = load_obj(ID, Mod, Old),
+            Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
+            snarl_vnode:put(UUID, Merged, State);
         not_found ->
             snarl_vnode:put(UUID, Obj, State);
         _ ->
