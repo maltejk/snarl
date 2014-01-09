@@ -84,29 +84,23 @@ hash(sha, Salt, Pass) ->
 auth(User, Passwd, OTP) ->
     Res1 = case lookup_(User) of
                {ok, UserR} ->
-                   case snarl_user_state:password(UserR) of
-                       {Salt, Hash} ->
-                           case hash(sha512, Salt, Passwd) of
-                               Hash ->
-                                   UserR;
-                               _ ->
-                                   not_found
-                           end;
-                       Hash ->
-                           case hash(sha, User, Passwd) of
-                               Hash ->
-                                   UserR;
-                               _ ->
-                                   not_found
-                           end
+                   {T, S, H} = case snarl_user_state:password(UserR) of
+                                   {Salt, Hash} ->
+                                       {sha512, Salt, Hash};
+                                   Hash ->
+                                       {sha, User, Hash}
+                               end,
+                   case hash(T, S, Passwd) of
+                       H ->
+                           {ok, UserR};
+                       _ ->
+                           not_found
                    end;
                E ->
                    E
            end,
     case Res1 of
-        not_found ->
-            not_found;
-        UserR1 ->
+        {ok, UserR1} ->
             case snarl_user_state:yubikeys(UserR1) of
                 [] ->
                     {ok, snarl_user_state:uuid(UserR1)};
@@ -123,7 +117,9 @@ auth(User, Passwd, OTP) ->
                                     not_found
                             end
                     end
-            end
+            end;
+        E1 ->
+            E1
     end.
 
 -spec lookup(User::binary()) ->
