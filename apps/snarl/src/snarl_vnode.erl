@@ -54,8 +54,9 @@ list_keys(Sender, State=#vstate{db=DB, bucket=Bucket}) ->
     {async, {fold, AsyncWork, FinishFun}, Sender, State}.
 
 list_keys(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
+    ID = snarl_vnode:mkid(list),
     FoldFn = fun (Key, E, C) ->
-                     E1 = E#snarl_obj{val=StateMod:load(E#snarl_obj.val)},
+                     E1 = E#snarl_obj{val=StateMod:load(ID, E#snarl_obj.val)},
                      case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
@@ -65,13 +66,15 @@ list_keys(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
              end,
     fold(FoldFn, [], Sender, State).
 
-list(Getter, Requirements, Sender, State) ->
+list(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
+    ID = snarl_vnode:mkid(list),
     FoldFn = fun (Key, E, C) ->
-                     case rankmatcher:match(E, Getter, Requirements) of
+                     E1 = E#snarl_obj{val=StateMod:load(ID, E#snarl_obj.val)},
+                     case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
                          Pts ->
-                             [{Pts, {Key, E}} | C]
+                             [{Pts, {Key, E1}} | C]
                      end
              end,
     fold(FoldFn, [], Sender, State).
