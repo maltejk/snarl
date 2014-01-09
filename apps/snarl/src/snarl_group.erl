@@ -117,7 +117,7 @@ list() ->
 
 list(Requirements, true) ->
     {ok, Res} = snarl_full_coverage:start(
-                  snarl_user_vnode_master, snarl_user,
+                  snarl_group_vnode_master, snarl_group,
                   {list, Requirements, true}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)};
