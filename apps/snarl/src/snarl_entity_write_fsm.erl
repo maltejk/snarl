@@ -97,9 +97,10 @@ write({Node, VNode, System}, User, Op, Val) ->
             ok;
         {ReqID, ok, Result} ->
             snarl_sync:sync_op(Node, VNode, System, User, Op, Val),
-            {ok, Result};
-        Other ->
-            lager:error("Unknown write reply: ~p", [Other])
+            {ok, Result}
+            %%;
+            %%Other ->
+            %%lager:error("Unknown write reply: ~p", [Other])
     after ?DEFAULT_TIMEOUT ->
             {error, timeout}
     end.
