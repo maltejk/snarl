@@ -1,59 +1,52 @@
 %% -*- erlang -*-
 
 
-%% @doc Interval between full rebuilds of the sync data.
+%% @doc This section deals with Yubikey support a API key and
+%% client ID can be obtained from:
+%% https://upgrade.yubico.com/getapikey/
+
+%% @doc Yubico API client ID issued from the API key page,
+%% this shhould be a number
 {mapping, "yubico.client_id", "snarl.yubico_client_id",
  [{commented, "123"},
   {datatype, string}]
 }.
 
-%% @doc Interval between full rebuilds of the sync data.
+%% @doc The Secret key related that was issued along with
+%% the Yubico cleint ID.
 {mapping, "yubico.secret_key", "snarl.yubico_secret_key",
  [{commented, "..."},
   {datatype, string}]
 }.
 
-%% @doc Interval between full rebuilds of the sync data.
-{mapping, "sync.build_interval", "snarl.sync_build_interval",
- [{default, "1h"},
-  {commented, "1h"},
-  {datatype, {duration, ms}}]
-}.
+%% @doc Datacenter Syncronisation settings, please keep in mind
+%% that for event replication only events from this server
+%% will be replicated, to replicate events from other servers
+%% syncronisation needs to be set up there as well.
+%%
+%% It is not required to have a 1:1 mapping but it is the most
+%% sensible way.
+%%
+%% It is also important to node that sync should be set up from
+%% both sides to get best results.
 
-%% @doc Interval between syncs with remote snarls.
-{mapping, "sync.interval", "snarl.sync_interval",
- [{default, "15m"},
-  {commented, "15m"},
-  {datatype, {duration, ms}}]
-}.
+%% @doc Specifies weather syncronisation is enabled on this node
+%% or not, valid values are 'on' and 'off'.
 
-%% @doc Timeout befeore a sync connection is considered dead.
-{mapping, "sync.recv_timeout", "snarl.sync_recv_timeout",
- [{default, "1s"},
-  {commented, "1s"},
-  {datatype, {duration, ms}}]
-}.
-
-%% @doc Delay between reads on a sync data rebuild.
-{mapping, "sync.read_delay", "snarl.sync_read_delay",
- [{default, "50ms"},
-  {commented, "50ms"},
-  {datatype, {duration, ms}}]
-}.
-
-%% @doc Enable or disable the sync client
 {mapping, "sync", "snarl.sync", [
   {datatype, {enum, [on, off, debug]}},
   {default, off}
 ]}.
 
-%% @doc Enable or disable the sync client
+%% @doc The IP/Port this server will listen to for incoming sync
+%% connections.
 {mapping, "sync.ip", "snarl.sync_ip",
  [{commented, {"{{snarl_ip}}", {{snarl_sync_port}} }},
   {datatype, ip}]}.
 
+%% @doc Specification of a sync partner, there should be one or
+%% more per remote datacenter.
 
-%% @doc Enable or disable the sync client
 {mapping, "sync.partner.$name", "snarl.sync_partners",
  [{commented, {"10.20.30.40", {{snarl_sync_port}} }},
   {datatype, ip}]}.
@@ -65,6 +58,45 @@
          [ IP || {_, IP} <- Partner]
  end
 }.
+
+
+%% @doc The full syncronisation will dynamically update it's data
+%% whenever a change is made to a object local to this node
+%% in addition to that this interval determines how often
+%% a full rebuild should take place.
+{mapping, "sync.build_interval", "snarl.sync_build_interval",
+ [{default, "1h"},
+  {commented, "1h"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc During a full rebuild reads from the Snarl system are
+%% delayed to prevent slowing down the database during the rebuild
+%% this value specifies the delay between reads.
+{mapping, "sync.read_delay", "snarl.sync_read_delay",
+ [{default, "50ms"},
+  {commented, "50ms"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc This defines how often it should be checked if differences
+%% exists betwen local and remote nodes. Please keep in mind that
+%% sync should be set up in both directions this syncs will be
+%% performed about twice as often as specified here.
+{mapping, "sync.interval", "snarl.sync_interval",
+ [{default, "15m"},
+  {commented, "15m"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc If a command is send to a sync partner and this trheashold
+%% is excided the connection will attempt to bounc and be reistablished.
+{mapping, "sync.recv_timeout", "snarl.sync_recv_timeout",
+ [{default, "1s"},
+  {commented, "1s"},
+  {datatype, {duration, ms}}]
+}.
+
 
 %% @doc enable active anti-entropy subsystem
 {mapping, "anti_entropy", "riak_core.anti_entropy", [
@@ -108,6 +140,16 @@
 
 {translation,
  "mdns_client_lib.interface",
+ fun(Conf) ->
+         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         [A, B, C, D] = [list_to_integer(O) ||
+                            O <- re:split(IP, "\\.", [{return, list}])],
+         {A, B, C, D}
+ end
+}.
+
+{translation,
+ "mdns_server_lib.interface",
  fun(Conf) ->
          {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
          [A, B, C, D] = [list_to_integer(O) ||
