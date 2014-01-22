@@ -144,9 +144,16 @@
           metadata    = riak_dt_map:new()    :: riak_dt_map:map()
          }).
 
+-record(organisation_0_1_2, {
+          uuid        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          name        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          triggers    = riak_dt_map:new()    :: riak_dt_map:map(),
+          metadata    = riak_dt_map:new()    :: riak_dt_map:map()
+         }).
+
 -define(USER, user_0_1_4).
 -define(GROUP, group_0_1_1).
--define(ORG, organisation_0_1_1).
+-define(ORG, organisation_0_1_2).
 
 
 -define(NEW_LWW(V, T), riak_dt_lwwreg:update(
