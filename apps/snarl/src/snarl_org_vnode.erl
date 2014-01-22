@@ -127,9 +127,9 @@ delete(Preflist, ReqID, Org) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add_trigger(Preflist, ReqID, Org, Val) ->
+add_trigger(Preflist, ReqID, Org, {UUID, Trigger}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add_trigger, ReqID, Org, Val},
+                                   {add_trigger, ReqID, Org, UUID, Trigger},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
