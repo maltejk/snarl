@@ -78,7 +78,8 @@ load({T, ID},
         triggers = Triggers,
         metadata = Metadata
        }) ->
-    Ts = [{trigger_uuid(UUID, Tr), Tr} || Tr <- riak_dt_orswot:value(Triggers)],
+    UUIDb = riak_dt_lwwreg:value(UUID),
+    Ts = [{trigger_uuid(UUIDb, Tr), Tr} || Tr <- riak_dt_orswot:value(Triggers)],
     Triggers1 = snarl_map:from_orddict(orddict:from_list(Ts), ID, T),
     load({T, ID},
          #organisation_0_1_2{
