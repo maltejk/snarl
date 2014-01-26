@@ -384,6 +384,6 @@
 %% via total_leveldb_mem_percent instead.
 {mapping, "leveldb.total_leveldb_mem", "eleveldb.total_leveldb_mem", [
   {datatype, bytesize},
-  {default, "512MB"}
+  {default, "512MB"},
   {level, advanced}
 ]}.
