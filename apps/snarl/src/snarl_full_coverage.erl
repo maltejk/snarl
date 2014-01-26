@@ -13,7 +13,6 @@
 
 -record(state, {replies, r, reqid, from, reqs}).
 
-
 start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true}) ->
     ReqID = mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
@@ -46,8 +45,6 @@ init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request}) ->
                    reqs = Requirements},
     {Request, VNodeSelector, NVal, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
-
-
 
 process_results({ok, _ReqID, _IdxNode, Obj},
                 State = #state{replies = Replies}) ->
