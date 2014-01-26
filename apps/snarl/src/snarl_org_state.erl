@@ -18,7 +18,7 @@
          load/2,
          uuid/1, uuid/3,
          name/1, name/3,
-         triggers/1, add_trigger/3, remove_trigger/3,
+         triggers/1, add_trigger/4, remove_trigger/3,
          metadata/1, set_metadata/4,
          merge/2,
          to_json/1,
@@ -33,7 +33,7 @@
               load/2,
               uuid/1, uuid/3,
               name/1, name/3,
-              triggers/1, add_trigger/3, remove_trigger/3,
+              triggers/1, add_trigger/4, remove_trigger/3,
               metadata/1, set_metadata/4,
               merge/2,
               to_json/1,
@@ -62,7 +62,7 @@ new({T, _ID}) ->
     #?ORG{
         uuid = UUID,
         name = Name,
-        triggers = riak_dt_orswot:new(),
+        triggers = snarl_map:new(),
         metadata = snarl_map:new()
        }.
 
@@ -70,6 +70,24 @@ new({T, _ID}) ->
 
 load(_, #?ORG{} = Org) ->
     Org;
+
+load({T, ID},
+     #organisation_0_1_1{
+        uuid = UUID,
+        name = Name,
+        triggers = Triggers,
+        metadata = Metadata
+       }) ->
+    UUIDb = riak_dt_lwwreg:value(UUID),
+    Ts = [{trigger_uuid(UUIDb, Tr), Tr} || Tr <- riak_dt_orswot:value(Triggers)],
+    Triggers1 = snarl_map:from_orddict(orddict:from_list(Ts), ID, T),
+    load({T, ID},
+         #organisation_0_1_2{
+            uuid = UUID,
+            name = Name,
+            triggers = Triggers1,
+            metadata = Metadata
+           });
 
 load({T, ID},
      #organisation_0_1_0{
@@ -150,7 +168,7 @@ to_json(#?ORG{
       [
        {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
        {<<"name">>, riak_dt_lwwreg:value(Name)},
-       {<<"triggers">>, [jsonify_trigger(T) || T <- riak_dt_orswot:value(Triggers)]},
+       {<<"triggers">>, [{U, jsonify_trigger(T)} || {U, T} <- snarl_map:value(Triggers)]},
        {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
@@ -188,15 +206,14 @@ uuid({T, _ID}, UUID, Org) ->
     Org#?ORG{uuid = V}.
 
 triggers(Org) ->
-    riak_dt_orswot:value(Org#?ORG.triggers).
+    snarl_map:value(Org#?ORG.triggers).
 
-add_trigger({_T, ID}, Trigger, Org) ->
-    {ok, V} = riak_dt_orswot:update({add, Trigger}, ID, Org#?ORG.triggers),
-    Org#?ORG{triggers = V}.
-
+add_trigger({T, ID}, UUID, Trigger, Org) ->
+    {ok, T1} = snarl_map:set(UUID, {reg, Trigger}, ID, T, Org#?ORG.triggers),
+    Org#?ORG{triggers = T1}.
 
 remove_trigger({_T, ID}, Trigger, Org) ->
-    {ok, V} = riak_dt_orswot:update({remove, Trigger}, ID, Org#?ORG.triggers),
+    {ok, V} = snarl_map:remove(Trigger, ID, Org#?ORG.triggers),
     Org#?ORG{triggers = V}.
 
 metadata(Org) ->
@@ -212,6 +229,10 @@ set_metadata({_T, ID}, Attribute, delete, Org) ->
 set_metadata({T, ID}, Attribute, Value, Org) ->
     {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Org#?ORG.metadata),
     Org#?ORG{metadata = M1}.
+
+trigger_uuid(UUID, Trigger) ->
+    list_to_binary(uuid:to_string(uuid:uuid5(UUID, term_to_binary(Trigger)))).
+
 
 -ifdef(TEST).
 mkid() ->

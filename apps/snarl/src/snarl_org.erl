@@ -56,7 +56,7 @@ ping() ->
 
 
 add_trigger(Org, Trigger) ->
-    do_write(Org, add_trigger, Trigger).
+    do_write(Org, add_trigger, {uuid:uuid4s(), Trigger}).
 
 remove_trigger(Org, Trigger) ->
     do_write(Org, remove_trigger, Trigger).
@@ -64,7 +64,7 @@ remove_trigger(Org, Trigger) ->
 trigger(Org, Event, Payload) ->
     case get_(Org) of
         {ok, OrgObj} ->
-            Triggers = snarl_org_state:triggers(OrgObj),
+            Triggers = [T || {_, T} <- snarl_org_state:triggers(OrgObj)],
             Executed = do_events(Triggers, Event, Payload, 0),
             {ok, Executed};
         R  ->
