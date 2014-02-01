@@ -187,7 +187,7 @@ merge(#?ORG{
     #?ORG{
         uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
         name = riak_dt_lwwreg:merge(Name1, Name2),
-        triggers = riak_dt_orswot:merge(Triggers1, Triggers2),
+        triggers = snarl_map:merge(Triggers1, Triggers2),
         metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
@@ -254,8 +254,5 @@ name_test() ->
     Org2 = name(mkid(), Name1, Org1),
     ?assertEqual(Name0, name(Org1)),
     ?assertEqual(Name1, name(Org2)).
-
-triggers_test() ->
-    ok.
 
 -endif.
