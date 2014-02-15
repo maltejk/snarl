@@ -20,7 +20,16 @@ cat <<EOF > $FILE
             </groups>
             <applications>
                 <application>
-                    <name>General</name>
+                    <name>Snarl</name>
+                </application>
+                <application>
+                    <name>user</name>
+                </application>
+                <application>
+                    <name>group</name>
+                </application>
+                <application>
+                    <name>token</name>
                 </application>
             </applications>
             <items>
@@ -74,7 +83,25 @@ EOF
                     <port/>
                     <description/>
                     <inventory_link>0</inventory_link>
-                    <applications/>
+                    <applications>
+EOF
+    if echo $param | grep '^\(group\|user\|token\|organisation\)'
+    then
+        app=$(echo $param | sed -e 's/^\([a-z]*\).*/\1/g')
+        cat <<EOF >> $FILE
+                        <application>
+                            <name>$app</name>
+                        </application>
+EOF
+    else
+        cat <<EOF >> $FILE
+                        <application>
+                            <name>Snarl</name>
+                        </application>
+EOF
+    fi
+cat <<EOF >> $FILE
+                    </applications>
                     <valuemap/>
                 </item>
 EOF
