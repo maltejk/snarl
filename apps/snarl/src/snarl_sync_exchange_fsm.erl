@@ -109,7 +109,7 @@ sync_diff(_, State = #state{
                         socket=Socket,
                         timeout=Timeout,
                         diff=[{Sys, UUID}|R]}) ->
-    lager:info("[sync-exchange] Diff: ~p", [{Sys, UUID}]),
+    lager:debug("[sync-exchange] Diff: ~p", [{Sys, UUID}]),
     case gen_tcp:send(Socket, term_to_binary({raw, Sys, UUID})) of
         ok ->
             case gen_tcp:recv(Socket, 0, Timeout) of
@@ -123,7 +123,6 @@ sync_diff(_, State = #state{
                                 {ok, LObj} ->
                                     Objs = [RObj, LObj],
                                     Merged = snarl_obj:merge(snarl_entity_read_fsm, Objs),
-                                    lager:info("[sync-exchange] Merge: ~p + ~p -> ~p", [RObj, LObj, Merged]),
                                     NVS = {{remote, node()}, vnode(Sys), Sys},
                                     snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Merged),
                                     Msg = write(Sys, UUID, sync_repair, Merged),
@@ -153,7 +152,7 @@ sync_get(_, State = #state{
                        socket=Socket,
                        timeout=Timeout,
                        get=[{Sys, UUID}|R]}) ->
-    lager:info("[sync-exchange] Get: ~p", [{Sys, UUID}]),
+    lager:debug("[sync-exchange] Get: ~p", [{Sys, UUID}]),
     case gen_tcp:send(Socket, term_to_binary({raw, Sys, UUID})) of
         ok ->
             case gen_tcp:recv(Socket, 0, Timeout) of
@@ -164,7 +163,7 @@ sync_get(_, State = #state{
                     NVS = {{remote, node()}, vnode(Sys), Sys},
                     case binary_to_term(Bin) of
                         {ok, Obj} ->
-                            lager:info("[sync-exchange] repairing(~p): ~p", [NVS, Obj]),
+                            lager:debug("[sync-exchange] repairing(~p): ~p", [NVS, Obj]),
                             snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Obj);
                         not_found ->
                             snarl_entity_write_fsm:write(NVS, UUID, delete, undefined)
@@ -182,7 +181,7 @@ sync_get(_, State = #state{get=[]}) ->
 sync_push(_, State = #state{
                         socket=Socket,
                         push=[{Sys, UUID}|R]}) ->
-    lager:info("[sync-exchange] Push: ~p", [{Sys, UUID}]),
+    lager:debug("[sync-exchange] Push: ~p", [{Sys, UUID}]),
     Msg  = case Sys:raw(UUID) of
                {ok, Obj} ->
                    write(Sys, UUID, sync_repair, Obj);
