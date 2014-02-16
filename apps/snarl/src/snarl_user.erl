@@ -105,16 +105,20 @@ auth(User, Passwd, OTP) ->
                 [] ->
                     {ok, snarl_user_state:uuid(UserR1)};
                 Ks ->
-                    YID = snarl_yubico:id(OTP),
-                    case lists:member(YID, Ks) of
-                        false ->
-                            not_found;
-                        true ->
-                            case snarl_yubico:verify(OTP) of
-                                {auth, ok} ->
-                                    {ok, snarl_user_state:uuid(UserR1)};
-                                _ ->
-                                    not_found
+                    case snarl_yubico:id(OTP) of
+                        <<>> ->
+                            key_required;
+                        YID  ->
+                            case lists:member(YID, Ks) of
+                                false ->
+                                    not_found;
+                                true ->
+                                    case snarl_yubico:verify(OTP) of
+                                        {auth, ok} ->
+                                            {ok, snarl_user_state:uuid(UserR1)};
+                                        _ ->
+                                            not_found
+                                    end
                             end
                     end
             end;
