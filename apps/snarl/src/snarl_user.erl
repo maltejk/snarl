@@ -319,6 +319,14 @@ add(Creator, User) when is_binary(Creator),
                         <<>> ->
                             R;
                         Org ->
+                            case snarl_opt:get("defaults", "users",
+                                               "inital_group",
+                                               user_inital_group, undefined) of
+                                undefined ->
+                                    ok;
+                                Grp ->
+                                    join(UUID, Grp)
+                            end,
                             snarl_org:trigger(Org, user_create, UUID),
                             R
                     end;
