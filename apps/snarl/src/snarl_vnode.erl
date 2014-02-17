@@ -146,8 +146,7 @@ handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
                          _ ->
                              [not_found]
                      end;
-                 (_, O, Res) ->
-                     lager:info("Oops: ~p", [O]),
+                 (_, _O, Res) ->
                      Res
              end,
     fold(FoldFn, [not_found], Sender, State);

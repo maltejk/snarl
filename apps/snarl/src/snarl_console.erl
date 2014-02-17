@@ -8,6 +8,7 @@
          remove/1,
          down/1,
          reip/1,
+         config/1,
          aae_status/1,
          staged_join/1,
          ringready/1]).
@@ -58,7 +59,8 @@
               grant_user/1,
               revoke_user/1,
               revoke_group/1,
-              passwd/1
+              passwd/1,
+              config/1
              ]).
 
 list_user([]) ->
@@ -463,6 +465,33 @@ ringready([]) ->
             error
     end.
 
+config(["show"]) ->
+    io:format("Storage~n  General Section~n"),
+    print_config(storage, general),
+    io:format("  S3 Section~n"),
+    print_config(storage, s3),
+    ok;
+
+config(["set", Ks, V]) ->
+    Ks1 = [binary_to_list(K) || K <- re:split(Ks, "\\.")],
+    config(["set" | Ks1] ++ [V]);
+
+config(["set" | R]) ->
+    [K1, K2, K3, V] = R,
+    Ks = [K1, K2, K3],
+    case snarl_opt:set(Ks, V) of
+        {invalid, key, K} ->
+            io:format("Invalid key: ~p~n", [K]),
+            error;
+        {invalid, type, T} ->
+            io:format("Invalid type: ~p~n", [T]),
+            error;
+        _ ->
+            io:format("Setting changed~n", []),
+            ok
+    end.
+
+
 %%%===================================================================
 %%% Private
 %%%===================================================================
@@ -517,3 +546,64 @@ format_timestamp(_Now, undefined) ->
     "--";
 format_timestamp(Now, TS) ->
     riak_core_format:human_time_fmt("~.1f", timer:now_diff(Now, TS)).
+
+print_config(Prefix, SubPrefix) ->
+    Fmt = [{"Key", 20}, {"Value", 50}],
+    hdr(Fmt),
+    PrintFn = fun({K, [V|_]}, _) ->
+                      fields(Fmt, [key(Prefix, SubPrefix, K), V])
+              end,
+    riak_core_metadata:fold(PrintFn, ok, {Prefix, SubPrefix}).
+
+key(Prefix, SubPrefix, Key) ->
+    io_lib:format("~p.~p.~p", [Prefix, SubPrefix, Key]).
+
+hdr(F) ->
+    hdr_lines(lists:reverse(F), {"~n", [], "~n", []}).
+
+
+hdr_lines([{N, n} | R], {Fmt, Vars, FmtLs, VarLs}) ->
+    %% there is a space that matters here ---------v
+    hdr_lines(R, {
+                "~20s " ++ Fmt,
+                [N | Vars],
+                "~20c " ++ FmtLs,
+                [$- | VarLs]});
+
+hdr_lines([{N, S}|R], {Fmt, Vars, FmtLs, VarLs}) ->
+    %% there is a space that matters here ---------v
+    hdr_lines(R, {
+                [$~ | integer_to_list(S) ++ [$s, $\  | Fmt]],
+                [N | Vars],
+                [$~ | integer_to_list(S) ++ [$c, $\  | FmtLs]],
+                [$- | VarLs]});
+
+hdr_lines([], {Fmt, Vars, FmtL, VarLs}) ->
+    io:format(Fmt, Vars),
+    io:format(FmtL, VarLs).
+
+
+fields(F, Vs) ->
+    fields(lists:reverse(F),
+           lists:reverse(Vs),
+           {"~n", []}).
+
+fields([{_, n}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
+                                     orelse is_binary(V) ->
+    fields(R, Vs, {"~s " ++ Fmt, [V | Vars]});
+
+fields([{_, n}|R], [V | Vs], {Fmt, Vars}) ->
+    fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
+
+fields([{_, S}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
+                                     orelse is_binary(V) ->
+    %% there is a space that matters here ------------v
+    fields(R, Vs, {[$~ | integer_to_list(S) ++ [$s, $\  | Fmt]], [V | Vars]});
+
+
+fields([{_, S}|R], [V | Vs], {Fmt, Vars}) ->
+    %% there is a space that matters here ------------v
+    fields(R, Vs, {[$~ | integer_to_list(S) ++ [$p, $\  | Fmt]], [V | Vars]});
+
+fields([], [], {Fmt, Vars}) ->
+    io:format(Fmt, Vars).
