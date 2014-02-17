@@ -140,18 +140,13 @@ case "$1" in
                 shift
                 run snarl_console import_user $@
                 ;;
-            "gcable")
+            "config")
                 shift
-                run snarl_console gcable_user $@
+                run snarl_console config $@
                 ;;
-            "gc")
-                shift
-                run snarl_console gc_user $@
-                ;;
-
             *)
                 echo "Usage: snarl-admin users { add | passwd | join | leave "
-                echo "                           grant | revoke | gcable | gc }."
+                echo "                           grant | revoke | config }."
                 exit 1
                 ;;
         esac
