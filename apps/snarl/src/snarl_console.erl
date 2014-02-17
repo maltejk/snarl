@@ -466,10 +466,8 @@ ringready([]) ->
     end.
 
 config(["show"]) ->
-    io:format("Storage~n  General Section~n"),
-    print_config(storage, general),
-    io:format("  S3 Section~n"),
-    print_config(storage, s3),
+    io:format("Defaults~n  User Section~n"),
+    print_config(defaults, user),
     ok;
 
 config(["set", Ks, V]) ->

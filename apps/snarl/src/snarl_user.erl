@@ -319,8 +319,8 @@ add(Creator, User) when is_binary(Creator),
                         <<>> ->
                             R;
                         Org ->
-                            case snarl_opt:get("defaults", "users",
-                                               "inital_group",
+                            case snarl_opt:get(defaults, users,
+                                               inital_group,
                                                user_inital_group, undefined) of
                                 undefined ->
                                     ok;
