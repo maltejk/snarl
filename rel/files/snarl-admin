@@ -142,7 +142,7 @@ case "$1" in
                 ;;
             *)
                 echo "Usage: snarl-admin users { add | passwd | join | leave "
-                echo "                           grant | revoke | config }."
+                echo "                           grant | revoke }."
                 exit 1
                 ;;
         esac
@@ -179,8 +179,7 @@ case "$1" in
                 run snarl_console import_group $@
                 ;;
             *)
-                echo "Usage: snarl-admin groups { list | add | grant | revoke "
-                echo "                            gc }."
+                echo "Usage: snarl-admin groups { list | add | grant | revoke }."
                 exit 1
                 ;;
         esac
