@@ -274,15 +274,19 @@ case "$1" in
         shift
         run snarl_console ringready $@
         ;;
-    "config")
+    config)
         shift
         run snarl_console config $@
+        ;;
+    status)
+        shift
+        run snarl_console status $@
         ;;
 
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
-        echo "                 ring_status}"
+        echo "                 ring_status | status}"
         echo "               config show                          - shows global config options."
         echo "               config set <key> <value>             - sets global config options."
         echo "               users list                           - list users."
