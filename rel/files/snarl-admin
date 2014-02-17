@@ -140,10 +140,6 @@ case "$1" in
                 shift
                 run snarl_console import_user $@
                 ;;
-            "config")
-                shift
-                run snarl_console config $@
-                ;;
             *)
                 echo "Usage: snarl-admin users { add | passwd | join | leave "
                 echo "                           grant | revoke | config }."
@@ -181,14 +177,6 @@ case "$1" in
             "import")
                 shift
                 run snarl_console import_group $@
-                ;;
-            "gcable")
-                shift
-                run snarl_console gcable_group $@
-                ;;
-            "gc")
-                shift
-                run snarl_console gc_group $@
                 ;;
             *)
                 echo "Usage: snarl-admin groups { list | add | grant | revoke "
@@ -287,11 +275,17 @@ case "$1" in
         shift
         run snarl_console ringready $@
         ;;
+    "config")
+        shift
+        run snarl_console config $@
+        ;;
 
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
-        echo "                 ring_status }"
+        echo "                 ring_status}"
+        echo "               config show                          - shows global config options."
+        echo "               config set <key> <value>             - sets global config options."
         echo "               users list                           - list users."
         echo "               users add <user>                     - adds a new user."
         echo "               users delete <uuid>                  - deletes a user."
