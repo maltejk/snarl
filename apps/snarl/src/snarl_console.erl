@@ -467,7 +467,7 @@ ringready([]) ->
 
 config(["show"]) ->
     io:format("Defaults~n  User Section~n"),
-    print_config(defaults, user),
+    print_config(defaults, users),
     ok;
 
 config(["set", Ks, V]) ->
