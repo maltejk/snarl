@@ -9,6 +9,7 @@
          down/1,
          reip/1,
          config/1,
+         status/1,
          aae_status/1,
          staged_join/1,
          ringready/1]).
@@ -60,7 +61,8 @@
               revoke_user/1,
               revoke_group/1,
               passwd/1,
-              config/1
+              config/1,
+              status/1
              ]).
 
 list_user([]) ->
@@ -489,6 +491,23 @@ config(["set" | R]) ->
             ok
     end.
 
+
+status([]) ->
+    case riak_core_status:transfers() of
+        {[], []} ->
+            io:format("The cluster is fine!~n"),
+            ok;
+        {[], H} ->
+            io:format("There are ~p handoffs pending!~n", [length(H)]),
+            error;
+        {S, []} ->
+            io:format("There are ~p servers down!~n", [length(S)]),
+            error;
+        {S, H} ->
+            io:format("There are ~p handoffs pending and ~p servers down!~n",
+                      [length(H), length(S)]),
+            error
+    end.
 
 %%%===================================================================
 %%% Private
