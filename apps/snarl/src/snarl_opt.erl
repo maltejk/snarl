@@ -71,7 +71,7 @@ get_type([K|R], Os) ->
 
 opts() ->
     [{"defaults",
-      [{"users", [{"inital_group", string}, {"inital_org", string}]}]}].
+      [{"users", [{"inital_group", binary}, {"inital_org", binary}]}]}].
 
 valid_type(integer, I) when is_list(I) ->
     try list_to_integer(I) of
