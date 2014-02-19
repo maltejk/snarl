@@ -319,14 +319,6 @@ add(Creator, User) when is_binary(Creator),
                         <<>> ->
                             R;
                         Org ->
-                            case snarl_opt:get(defaults, users,
-                                               inital_group,
-                                               user_inital_group, undefined) of
-                                undefined ->
-                                    ok;
-                                Grp ->
-                                    join(UUID, Grp)
-                            end,
                             snarl_org:trigger(Org, user_create, UUID),
                             R
                     end;
@@ -339,7 +331,20 @@ add(Creator, User) when is_binary(Creator),
 
 add(_, User) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    create(UUID, User).
+    case create(UUID, User) of
+        {ok, UUID} ->
+            case snarl_opt:get(defaults, users,
+                               inital_group,
+                               user_inital_group, undefined) of
+                undefined ->
+                    ok;
+                Grp ->
+                    join(UUID, Grp)
+            end,
+            {ok, UUID};
+        E ->
+            E
+    end.
 
 add(User) ->
     add(undefined, User).
