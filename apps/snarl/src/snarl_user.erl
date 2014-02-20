@@ -309,6 +309,30 @@ list(Requirements, false) ->
                  {error, timeout} |
                  {ok, UUID::fifo:user_id()}.
 
+add(undefined, User) ->
+    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    lager:info("[~p:create] Creation Started.", [UUID]),
+    case create(UUID, User) of
+        {ok, UUID} ->
+            lager:info("[~p:create] Created.", [UUID]),
+            case snarl_opt:get(defaults, users,
+                               inital_group,
+                               user_inital_group, undefined) of
+                undefined ->
+                    lager:info("[~p:create] No default group.",
+                               [UUID]),
+                    ok;
+                Grp ->
+                    lager:info("[~p:create] Assigning default group: ~s.",
+                               [UUID, Grp]),
+                    join(UUID, Grp)
+            end,
+            {ok, UUID};
+        E ->
+            lager:error("[create] Failed to create: ~p.", [E]),
+            E
+    end;
+
 add(Creator, User) when is_binary(Creator),
                         is_binary(User) ->
     case add(undefined, User) of
@@ -317,31 +341,22 @@ add(Creator, User) when is_binary(Creator),
                 {ok, C} ->
                     case snarl_user_state:active_org(C) of
                         <<>> ->
+                            lager:info("[~s:create] Creator ~s has no "
+                                       "active organisation.",
+                                       [UUID, Creator]),
                             R;
                         Org ->
+                            lager:info("[~s:create] Triggering org user "
+                                       "creation for organisation ~s",
+                                       [UUID, Org]),
                             snarl_org:trigger(Org, user_create, UUID),
                             R
                     end;
-                _ ->
+                E ->
+                    lager:warning("[~s:create] Failed to get creator ~s: ~p.",
+                                  [UUID, Creator, E]),
                     R
             end;
-        E ->
-            E
-    end;
-
-add(_, User) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    case create(UUID, User) of
-        {ok, UUID} ->
-            case snarl_opt:get(defaults, users,
-                               inital_group,
-                               user_inital_group, undefined) of
-                undefined ->
-                    ok;
-                Grp ->
-                    join(UUID, Grp)
-            end,
-            {ok, UUID};
         E ->
             E
     end.
