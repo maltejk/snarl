@@ -376,6 +376,14 @@
   end
 }.
 
+%% @doc the Size of the mmaped chunkes, this should be tuned according to
+%% the number of open files and total memory present.
+%% Default is 1MB to allow for a bigger number of small files, please tune
+%% accordingly in bigger installations.
+{mapping, "leveldb.mmap_size", "eleveldb.mmap_size",
+ [{datatype, bytesize},
+  {default, "1MB"}]}.
+
 %% @doc This parameter defines the number of bytes of
 %% server memory to assign to leveldb.  leveldb will dynamically
 %% adjust it internal cache sizes as Riak activates / inactivates
