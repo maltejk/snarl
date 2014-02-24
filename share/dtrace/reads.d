@@ -1,3 +1,4 @@
+#!/usr/sbin/dtrace -s
 /*
  * arg0 arg1 arg2 arg3 arg4  arg5 arg6   arg7 arg8
  * PID       ID   Type Found      Module Key  Opperation
@@ -11,15 +12,13 @@
  * run with: dtrace -s reads.d
  */
 
-
-
 /*
  * This function gets called every time a erlang developper probe is
  * fiered, we filter for 801 and 1, so it gets executed when a handler
  * function is entered.
  */
 
-erlang*:::user_trace-i4s4
+erlang*:::user_trace*
 / arg2 == 4202 && arg3 == 2 && arg4 == 1/
 {
   /*
@@ -29,7 +28,7 @@ erlang*:::user_trace-i4s4
 }
 
 
-erlang*:::user_trace-i4s4
+erlang*:::user_trace*
 / arg2 == 4202 && arg3 == 2 && arg4 == 2/
 {
   /*
@@ -39,5 +38,5 @@ erlang*:::user_trace-i4s4
 }
 tick-1s
 {
-printa(@);
+  printa(@);
 }
