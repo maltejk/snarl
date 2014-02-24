@@ -66,32 +66,29 @@ find_key(KeyID) ->
                         {ok, R}
                 end, not_found, Res).
 
--ifndef(old_hash).
-hash(Hash, Salt, Passwd) ->
-    crypto:hash(Hash, [Salt, Passwd]).
--else.
-hash(sha512, Salt, Passwd) ->
-    crypto:sha512([Salt, Passwd]);
-hash(sha, Salt, Pass) ->
-    crypto:sha([User, Passwd]).
--endif
-
--spec auth(User::binary(), Passwd::binary(), OTP::binary()) ->
+-spec auth(User::binary(), Passwd::binary(), OTP::binary()|basic) ->
                   not_found |
                   {error, timeout} |
                   {ok, User::fifo:user()}.
 
+auth(User, Passwd, basic) ->
+    case get_(User) of
+        {ok, UserR} ->
+            case check_pw(UserR, Passwd) of
+                true ->
+                    {ok, snarl_user_state:uuid(UserR)};
+                _ ->
+                    not_found
+            end;
+        E ->
+            E
+    end;
+
 auth(User, Passwd, OTP) ->
     Res1 = case lookup_(User) of
                {ok, UserR} ->
-                   {T, S, H} = case snarl_user_state:password(UserR) of
-                                   {Salt, Hash} ->
-                                       {sha512, Salt, Hash};
-                                   Hash ->
-                                       {sha, User, Hash}
-                               end,
-                   case hash(T, S, Passwd) of
-                       H ->
+                   case check_pw(UserR, Passwd) of
+                       true ->
                            {ok, UserR};
                        _ ->
                            not_found
@@ -391,17 +388,10 @@ set(User, Attributes) ->
                     not_found |
                     {error, timeout} |
                     ok.
--ifndef(old_hash).
 passwd(User, Passwd) ->
-    Salt = crypto:rand_bytes(64),
-    Hash = crypto:hash(sha512, [Salt, Passwd]),
-    do_write(User, passwd, {Salt, Hash}).
--else.
-passwd(User, Passwd) ->
-    Salt = crypto:rand_bytes(64),
-    Hash = crypto:sha512([Salt, Passwd]),
-    do_write(User, passwd, {Salt, Hash}).
--endif.
+    {ok, Salt} = bcrypt:gen_salt(),
+    {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
+    do_write(User, passwd, {bcrypt, list_to_binary(Hash)}).
 
 import(User, Data) ->
     do_write(User, import, Data).
@@ -534,3 +524,30 @@ test_user(UserObj, Permission) ->
         false ->
             test_groups(Permission, snarl_user_state:groups(UserObj))
     end.
+
+check_pw(UserR, Passwd) ->
+    case snarl_user_state:password(UserR) of
+        {bcrypt, Hash} ->
+            HashS = binary_to_list(Hash),
+            case bcrypt:hashpw(Passwd, Hash) of
+                {ok, HashS} ->
+                    true;
+                _ ->
+                    false
+            end;
+        {S, H} ->
+            case hash(sha512, S, Passwd) of
+                H ->
+                    true;
+                _ ->
+                    false
+            end
+    end.
+
+-ifndef(old_hash).
+hash(Hash, Salt, Passwd) ->
+    crypto:hash(Hash, [Salt, Passwd]).
+-else.
+hash(sha512, Salt, Passwd) ->
+    crypto:sha512([Salt, Passwd]).
+-endif.
