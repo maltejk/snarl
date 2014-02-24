@@ -15,6 +15,7 @@
      newrelic,
      snmp,
      crypto,
+     bcrypt,
      uuid
      ]},
   {mod, {snarl_app, []}},

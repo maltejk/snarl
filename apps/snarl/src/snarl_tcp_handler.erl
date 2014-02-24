@@ -183,6 +183,19 @@ message({user, auth, User, Pass}, State) when
       is_binary(Pass) ->
     message({user, auth, User, Pass, <<>>}, State);
 
+message({user, auth, User, Pass, basic}, State) when
+      is_binary(User),
+      is_binary(Pass) ->
+    Res = case snarl_user:auth(User, Pass, basic) of
+              not_found ->
+                  {error, not_found};
+              {ok, UUID}  ->
+                  {ok, UUID}
+          end,
+    {reply,
+     Res,
+     State};
+
 message({user, auth, User, Pass, OTP}, State) when
       is_binary(User),
       is_binary(Pass),
