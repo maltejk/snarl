@@ -10,6 +10,8 @@
 
 -behaviour(gen_server).
 
+-include("snarl_dtrace.hrl").
+
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
 -endif.
@@ -136,6 +138,9 @@ handle_cast({write, Node, VNode, System, User, Op, Val},
     {noreply, State};
 handle_cast({write, Node, VNode, System, ID, Op, Val},
             State = #state{socket=Socket}) ->
+    SystemS = atom_to_list(System),
+    OpS = atom_to_list(Op),
+    dyntrace:p(?DT_SYNC_SEND, ?DT_ENTRY, SystemS, ID, OpS),
     Command = {write, Node, VNode, System, ID, Op, Val},
     State0 = case gen_tcp:send(Socket, term_to_binary(Command)) of
                  ok ->
@@ -143,14 +148,10 @@ handle_cast({write, Node, VNode, System, ID, Op, Val},
                  E ->
                      lager:error("[sync] Error: ~p", [E]),
                      reconnect(),
+                     dyntrace:p(?DT_SYNC, ?DT_RETURN, ?DT_FAIL, SystemS, ID, OpS),
                      State#state{socket=undefined}
              end,
-    case Op of
-        delete ->
-            handle_cast({delete, System, ID}, State0);
-        _ ->
-            {noreply, State0}
-    end;
+    {noreply, State0};
 
 handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
     case gen_tcp:connect(IP, Port,
