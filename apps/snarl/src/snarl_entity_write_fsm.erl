@@ -185,8 +185,13 @@ waiting({ok, ReqID, Reply},
             statman_histogram:record_value(
               {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
               SD0#state.start),
-            From ! {ReqID, ok, Reply},
+            if
+                is_pid(From) ->
+                    From ! {ReqID, ok, Reply};
+                true -> ok
+            end,
             {stop, normal, SD};
+
         true -> {next_state, waiting, SD}
     end.
 

@@ -5,7 +5,7 @@
 .bin
 .eunit
 Mnesia.*
-apps/snarl/src/snarl_version.hrl
+apps/snarl/include/snarl_version.hrl
 apps/snarl/ebin
 apps/snarl/include/SNARL-MIB.hrl
 apps/snarl/priv/mibs/SNARL-MIB.bin
