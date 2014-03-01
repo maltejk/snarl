@@ -79,7 +79,7 @@ remove(Ks, A, M) when is_list(Ks) ->
             Ops = nested_update(Path, [{remove, K}]),
             riak_dt_map:update({update, Ops}, A, M);
         {ok, missing} ->
-            M
+            {ok, M}
     end;
 
 remove(K, A, M) ->
