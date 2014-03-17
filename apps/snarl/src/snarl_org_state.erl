@@ -41,11 +41,13 @@
               is_a/1
              ]).
 
--opaque organisation() :: #?ORG{}.
+-type organisation() :: #?ORG{}.
 
--opaque any_organisation() :: organisation() |
-                              #organisation_0_1_0{} |
-                              statebox:statebox().
+-type any_organisation() :: organisation() |
+                            #organisation_0_1_0{} |
+                            #organisation_0_1_1{} |
+                            #organisation_0_1_2{} |
+                            statebox:statebox().
 
 getter(#snarl_obj{val=S0}, <<"uuid">>) ->
     ID = snarl_vnode:mkid(getter),
@@ -66,7 +68,7 @@ new({T, _ID}) ->
         metadata = snarl_map:new()
        }.
 
--spec load({atom(), integer()}, any_organisation()) -> organisation().
+%%-spec load({non_neg_integer(), atom()}, any_organisation()) -> organisation().
 
 load(_, #?ORG{} = Org) ->
     Org;
@@ -158,6 +160,7 @@ jsonify_permission(Permission) ->
                       E
               end, Permission).
 
+-spec to_json(Org::organisation()) -> fifo:org().
 to_json(#?ORG{
             uuid = UUID,
             name = Name,
@@ -205,6 +208,8 @@ uuid({T, _ID}, UUID, Org) ->
     {ok, V} = riak_dt_lwwreg:update({assign, UUID, T}, none, Org#?ORG.uuid),
     Org#?ORG{uuid = V}.
 
+-spec triggers(Org::organisation()) -> [{ID::fifo:uuid(), Trigger::term()}].
+
 triggers(Org) ->
     snarl_map:value(Org#?ORG.triggers).
 
@@ -230,9 +235,10 @@ set_metadata({T, ID}, Attribute, Value, Org) ->
     {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Org#?ORG.metadata),
     Org#?ORG{metadata = M1}.
 
+-spec trigger_uuid(UUID::uuid:uuid_string(), Trigger::term()) -> uuid:uuid().
+
 trigger_uuid(UUID, Trigger) ->
     list_to_binary(uuid:to_string(uuid:uuid5(UUID, term_to_binary(Trigger)))).
-
 
 -ifdef(TEST).
 mkid() ->

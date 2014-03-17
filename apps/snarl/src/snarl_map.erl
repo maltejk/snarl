@@ -16,11 +16,16 @@
 -define(MAP, riak_dt_map).
 -define(COUNTER, riak_dt_pncounter).
 
+-spec new() -> riak_dt_map:map().
+
 new() ->
     riak_dt_map:new().
 
 merge(A, B) ->
     riak_dt_map:merge(A, B).
+
+-spec get(Keys::[binary()]|binary(), Map::riak_dt_map:map()) ->
+                 term().
 
 get([K], M) ->
     Keys = riak_dt_map:value(keyset, M),
@@ -40,11 +45,16 @@ get([K | Ks], M) ->
         {ok, T} ->
             {error, {bad_type, K, T}};
         E ->
-            E
+            {error, E}
     end;
 
 get(K, M) ->
     get([K], M).
+
+-spec set(Key::[binary()]|binary(), Value::term(),
+          Actor::atom(), Timestamp::non_neg_integer(),
+          Map::riak_dt_map:map()) ->
+                 {ok, riak_dt_map:map()}.
 
 set(K, V, A, T, M) when not is_list(K) ->
     set([K], V, A, T, M);
@@ -88,6 +98,11 @@ remove(K, A, M) ->
 value(M) ->
     value_(riak_dt_map:value(M)).
 
+-spec from_orddict(D::orddict:orddict(),
+                   Actor::term(),
+                   Timestamp::non_neg_integer()) ->
+                          riak_dt_map:map().
+
 from_orddict(D, Actor, Timestamp) ->
     lists:foldl(fun({Ks, V}, Map) ->
                         {ok, M1} = set(Ks, V, Actor, Timestamp, Map),
@@ -98,6 +113,10 @@ from_orddict(D, Actor, Timestamp) ->
 %%% Internal Functions
 %%%===================================================================
 
+-spec split_path([binary()], [binary()], riak_dt_map:map()) ->
+                        {error, not_a_map, term(), [binary()]} |
+                        {ok, {[binary()], [binary()]}}.
+%%split_path([K | Ks], Existing, M) when is_list(Ks) ->
 split_path([K | Ks], Existing, M) ->
     Keys = riak_dt_map:value(keyset, M),
     case orddict:find(K, Keys) of

@@ -39,15 +39,16 @@
               to_json/1
              ]).
 
--opaque group() :: #?GROUP{}.
+-type group() :: #?GROUP{}.
 
--opaque any_group() :: group() |
-                       #group_0_1_0{} |
-                       statebox:statebox().
+-type any_group() ::
+        #group_0_1_0{} |
+        #?GROUP{} |
+        statebox:statebox().
 
 getter(#snarl_obj{val=S0}, <<"uuid">>) ->
     ID = snarl_vnode:mkid(getter),
-    uuid(snarl_group_state:load(ID, S0)).
+    uuid(load(ID, S0)).
 
 is_a(#?GROUP{}) ->
     true;
@@ -65,8 +66,7 @@ new({T, _ID}) ->
         metadata = snarl_map:new()
        }.
 
--spec load({atom(), integer()}, any_group()) ->
-                  group().
+%%-spec load({integer(), atom()}, any_group()) -> group().
 
 load(_, #?GROUP{} = Group) ->
     Group;
@@ -123,6 +123,8 @@ to_json(#?GROUP{
        {<<"permissions">>, riak_dt_orswot:value(Permissions)},
        {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
+
+-spec merge(group(), group()) -> group().
 
 merge(#?GROUP{
           uuid = UUID1,
