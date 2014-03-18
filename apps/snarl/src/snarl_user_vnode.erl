@@ -324,11 +324,18 @@ handle_coverage({find_key, KeyID}, _KeySpaces, Sender, State) ->
     FoldFn = fun (UUID, #snarl_obj{val=U0}, [not_found]) ->
                      U1 = snarl_user_state:load(ID, U0),
                      Ks = snarl_user_state:keys(U1),
-                     Ks1 = [key_to_id(K) || {_, K} <- Ks],
-                     case lists:member(KeyID, Ks1) of
-                         true ->
-                             [UUID];
-                         _ ->
+                     try
+                         Ks1 = [key_to_id(K) || {_, K} <- Ks],
+                         case lists:member(KeyID, Ks1) of
+                             true ->
+                                 [UUID];
+                             _ ->
+                                 [not_found]
+                         end
+                     catch
+                         Exception:Reason ->
+                             lager:warning("[key_find:~s] ~p:~p -> ~p",
+                                           [UUID, Exception, Reason, Ks]),
                              [not_found]
                      end;
                  (_U, _, Res) ->
