@@ -66,8 +66,7 @@ is_a(#?USER{}) ->
 is_a(_) ->
     false.
 
--spec load({atom(), integer()}, any_user()) ->
-                  user().
+% -spec load({non_neg_integer(), atom()}, any_user()) -> user().
 
 load(_, #?USER{} = User) ->
     User;

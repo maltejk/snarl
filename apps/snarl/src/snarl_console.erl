@@ -579,13 +579,13 @@ hdr(F) ->
     hdr_lines(lists:reverse(F), {"~n", [], "~n", []}).
 
 
-hdr_lines([{N, n} | R], {Fmt, Vars, FmtLs, VarLs}) ->
-    %% there is a space that matters here ---------v
-    hdr_lines(R, {
-                "~20s " ++ Fmt,
-                [N | Vars],
-                "~20c " ++ FmtLs,
-                [$- | VarLs]});
+%% hdr_lines([{N, n} | R], {Fmt, Vars, FmtLs, VarLs}) ->
+%%     %% there is a space that matters here ---------v
+%%     hdr_lines(R, {
+%%                 "~20s " ++ Fmt,
+%%                 [N | Vars],
+%%                 "~20c " ++ FmtLs,
+%%                 [$- | VarLs]});
 
 hdr_lines([{N, S}|R], {Fmt, Vars, FmtLs, VarLs}) ->
     %% there is a space that matters here ---------v
@@ -605,12 +605,12 @@ fields(F, Vs) ->
            lists:reverse(Vs),
            {"~n", []}).
 
-fields([{_, n}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
-                                     orelse is_binary(V) ->
-    fields(R, Vs, {"~s " ++ Fmt, [V | Vars]});
+%% fields([{_, n}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
+%%                                      orelse is_binary(V) ->
+%%     fields(R, Vs, {"~s " ++ Fmt, [V | Vars]});
 
-fields([{_, n}|R], [V | Vs], {Fmt, Vars}) ->
-    fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
+%% fields([{_, n}|R], [V | Vs], {Fmt, Vars}) ->
+%%     fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
 
 fields([{_, S}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
                                      orelse is_binary(V) ->

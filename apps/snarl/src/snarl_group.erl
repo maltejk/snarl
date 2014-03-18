@@ -50,7 +50,7 @@ lookup(Group) ->
 -spec lookup_(Group::binary()) ->
                      not_found |
                      {error, timeout} |
-                     {ok, Group::snarl_group_state:group()}.
+                     {ok, Group::#?GROUP{}}.
 lookup_(Group) ->
     {ok, Res} = snarl_coverage:start(
                   snarl_group_vnode_master, snarl_group,
@@ -82,7 +82,7 @@ get(Group) ->
 -spec get_(Group::fifo:group_id()) ->
                  not_found |
                  {error, timeout} |
-                 {ok, Group::snarl_group_state:group()}.
+                 {ok, Group::#?GROUP{}}.
 get_(Group) ->
     case snarl_entity_read_fsm:start(
            {snarl_group_vnode, snarl_group},
