@@ -160,7 +160,8 @@ handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
         {ok, Socket} ->
             {noreply, State#state{socket=Socket}};
         E ->
-            lager:error("[sync] Initialization failed: ~p.", [E]),
+            lager:error("[sync(~p:~p)] Initialization failed: ~p.",
+                        [IP, Port, E]),
             timer:sleep(500),
             reconnect(),
             {noreply, State#state{socket=undefined}}
