@@ -17,6 +17,8 @@ verify(OTP) when is_binary(OTP) ->
     verify(binary_to_list(OTP));
 
 verify(OTP) ->
-    {ok, ClientID} = application:get_env(snarl, yubico_client_id),
-    {ok, SecretKey} = application:get_env(snarl, yubico_secret_key),
+    ClientID = snarl_opt:get(yubico, api, client_id, yubico_client_id,
+                             undefined),
+    SecretKey = snarl_opt:get(yubico, api, secret_key, yubico_secret_key,
+                             undefined),
     yubico:simple_verify(OTP, ClientID, SecretKey, []).
