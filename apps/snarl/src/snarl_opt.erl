@@ -71,7 +71,9 @@ get_type([K|R], Os) ->
 
 opts() ->
     [{"defaults",
-      [{"users", [{"inital_group", binary}, {"inital_org", binary}]}]}].
+      [{"users", [{"inital_group", binary}, {"inital_org", binary}]}]},
+     {"yubico",
+      [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].
 
 valid_type(integer, I) when is_list(I) ->
     try list_to_integer(I) of
