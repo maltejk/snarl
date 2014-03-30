@@ -8,6 +8,9 @@
          remove/1,
          down/1,
          reip/1,
+         config/1,
+         status/1,
+         aae_status/1,
          staged_join/1,
          ringready/1]).
 
@@ -44,6 +47,7 @@
               import_group/1,
               down/1,
               reip/1,
+              aae_status/1,
               staged_join/1,
               ringready/1,
               list_user/1,
@@ -56,7 +60,9 @@
               grant_user/1,
               revoke_user/1,
               revoke_group/1,
-              passwd/1
+              passwd/1,
+              config/1,
+              status/1
              ]).
 
 list_user([]) ->
@@ -401,6 +407,20 @@ down([Node]) ->
             error
     end.
 
+aae_status([]) ->
+    Services = [{snarl_user, "User"}, {snarl_group, "Group"},
+                {snarl_org, "Org"}],
+    [aae_status(E) || E <- Services];
+
+aae_status({System, Name}) ->
+    ExchangeInfo = riak_core_entropy_info:compute_exchange_info(System),
+    io:format("~s~n~n", [Name]),
+    aae_exchange_status(ExchangeInfo),
+    io:format("~n"),
+    aae_tree_status(System),
+    io:format("~n"),
+    aae_repair_status(ExchangeInfo).
+
 reip([OldNode, NewNode]) ->
     try
         %% reip is called when node is down (so riak_core_ring_manager is not running),
@@ -447,6 +467,162 @@ ringready([]) ->
             error
     end.
 
+config(["show"]) ->
+    io:format("Defaults~n  User Section~n"),
+    print_config(defaults, users),
+    io:format("Yubikey~n~n"),
+    print_config(yubico, api),
+    ok;
+
+config(["set", Ks, V]) ->
+    Ks1 = [binary_to_list(K) || K <- re:split(Ks, "\\.")],
+    config(["set" | Ks1] ++ [V]);
+
+config(["set" | R]) ->
+    [K1, K2, K3, V] = R,
+    Ks = [K1, K2, K3],
+    case snarl_opt:set(Ks, V) of
+        {invalid, key, K} ->
+            io:format("Invalid key: ~p~n", [K]),
+            error;
+        {invalid, type, T} ->
+            io:format("Invalid type: ~p~n", [T]),
+            error;
+        _ ->
+            io:format("Setting changed~n", []),
+            ok
+    end.
+
+
+status([]) ->
+    case riak_core_status:transfers() of
+        {[], []} ->
+            io:format("The cluster is fine!~n"),
+            ok;
+        {[], H} ->
+            io:format("There are ~p handoffs pending!~n", [length(H)]),
+            error;
+        {S, []} ->
+            io:format("There are ~p servers down!~n", [length(S)]),
+            error;
+        {S, H} ->
+            io:format("There are ~p handoffs pending and ~p servers down!~n",
+                      [length(H), length(S)]),
+            error
+    end.
+
+%%%===================================================================
+%%% Private
+%%%===================================================================
 
 build_permission(P) ->
     lists:map(fun list_to_binary/1, P).
+
+aae_exchange_status(ExchangeInfo) ->
+    io:format("~s~n", [string:centre(" Exchanges ", 79, $=)]),
+    io:format("~-49s  ~-12s  ~-12s~n", ["Index", "Last (ago)", "All (ago)"]),
+    io:format("~79..-s~n", [""]),
+    [begin
+         Now = os:timestamp(),
+         LastStr = format_timestamp(Now, LastTS),
+         AllStr = format_timestamp(Now, AllTS),
+         io:format("~-49b  ~-12s  ~-12s~n", [Index, LastStr, AllStr]),
+         ok
+     end || {Index, LastTS, AllTS, _Repairs} <- ExchangeInfo],
+    ok.
+
+aae_repair_status(ExchangeInfo) ->
+    io:format("~s~n", [string:centre(" Keys Repaired ", 79, $=)]),
+    io:format("~-49s  ~s  ~s  ~s~n", ["Index",
+                                      string:centre("Last", 8),
+                                      string:centre("Mean", 8),
+                                      string:centre("Max", 8)]),
+    io:format("~79..-s~n", [""]),
+    [begin
+         io:format("~-49b  ~s  ~s  ~s~n", [Index,
+                                           string:centre(integer_to_list(Last), 8),
+                                           string:centre(integer_to_list(Mean), 8),
+                                           string:centre(integer_to_list(Max), 8)]),
+         ok
+     end || {Index, _, _, {Last,_Min,Max,Mean}} <- ExchangeInfo],
+    ok.
+
+aae_tree_status(System) ->
+    TreeInfo = riak_core_entropy_info:compute_tree_info(System),
+    io:format("~s~n", [string:centre(" Entropy Trees ", 79, $=)]),
+    io:format("~-49s  Built (ago)~n", ["Index"]),
+    io:format("~79..-s~n", [""]),
+    [begin
+         Now = os:timestamp(),
+         BuiltStr = format_timestamp(Now, BuiltTS),
+         io:format("~-49b  ~s~n", [Index, BuiltStr]),
+         ok
+     end || {Index, BuiltTS} <- TreeInfo],
+    ok.
+
+
+format_timestamp(_Now, undefined) ->
+    "--";
+format_timestamp(Now, TS) ->
+    riak_core_format:human_time_fmt("~.1f", timer:now_diff(Now, TS)).
+
+print_config(Prefix, SubPrefix) ->
+    Fmt = [{"Key", 20}, {"Value", 50}],
+    hdr(Fmt),
+    PrintFn = fun({K, [V|_]}, _) ->
+                      fields(Fmt, [key(Prefix, SubPrefix, K), V])
+              end,
+    riak_core_metadata:fold(PrintFn, ok, {Prefix, SubPrefix}).
+
+key(Prefix, SubPrefix, Key) ->
+    io_lib:format("~p.~p.~p", [Prefix, SubPrefix, Key]).
+
+hdr(F) ->
+    hdr_lines(lists:reverse(F), {"~n", [], "~n", []}).
+
+
+%% hdr_lines([{N, n} | R], {Fmt, Vars, FmtLs, VarLs}) ->
+%%     %% there is a space that matters here ---------v
+%%     hdr_lines(R, {
+%%                 "~20s " ++ Fmt,
+%%                 [N | Vars],
+%%                 "~20c " ++ FmtLs,
+%%                 [$- | VarLs]});
+
+hdr_lines([{N, S}|R], {Fmt, Vars, FmtLs, VarLs}) ->
+    %% there is a space that matters here ---------v
+    hdr_lines(R, {
+                [$~ | integer_to_list(S) ++ [$s, $\  | Fmt]],
+                [N | Vars],
+                [$~ | integer_to_list(S) ++ [$c, $\  | FmtLs]],
+                [$- | VarLs]});
+
+hdr_lines([], {Fmt, Vars, FmtL, VarLs}) ->
+    io:format(Fmt, Vars),
+    io:format(FmtL, VarLs).
+
+
+fields(F, Vs) ->
+    fields(lists:reverse(F),
+           lists:reverse(Vs),
+           {"~n", []}).
+
+%% fields([{_, n}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
+%%                                      orelse is_binary(V) ->
+%%     fields(R, Vs, {"~s " ++ Fmt, [V | Vars]});
+
+%% fields([{_, n}|R], [V | Vs], {Fmt, Vars}) ->
+%%     fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
+
+fields([{_, S}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
+                                     orelse is_binary(V) ->
+    %% there is a space that matters here ------------v
+    fields(R, Vs, {[$~ | integer_to_list(S) ++ [$s, $\  | Fmt]], [V | Vars]});
+
+
+fields([{_, S}|R], [V | Vs], {Fmt, Vars}) ->
+    %% there is a space that matters here ------------v
+    fields(R, Vs, {[$~ | integer_to_list(S) ++ [$p, $\  | Fmt]], [V | Vars]});
+
+fields([], [], {Fmt, Vars}) ->
+    io:format(Fmt, Vars).

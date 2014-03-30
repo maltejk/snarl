@@ -1,5 +1,4 @@
 ^fsm_example
-^mdns_server_protocol.erl:115: Call to missing or unexported function lager:warning/2
 ^uuid
 ^hanoidb
 ^triq_
@@ -27,3 +26,17 @@
 ^jsx_decoder.erl:149:
 ^glc_code.erl:
 ^lager
+^conf_parse.erl
+^cuttlefish_escript.erl
+^hashtree.erl:838: Function bitarray_set/2 will never be called
+^neotoma
+^riak_ensemble_msg.erl
+^snarl_full_coverage.erl:5: Callback info about the riak_core_coverage_fsm behaviour is not available
+^snarl_group_vnode.erl:3: Callback info about the riak_core_aae_vnode behaviour is not available
+^snarl_org_vnode.erl:3: Callback info about the riak_core_aae_vnode behaviour is not available
+^snarl_user_vnode.erl:3: Callback info about the riak_core_aae_vnode behaviour is not available
+^vclock.erl:101
+^yubico_
+^snarl_worker.erl:2: Callback info about the riak_core_vnode_worker behaviour is not available
+^snarl_user_vnode.erl:355: Function key_to_id/1 will never be called
+^snarl_org_state.erl:241: The call uuid:uuid5(UUID::any(),binary()) breaks the contract (NamespaceOrUuid::atom() | uuid_string() | uuid(),Name::string()) -> uuid()

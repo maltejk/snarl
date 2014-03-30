@@ -30,7 +30,10 @@ message({org, list}, State) ->
     {reply, snarl_org:list(), State};
 
 message({org, list, Requirements}, State) ->
-    {reply, snarl_org:list(Requirements), State};
+    message({org, list, Requirements, false}, State);
+
+message({org, list, Requirements, Full}, State) ->
+    {reply, snarl_org:list(Requirements, Full), State};
 
 message({org, get, Org}, State) ->
     {reply, snarl_org:get(Org), State};
@@ -70,7 +73,10 @@ message({user, list}, State) ->
     {reply, snarl_user:list(), State};
 
 message({user, list, Requirements}, State) ->
-    {reply, snarl_user:list(Requirements), State};
+    message({user, list, Requirements, false}, State);
+
+message({user, list, Requirements, Full}, State) ->
+    {reply, snarl_user:list(Requirements, Full), State};
 
 message({user, get, {token, Token}}, State) ->
     case snarl_token:get(Token) of
@@ -108,6 +114,25 @@ message({user, keys, revoke, User, KeyId}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:revoke_key(User, KeyId),
+     State};
+
+
+message({user, yubikeys, get, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:yubikeys(User),
+     State};
+
+message({user, yubikeys, add, User, OTP}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add_yubikey(User, OTP),
+     State};
+
+message({user, yubikeys, remove, User, KeyId}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:remove_yubikey(User, KeyId),
      State};
 
 message({user, set, User, Attribute, Value}, State) when
@@ -156,7 +181,26 @@ message({user, add, Creator, User}, State) when
 message({user, auth, User, Pass}, State) when
       is_binary(User),
       is_binary(Pass) ->
-    Res = case snarl_user:auth(User, Pass) of
+    message({user, auth, User, Pass, <<>>}, State);
+
+message({user, auth, User, Pass, basic}, State) when
+      is_binary(User),
+      is_binary(Pass) ->
+    Res = case snarl_user:auth(User, Pass, basic) of
+              not_found ->
+                  {error, not_found};
+              {ok, UUID}  ->
+                  {ok, UUID}
+          end,
+    {reply,
+     Res,
+     State};
+
+message({user, auth, User, Pass, OTP}, State) when
+      is_binary(User),
+      is_binary(Pass),
+      is_binary(OTP) ->
+    Res = case snarl_user:auth(User, Pass, OTP) of
               not_found ->
                   {error, not_found};
               {ok, UUID}  ->
@@ -257,7 +301,10 @@ message({group, list}, State) ->
     {reply, snarl_group:list(), State};
 
 message({group, list, Requirements}, State) ->
-    {reply, snarl_group:list(Requirements), State};
+    message({group, list, Requirements, false}, State);
+
+message({group, list, Requirements, Full}, State) ->
+    {reply, snarl_group:list(Requirements, Full), State};
 
 message({group, get, Group}, State) ->
     {reply, snarl_group:get(Group), State};
@@ -291,6 +338,55 @@ message({group, revoke, Group, Permission}, State) ->
 message({group, revoke_prefix, Group, Prefix}, State) ->
     {reply, snarl_group:revoke_prefix(Group, Prefix), State};
 
+message({cloud, status}, State) ->
+    {reply,
+     status(),
+     State};
+
 message(Message, State) ->
-    io:format("Unsuppored TCP message: ~p", [Message]),
+    lager:warning("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
+
+status() ->
+    {ok, Us} = snarl_user:list(),
+    {ok, Gs} = snarl_group:list(),
+    {ok, Os} = snarl_org:list(),
+    Resources = [{<<"users">>, length(Us)},
+                 {<<"groups">>, length(Gs)},
+                 {<<"orgs">>, length(Os)}],
+    Warnings = case riak_core_status:transfers() of
+                   {[], []} ->
+                       [];
+                   {[], L} ->
+                       W = jsxd:from_list(
+                             [{<<"category">>, <<"snarl">>},
+                              {<<"element">>, <<"handoff">>},
+                              {<<"type">>, <<"info">>},
+                              {<<"message">>, bin_fmt("~b handofs pending.",
+                                                      [length(L)])}]),
+                       [W];
+                   {S, []} ->
+                       server_errors(S);
+                   {S, L} ->
+                       W = jsxd:from_list(
+                             [{<<"category">>, <<"snarl">>},
+                              {<<"element">>, <<"handoff">>},
+                              {<<"type">>, <<"info">>},
+                              {<<"message">>, bin_fmt("~b handofs pending.",
+                                                      [length(L)])}]),
+                       [W | server_errors(S)]
+               end,
+    {ok, {ordsets:from_list(Resources), ordsets:from_list(Warnings)}}.
+
+
+server_errors(Servers) ->
+    lists:map(fun (Server) ->
+                      jsxd:from_list(
+                        [{<<"category">>, <<"snarl">>},
+                         {<<"element">>, list_to_binary(atom_to_list(Server))},
+                         {<<"type">>, <<"critical">>},
+                         {<<"message">>, bin_fmt("Snarl server ~s down.", [Server])}])
+              end, Servers).
+
+bin_fmt(F, L) ->
+    list_to_binary(io_lib:format(F, L)).

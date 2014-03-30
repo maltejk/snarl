@@ -7,12 +7,13 @@
 -endif.
 
 -export([
+         sync_repair/2,
          ping/0,
          list/0,
-         list/1,
-         auth/2,
+         list/2,
+         auth/3,
          find_key/1,
-         get_/1, get/1,
+         get_/1, get/1, raw/1,
          lookup_/1, lookup/1,
          add/1, add/2,
          delete/1,
@@ -25,9 +26,8 @@
          set/3,
          import/2,
          cache/1,
-         add_key/3,
-         revoke_key/2,
-         keys/1,
+         add_key/3, revoke_key/2, keys/1,
+         add_yubikey/2, remove_yubikey/2, yubikeys/1,
          active/1,
          orgs/1
         ]).
@@ -35,12 +35,15 @@
 -ignore_xref([
               join_org/2, leave_org/2, select_org/2,
               lookup_/1,
-              ping/0
+              ping/0, raw/1, sync_repair/2
              ]).
 
 -define(TIMEOUT, 5000).
 
 %% Public API
+
+sync_repair(UUID, Obj) ->
+    do_write(UUID, sync_repair, Obj).
 
 %% @doc Pings a random vnode to make sure communication is functional
 ping() ->
@@ -62,58 +65,63 @@ find_key(KeyID) ->
                     (R, _) ->
                         {ok, R}
                 end, not_found, Res).
--spec auth(User::binary(), Passwd::binary()) ->
+
+-spec auth(User::binary(), Passwd::binary(), OTP::binary()|basic) ->
                   not_found |
                   {error, timeout} |
                   {ok, User::fifo:user()}.
 
--ifndef(old_hash).
-auth(User, Passwd) ->
-    case lookup_(User) of
+auth(User, Passwd, basic) ->
+    case get_(User) of
         {ok, UserR} ->
-            case snarl_user_state:password(UserR) of
-                {Salt, Hash} ->
-                    case crypto:hash(sha512, [Salt, Passwd]) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
-                    end;
-                Hash ->
-                    case crypto:hash(sha, [User, Passwd]) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
-                    end
+            case check_pw(UserR, Passwd) of
+                true ->
+                    {ok, snarl_user_state:uuid(UserR)};
+                _ ->
+                    not_found
             end;
         E ->
             E
-    end.
--else.
-auth(User, Passwd) ->
-    case lookup_(User) of
-        {ok, UserR} ->
-            case snarl_user_state:password(UserR) of
-                {Salt, Hash} ->
-                    case crypto:sha512([Salt, Passwd]) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
-                    end;
-                Hash ->
-                    case crypto:sha([User, Passwd]) of
-                        Hash ->
-                            {ok, snarl_user_state:uuid(UserR)};
-                        _ ->
-                            not_found
+    end;
+
+auth(User, Passwd, OTP) ->
+    Res1 = case lookup_(User) of
+               {ok, UserR} ->
+                   case check_pw(UserR, Passwd) of
+                       true ->
+                           {ok, UserR};
+                       _ ->
+                           not_found
+                   end;
+               E ->
+                   E
+           end,
+    case Res1 of
+        {ok, UserR1} ->
+            case snarl_user_state:yubikeys(UserR1) of
+                [] ->
+                    {ok, snarl_user_state:uuid(UserR1)};
+                Ks ->
+                    case snarl_yubico:id(OTP) of
+                        <<>> ->
+                            key_required;
+                        YID  ->
+                            case lists:member(YID, Ks) of
+                                false ->
+                                    not_found;
+                                true ->
+                                    case snarl_yubico:verify(OTP) of
+                                        {auth, ok} ->
+                                            {ok, snarl_user_state:uuid(UserR1)};
+                                        _ ->
+                                            not_found
+                                    end
+                            end
                     end
             end;
-        E ->
-            E
+        E1 ->
+            E1
     end.
--endif.
 
 -spec lookup(User::binary()) ->
                     not_found |
@@ -178,6 +186,21 @@ keys(User) ->
     case get_(User) of
         {ok, UserObj} ->
             {ok, snarl_user_state:keys(UserObj)};
+        E ->
+            E
+    end.
+
+add_yubikey(User, OTP) ->
+    KeyID = snarl_yubico:id(OTP),
+    do_write(User, add_yubikey, KeyID).
+
+remove_yubikey(User, KeyID) ->
+    do_write(User, remove_yubikey, KeyID).
+
+yubikeys(User) ->
+    case get_(User) of
+        {ok, UserObj} ->
+            {ok, snarl_user_state:yubikeys(UserObj)};
         E ->
             E
     end.
@@ -249,6 +272,9 @@ get_(User) ->
             R
     end.
 
+raw(User) ->
+    snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
+                                User, undefined, true).
 
 -spec list() ->
                   {error, timeout} |
@@ -258,9 +284,16 @@ list() ->
       snarl_user_vnode_master, snarl_user,
       list).
 
--spec list(Reqs::[fifo:matcher()]) ->
-                  {ok, [IPR::fifo:user_id()]} | {error, timeout}.
-list(Requirements) ->
+-spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
+
+list(Requirements, true) ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, Requirements, true}),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)};
+
+list(Requirements, false) ->
     {ok, Res} = snarl_coverage:start(
                   snarl_user_vnode_master, snarl_user,
                   {list, Requirements}),
@@ -273,6 +306,30 @@ list(Requirements) ->
                  {error, timeout} |
                  {ok, UUID::fifo:user_id()}.
 
+add(undefined, User) ->
+    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    lager:info("[~p:create] Creation Started.", [UUID]),
+    case create(UUID, User) of
+        {ok, UUID} ->
+            lager:info("[~p:create] Created.", [UUID]),
+            case snarl_opt:get(defaults, users,
+                               inital_group,
+                               user_inital_group, undefined) of
+                undefined ->
+                    lager:info("[~p:create] No default group.",
+                               [UUID]),
+                    ok;
+                Grp ->
+                    lager:info("[~p:create] Assigning default group: ~s.",
+                               [UUID, Grp]),
+                    join(UUID, Grp)
+            end,
+            {ok, UUID};
+        E ->
+            lager:error("[create] Failed to create: ~p.", [E]),
+            E
+    end;
+
 add(Creator, User) when is_binary(Creator),
                         is_binary(User) ->
     case add(undefined, User) of
@@ -281,21 +338,25 @@ add(Creator, User) when is_binary(Creator),
                 {ok, C} ->
                     case snarl_user_state:active_org(C) of
                         <<>> ->
+                            lager:info("[~s:create] Creator ~s has no "
+                                       "active organisation.",
+                                       [UUID, Creator]),
                             R;
                         Org ->
+                            lager:info("[~s:create] Triggering org user "
+                                       "creation for organisation ~s",
+                                       [UUID, Org]),
                             snarl_org:trigger(Org, user_create, UUID),
                             R
                     end;
-                _ ->
+                E ->
+                    lager:warning("[~s:create] Failed to get creator ~s: ~p.",
+                                  [UUID, Creator, E]),
                     R
             end;
         E ->
             E
-    end;
-
-add(_, User) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    create(UUID, User).
+    end.
 
 add(User) ->
     add(undefined, User).
@@ -327,17 +388,10 @@ set(User, Attributes) ->
                     not_found |
                     {error, timeout} |
                     ok.
--ifndef(old_hash).
 passwd(User, Passwd) ->
-    Salt = crypto:rand_bytes(64),
-    Hash = crypto:hash(sha512, [Salt, Passwd]),
-    do_write(User, passwd, {Salt, Hash}).
--else.
-passwd(User, Passwd) ->
-    Salt = crypto:rand_bytes(64),
-    Hash = crypto:sha512([Salt, Passwd]),
-    do_write(User, passwd, {Salt, Hash}).
--endif.
+    {ok, Salt} = bcrypt:gen_salt(),
+    {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
+    do_write(User, passwd, {bcrypt, list_to_binary(Hash)}).
 
 import(User, Data) ->
     do_write(User, import, Data).
@@ -470,3 +524,30 @@ test_user(UserObj, Permission) ->
         false ->
             test_groups(Permission, snarl_user_state:groups(UserObj))
     end.
+
+check_pw(UserR, Passwd) ->
+    case snarl_user_state:password(UserR) of
+        {bcrypt, Hash} ->
+            HashS = binary_to_list(Hash),
+            case bcrypt:hashpw(Passwd, Hash) of
+                {ok, HashS} ->
+                    true;
+                _ ->
+                    false
+            end;
+        {S, H} ->
+            case hash(sha512, S, Passwd) of
+                H ->
+                    true;
+                _ ->
+                    false
+            end
+    end.
+
+-ifndef(old_hash).
+hash(Hash, Salt, Passwd) ->
+    crypto:hash(Hash, [Salt, Passwd]).
+-else.
+hash(sha512, Salt, Passwd) ->
+    crypto:sha512([Salt, Passwd]).
+-endif.

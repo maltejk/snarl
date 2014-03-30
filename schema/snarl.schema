@@ -1,0 +1,408 @@
+%% -*- erlang -*-
+
+
+%% @doc This section deals with Yubikey support a API key and
+%% client ID can be obtained from:
+%% https://upgrade.yubico.com/getapikey/
+
+%% @doc Yubico API client ID issued from the API key page,
+%% this shhould be a number
+{mapping, "yubico.client_id", "snarl.yubico_client_id",
+ [{commented, "123"},
+  {datatype, string}]
+}.
+
+%% @doc The Secret key related that was issued along with
+%% the Yubico cleint ID.
+{mapping, "yubico.secret_key", "snarl.yubico_secret_key",
+ [{commented, "..."},
+  {datatype, string}]
+}.
+
+%% @doc Datacenter Syncronisation settings, please keep in mind
+%% that for event replication only events from this server
+%% will be replicated, to replicate events from other servers
+%% syncronisation needs to be set up there as well.
+%%
+%% It is not required to have a 1:1 mapping but it is the most
+%% sensible way.
+%%
+%% It is also important to node that sync should be set up from
+%% both sides to get best results.
+
+%% @doc Specifies weather syncronisation is enabled on this node
+%% or not, valid values are 'on' and 'off'.
+
+{mapping, "sync", "snarl.sync", [
+  {datatype, {enum, [on, off, debug]}},
+  {default, off}
+]}.
+
+%% @doc The IP/Port this server will listen to for incoming sync
+%% connections.
+{mapping, "sync.ip", "snarl.sync_ip",
+ [{commented, {"{{snarl_ip}}", {{snarl_sync_port}} }},
+  {datatype, ip}]}.
+
+%% @doc Specification of a sync partner, there should be one or
+%% more per remote datacenter.
+
+{mapping, "sync.partner.$name", "snarl.sync_partners",
+ [{commented, {"10.20.30.40", {{snarl_sync_port}} }},
+  {datatype, ip}]}.
+
+{translation,
+ "snarl.sync_partners",
+ fun(Conf) ->
+         Partner = cuttlefish_util:filter_by_variable_starts_with("sync.partner", Conf),
+         [ IP || {_, IP} <- Partner]
+ end
+}.
+
+
+%% @doc The full syncronisation will dynamically update it's data
+%% whenever a change is made to a object local to this node
+%% in addition to that this interval determines how often
+%% a full rebuild should take place.
+{mapping, "sync.build_interval", "snarl.sync_build_interval",
+ [{default, "1h"},
+  {commented, "1h"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc During a full rebuild reads from the Snarl system are
+%% delayed to prevent slowing down the database during the rebuild
+%% this value specifies the delay between reads.
+{mapping, "sync.read_delay", "snarl.sync_read_delay",
+ [{default, "50ms"},
+  {commented, "50ms"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc This defines how often it should be checked if differences
+%% exists betwen local and remote nodes. Please keep in mind that
+%% sync should be set up in both directions this syncs will be
+%% performed about twice as often as specified here.
+{mapping, "sync.interval", "snarl.sync_interval",
+ [{default, "15m"},
+  {commented, "15m"},
+  {datatype, {duration, ms}}]
+}.
+
+%% @doc If a command is send to a sync partner and this trheashold
+%% is excided the connection will attempt to bounc and be reistablished.
+{mapping, "sync.recv_timeout", "snarl.sync_recv_timeout",
+ [{default, "1s"},
+  {commented, "1s"},
+  {datatype, {duration, ms}}]
+}.
+
+
+%% @doc enable active anti-entropy subsystem
+{mapping, "anti_entropy", "riak_core.anti_entropy", [
+  {datatype, {enum, [on, off, debug]}},
+  {default, on}
+]}.
+
+{ translation,
+  "riak_core.anti_entropy",
+  fun(Conf) ->
+    Setting = cuttlefish_util:conf_get_value("anti_entropy", Conf),
+    case Setting of
+      on -> {on, []};
+      debug -> {on, [debug]};
+      off -> {off, []};
+      _Default -> {on, []}
+    end
+  end
+}.
+
+%% @doc The TCP endpoint that will be broadcasted.
+{mapping, "ip", "snarl.endpoint",
+ [{default, {"{{snarl_ip}}", {{snarl_port}} }},
+  {datatype, ip}]}.
+
+{translation,
+ "mdns_server_lib.ip",
+ fun(Conf) ->
+         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         IP
+ end
+}.
+
+{translation,
+ "mdns_server_lib.port",
+ fun(Conf) ->
+         {_IP, Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         Port
+ end
+}.
+
+{translation,
+ "mdns_client_lib.interface",
+ fun(Conf) ->
+         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         [A, B, C, D] = [list_to_integer(O) ||
+                            O <- re:split(IP, "\\.", [{return, list}])],
+         {A, B, C, D}
+ end
+}.
+
+{translation,
+ "mdns_server_lib.interface",
+ fun(Conf) ->
+         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         [A, B, C, D] = [list_to_integer(O) ||
+                            O <- re:split(IP, "\\.", [{return, list}])],
+         {A, B, C, D}
+ end
+}.
+
+%% @doc The path data gets stored into.
+{mapping, "data_dir", "fifo_db.db_path",
+ [{default, "{{platform_data_dir}}"},
+  {datatype, string}]}.
+
+{translation,
+ "riak_core.platform_data_dir",
+ fun(Conf) ->
+         cuttlefish_util:conf_get_value("data_dir", Conf)
+ end
+}.
+
+{translation,
+ "leveldb.data_root",
+ fun(Conf) ->
+         cuttlefish_util:conf_get_value("data_dir", Conf)
+ end
+}.
+
+{translation,
+ "hanoidb.data_root",
+ fun(Conf) ->
+         cuttlefish_util:conf_get_value("data_dir", Conf)
+ end
+}.
+
+{translation,
+ "bitcask.data_root",
+ fun(Conf) ->
+         cuttlefish_util:conf_get_value("data_dir", Conf)
+ end
+}.
+
+
+%% @doc The mDNS domain this installation is part of
+{mapping, "domain", "mdns_server_lib.domain",
+ [{default, ".local"},
+  {commented, ".local"},
+  {datatype, string}]}.
+
+%% @doc The livetime of a broadcast, alsot he rebroadcast frequency
+{mapping, "broadcast_interval", "mdns_server_lib.ttl",
+ [{default, 120},
+  {commented, 120},
+  {datatype, {duration, s}}]}.
+
+%% @doc The default TCP handler, there is very very very
+%% rarely any reason to change this.
+{mapping, "tcp_callback", "mdns_server_lib.handler",
+ [{datatype, string},
+  {level, advanced},
+  {default, "snarl_tcp_handler"}]}.
+
+{translation,
+ "mdns_server_lib.handler",
+ fun(Conf) ->
+         Setting = cuttlefish_util:conf_get_value("tcp_callback", Conf),
+         list_to_atom(Setting)
+ end
+}.
+
+%% @doc The default Service that is announced, ther eis very very
+%% rarely any reason to change this.
+{mapping, "service", "mdns_server_lib.service",
+ [{datatype, string},
+  {default, "snarl"}]}.
+
+%% @doc Default ring creation size.  Make sure it is a power of 2,
+%% e.g. 16, 32, 64, 128, 256, 512 etc
+%% This is set to a default of 4 to work in a one server installation
+%% if you plan to expand your system please set it higher and reads
+%% the manual at http://bit.ly/1ciKRkS
+{mapping, "ring_size", "riak_core.ring_creation_size",
+ [{datatype, integer},
+  {default, 8},
+  {commented, 64},
+  {validators, ["ring_size"]}
+ ]}.
+
+{validator, "ring_size", "not a power of 2 greater than 1",
+ fun(Size) ->
+         Size > 1 andalso (Size band (Size-1) =:= 0)
+ end}.
+
+%% @doc The number of copies of the data that is keeped.
+%% For good consistency N  < (R + W) should be true.
+{mapping, "n", "snarl.n",
+ [{datatype, integer},
+  {default, 3},
+  {commented, 3}]}.
+
+%% @doc The number of replies requried for a read request to succeed
+%% The lower the value the faster the replies but the more likely stale
+%% data is returend.
+{mapping, "r", "snarl.r",
+ [{datatype, integer},
+  {default, 2},
+  {commented, 2}]}.
+
+%% @doc The number of replies requried for a write request to succeed
+%% The lower the value the faster the write but the more likely to only
+%% write partial data.
+{mapping, "w", "snarl.w",
+ [{datatype, integer},
+  {default, 3},
+  {commented, 3}]}.
+
+%% @doc The number of copies of the data that is keeped.
+%% For good consistency N  < (R + W) should be true.
+{mapping, "user.n", "snarl.snarl_user",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 3},
+  {commented, 3}]}.
+
+%% @doc The number of replies requried for a read request to succeed
+%% The lower the value the faster the replies but the more likely stale
+%% data is returend.
+{mapping, "user.r", "snarl.snarl_user",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 2},
+  {commented, 2}]}.
+
+
+%% @doc The number of replies requried for a write request to succeed
+%% The lower the value the faster the write but the more likely to only
+%% write partial data.
+{mapping, "user.w", "snarl.snarl_user",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 3},
+  {commented, 3}]}.
+
+{ translation,
+  "snarl.snarl_user",
+  fun(Conf) ->
+          N = cuttlefish_util:conf_get_value("user.n", Conf),
+          R = cuttlefish_util:conf_get_value("user.r", Conf),
+          W = cuttlefish_util:conf_get_value("user.w", Conf),
+          {N, R, W}
+  end
+}.
+
+%% @doc The number of copies of the data that is keeped.
+%% For good consistency N  < (R + W) should be true.
+{mapping, "group.n", "snarl.snarl_group",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 3},
+  {commented, 3}]}.
+
+%% @doc The number of replies requried for a read request to succeed
+%% The lower the value the faster the replies but the more likely stale
+%% data is returend.
+{mapping, "group.r", "snarl.snarl_group",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 2},
+  {commented, 2}]}.
+
+
+%% @doc The number of replies requried for a write request to succeed
+%% The lower the value the faster the write but the more likely to only
+%% write partial data.
+{mapping, "group.w", "snarl.snarl_group",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 3},
+  {commented, 3}]}.
+
+{ translation,
+  "snarl.snarl_group",
+  fun(Conf) ->
+          N = cuttlefish_util:conf_get_value("group.n", Conf),
+          R = cuttlefish_util:conf_get_value("group.r", Conf),
+          W = cuttlefish_util:conf_get_value("group.w", Conf),
+          {N, R, W}
+  end
+}.
+
+%% @doc The number of copies of the data that is keeped.
+%% For good consistency N  < (R + W) should be true.
+{mapping, "org.n", "snarl.snarl_org",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 3},
+  {commented, 3}]}.
+
+%% @doc The number of replies requried for a read request to succeed
+%% The lower the value the faster the replies but the more likely stale
+%% data is returend.
+{mapping, "org.r", "snarl.snarl_org",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 2},
+  {commented, 2}]}.
+
+
+%% @doc The number of replies requried for a write request to succeed
+%% The lower the value the faster the write but the more likely to only
+%% write partial data.
+{mapping, "org.w", "snarl.snarl_org",
+ [{datatype, integer},
+  {level, advanced},
+  {default, 3},
+  {commented, 3}]}.
+
+{ translation,
+  "snarl.snarl_org",
+  fun(Conf) ->
+          N = cuttlefish_util:conf_get_value("org.n", Conf),
+          R = cuttlefish_util:conf_get_value("org.r", Conf),
+          W = cuttlefish_util:conf_get_value("org.w", Conf),
+          {N, R, W}
+  end
+}.
+
+%% @doc the Size of the mmaped chunkes, this should be tuned according to
+%% the number of open files and total memory present.
+%% Default is 1MB to allow for a bigger number of small files, please tune
+%% accordingly in bigger installations.
+{mapping, "leveldb.mmap_size", "eleveldb.mmap_size",
+ [{datatype, bytesize},
+  {default, "1MB"}]}.
+
+%% @doc This parameter defines the number of bytes of
+%% server memory to assign to leveldb.  leveldb will dynamically
+%% adjust it internal cache sizes as Riak activates / inactivates
+%% vnodes on this server to stay within this size.  The memory size
+%% can alternately be assigned as percentage of total server memory
+%% via total_leveldb_mem_percent instead.
+{mapping, "leveldb.total_leveldb_mem", "eleveldb.total_leveldb_mem", [
+  {datatype, bytesize},
+  {default, "512MB"},
+  {level, advanced}
+]}.
+
+%% @doc DTrace support
+%% Do not enable 'dtrace' unless your Erlang/OTP
+%% runtime is compiled to support DTrace.  DTrace is
+%% available in R15B01 (supported by the Erlang/OTP
+%% official source package) and in R14B04 via a custom
+%% source repository & branch.
+{mapping, "dtrace", "riak_core.dtrace_support", [
+  {default, on},
+  {datatype, {enum, [on, off]}}
+]}.

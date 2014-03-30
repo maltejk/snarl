@@ -3,11 +3,13 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
+         sync_repair/2,
          ping/0,
          list/0,
-         list/1,
+         list/2,
          get/1,
          get_/1,
+         raw/1,
          lookup/1,
          add/1,
          delete/1,
@@ -32,7 +34,7 @@
               create/2,
               import/2,
               trigger/3,
-              add_trigger/2, remove_trigger/2
+              add_trigger/2, remove_trigger/2, raw/1, sync_repair/2
              ]).
 
 -ignore_xref([ping/0, create/2]).
@@ -41,6 +43,9 @@
 
 -type template() :: [binary()|placeholder].
 %% Public API
+
+sync_repair(UUID, Obj) ->
+    do_write(UUID, sync_repair, Obj).
 
 %% @doc Pings a random vnode to make sure communication is functional
 ping() ->
@@ -51,7 +56,7 @@ ping() ->
 
 
 add_trigger(Org, Trigger) ->
-    do_write(Org, add_trigger, Trigger).
+    do_write(Org, add_trigger, {uuid:uuid4s(), Trigger}).
 
 remove_trigger(Org, Trigger) ->
     do_write(Org, remove_trigger, Trigger).
@@ -59,7 +64,7 @@ remove_trigger(Org, Trigger) ->
 trigger(Org, Event, Payload) ->
     case get_(Org) of
         {ok, OrgObj} ->
-            Triggers = snarl_org_state:triggers(OrgObj),
+            Triggers = [T || {_, T} <- snarl_org_state:triggers(OrgObj)],
             Executed = do_events(Triggers, Event, Payload, 0),
             {ok, Executed};
         R  ->
@@ -159,6 +164,10 @@ get_(Org) ->
             R
     end.
 
+raw(Org) ->
+    snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
+                                Org, undefined, true).
+
 -spec list() -> {ok, [fifo:org_id()]} |
                 not_found |
                 {error, timeout}.
@@ -168,15 +177,21 @@ list() ->
       snarl_org_vnode_master, snarl_org,
       list).
 
--spec list(Reqs::[fifo:matcher()]) ->
-                  {ok, [IPR::fifo:group_id()]} | {error, timeout}.
-list(Requirements) ->
+-spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
+
+list(Requirements, true) ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {list, Requirements, true}),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)};
+
+list(Requirements, false) ->
     {ok, Res} = snarl_coverage:start(
                   snarl_org_vnode_master, snarl_org,
                   {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
-
 
 -spec add(Org::binary()) ->
                  {ok, UUID::fifo:org_id()} |

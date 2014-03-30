@@ -1,14 +1,14 @@
+#!/usr/sbin/dtrace -s -x aggpack -x agghist
 /*
  * arg0 arg1 arg2 arg3 arg4  arg5 arg6   arg7 arg8
  * PID       ID   Type Found      Module Key  Opperation
  *
  * PID -> Erlang process ID. (String)
  * ID -> ID of the mesurement group, 801 for cowboy handler calls.
- * Found -> 1 if the item was found 2 if not
  * Type -> Indicates of this is a entry (1) or return (2).
  * Module - The module that was called. (string).
  *
- * run with: dtrace -s reads.d
+  run with: dtrace -s reads.d
  */
 
 
@@ -19,25 +19,28 @@
  * function is entered.
  */
 
-erlang*:::user_trace-i4s4
-/ arg2 == 4202 && arg3 == 2 && arg4 == 1/
+erlang*:::user_trace*
+/ arg2 == 4202 && arg3 == 1 /
+{
+  /*
+  * We cache the relevant strings
+  */
+  self->_t[copyinstr(arg0), copyinstr(arg8), copyinstr(arg7)] = timestamp;
+}
+
+erlang*:::user_trace*
+/ arg2 == 4202 && arg3 == 2 /
 {
   /*
    * We cache the relevant strings
    */
-  @["found"] = count();
+  op = copyinstr(arg8);
+  key = copyinstr(arg7);
+  @[key] = quantize((timestamp - self->_t[copyinstr(arg0), op, key])/100000);
 }
 
 
-erlang*:::user_trace-i4s4
-/ arg2 == 4202 && arg3 == 2 && arg4 == 2/
-{
-  /*
-   * We cache the relevant strings
-   */
-  @["not found"] = count();
-}
 tick-1s
 {
-printa(@);
+  printa(@);
 }

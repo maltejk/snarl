@@ -1,4 +1,4 @@
--module(snarl_coverage).
+-module(snarl_full_coverage).
 
 -include("snarl.hrl").
 
@@ -11,14 +11,12 @@
          start/3
         ]).
 
--record(state, {replies, r, reqid, from}).
+-record(state, {replies, r, reqid, from, reqs}).
 
-
-start(VNodeMaster, NodeCheckService, Request) ->
-
+start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true}) ->
     ReqID = mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
-      ?MODULE, {self(), ReqID, something_else},
+      ?MODULE, {self(), ReqID, Requirements},
       {VNodeMaster, NodeCheckService, Request}),
     receive
         ok ->
@@ -34,7 +32,7 @@ start(VNodeMaster, NodeCheckService, Request) ->
     end.
 
 %% The first is the vnode service used
-init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
+init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request}) ->
     {NVal, R, _W} = ?NRW(NodeCheckService),
     %% all - full coverage; allup - partial coverage
     VNodeSelector = allup,
@@ -43,16 +41,16 @@ init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
     %% We timeout after 5s
     Timeout = 5000,
     State = #state{replies = dict:new(), r = R,
-                   from = From, reqid = ReqID},
+                   from = From, reqid = ReqID,
+                   reqs = Requirements},
     {Request, VNodeSelector, NVal, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
-
-
 process_results({ok, _ReqID, _IdxNode, Obj},
                 State = #state{replies = Replies}) ->
-    Replies1 = lists:foldl(fun (Key, D) ->
-                                   dict:update_counter(Key, 1, D)
+    lager:debug("Objs: ~p", [Obj]),
+    Replies1 = lists:foldl(fun ({Pts, {Key, V}}, D) ->
+                                   dict:append(Key, {Pts, V}, D)
                            end, Replies, Obj),
     {done, State#state{replies = Replies1}};
 
@@ -62,10 +60,15 @@ process_results(Result, State) ->
 
 finish(clean, State = #state{replies = Replies,
                              from = From, r = R}) ->
-    MergedReplies = dict:fold(fun(_Key, Count, Keys) when Count < R->
-                                      Keys;
-                                 (Key, _Count, Keys) ->
-                                      [Key | Keys]
+    MergedReplies = dict:fold(fun(_Key, Es, Res)->
+                                      case length(Es) of
+                                          _L when _L < R ->
+                                              Res;
+                                          _ ->
+                                              Mgd = merge(Es),
+                                              lager:debug("Merged: ~p-> ~p", [Es, Mgd]),
+                                              [Mgd | Res]
+                                      end
                               end, [], Replies),
     %%    statman_histogram:record_value(
     %%      {list_to_binary(stat_name(SD0#state.vnode) ++ "/list"), total},
@@ -84,3 +87,31 @@ finish(How, State) ->
 mk_reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
     (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+
+
+merge([{Score, V} | R]) ->
+    merge(R, Score, [V]).
+
+merge([], recalculate, Vs) ->
+    {0, merge_obj(Vs)};
+
+merge([], Score, Vs) ->
+    {Score, merge_obj(Vs)};
+
+
+merge([{Score, V} | R], Score, Vs) ->
+    merge(R, Score, [V | Vs]);
+
+merge([{_Score1, V} | R], _Score2, Vs) when _Score1 =/= _Score2->
+    merge(R, recalculate, [V | Vs]).
+
+
+merge_obj(Vs) ->
+    case snarl_obj:merge(snarl_entity_read_fsm, Vs) of
+        #snarl_obj{val = V = #?USER{}} ->
+            snarl_user_state:to_json(V);
+        #snarl_obj{val = V = #?ORG{}} ->
+            snarl_org_state:to_json(V);
+        #snarl_obj{val = V = #?GROUP{}} ->
+            snarl_group_state:to_json(V)
+    end.

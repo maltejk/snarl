@@ -1,4 +1,5 @@
-cat <<EOF > share/snarl_template.xml
+FILE=share/snarl_template.xml
+cat <<EOF > $FILE
 <?xml version="1.0" encoding="UTF-8"?>
 <zabbix_export>
     <version>2.0</version>
@@ -19,14 +20,23 @@ cat <<EOF > share/snarl_template.xml
             </groups>
             <applications>
                 <application>
-                    <name>General</name>
+                    <name>Snarl</name>
+                </application>
+                <application>
+                    <name>user</name>
+                </application>
+                <application>
+                    <name>group</name>
+                </application>
+                <application>
+                    <name>token</name>
                 </application>
             </applications>
             <items>
 EOF
 cat apps/snarl/include/SNARL-MIB.hrl | grep instance | sed 's/-define(//' | sed 's/_instance, ./ /' | sed 's/]).//' | sed 's/,/./g' | while read param oid
 do
-    cat <<EOF >> snarl_template.xml
+    cat <<EOF >> $FILE
                 <item>
                     <name>$param</name>
                     <type>4</type>
@@ -43,18 +53,18 @@ do
 EOF
     if echo $param | grep Count
     then
-        cat <<EOF >> snarl_template.xml
+        cat <<EOF >> $FILE
                     <units>requests</units>
                     <formula>1</formula>
 EOF
     else
-        cat <<EOF >> snarl_template.xml
+        cat <<EOF >> $FILE
                     <units>nanoseconds</units>
                     <formula>0.001</formula>
 EOF
     fi
 
-    cat <<EOF >> snarl_template.xml
+    cat <<EOF >> $FILE
 
                     <delta>0</delta>
                     <snmpv3_securityname/>
@@ -73,12 +83,30 @@ EOF
                     <port/>
                     <description/>
                     <inventory_link>0</inventory_link>
-                    <applications/>
+                    <applications>
+EOF
+    if echo $param | grep '^\(group\|user\|token\|organisation\)'
+    then
+        app=$(echo $param | sed -e 's/^\([a-z]*\).*/\1/g')
+        cat <<EOF >> $FILE
+                        <application>
+                            <name>$app</name>
+                        </application>
+EOF
+    else
+        cat <<EOF >> $FILE
+                        <application>
+                            <name>Snarl</name>
+                        </application>
+EOF
+    fi
+cat <<EOF >> $FILE
+                    </applications>
                     <valuemap/>
                 </item>
 EOF
 done
-cat <<EOF >> snarl_template.xml
+cat <<EOF >> $FILE
             </items>
             <discovery_rules/>
             <macros/>

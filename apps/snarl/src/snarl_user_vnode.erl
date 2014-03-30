@@ -1,5 +1,6 @@
 -module(snarl_user_vnode).
 -behaviour(riak_core_vnode).
+-behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
@@ -16,7 +17,15 @@
          handle_handoff_data/2,
          encode_handoff_item/2,
          handle_coverage/4,
-         handle_exit/3]).
+         handle_exit/3,
+         handle_info/2
+       ]).
+
+-export([
+         master/0,
+         aae_repair/2,
+         hash_object/2
+        ]).
 
 %% Reads
 -export([
@@ -26,9 +35,12 @@
 %% Writes
 -export([
          add/4,
+         sync_repair/4,
          import/4,
          repair/4,
          add_key/4,
+         add_yubikey/4,
+         remove_yubikey/4,
          delete/3,
          grant/4, revoke/4, revoke_prefix/4,
          join/4, leave/4,
@@ -39,7 +51,10 @@
         ]).
 
 -ignore_xref([
+              add_yubikey/4,
+              remove_yubikey/4,
               add/4,
+              sync_repair/4,
               add_key/4,
               find_key/3,
               delete/3,
@@ -57,14 +72,30 @@
               revoke_key/4,
               revoke_prefix/4,
               set/4,
+              handle_info/2,
               join_org/4, leave_org/4, select_org/4,
               start_vnode/1
              ]).
 
 
--record(state, {db, partition, node}).
+-define(SERVICE, snarl_user).
 
 -define(MASTER, snarl_user_vnode_master).
+
+%%%===================================================================
+%%% AAE
+%%%===================================================================
+
+master() ->
+    ?MASTER.
+
+hash_object(BKey, RObj) ->
+    lager:debug("Hashing Key: ~p", [BKey]),
+    list_to_binary(integer_to_list(erlang:phash2({BKey, RObj}))).
+
+aae_repair(_, Key) ->
+    lager:debug("AAE Repair: ~p", [Key]),
+    snarl_user:get_(Key).
 
 %%%===================================================================
 %%% API
@@ -82,7 +113,7 @@ repair(IdxNode, User, VClock, Obj) ->
 
 %%%===================================================================
 %%% API - reads
-%%%===================================================================
+%%%===================================================================g
 
 get(Preflist, ReqID, User) ->
     riak_core_vnode_master:command(Preflist,
@@ -93,6 +124,13 @@ get(Preflist, ReqID, User) ->
 %%%===================================================================
 %%% API - writes
 %%%===================================================================
+
+
+sync_repair(Preflist, ReqID, UUID, Obj) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {sync_repair, ReqID, UUID, Obj},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 add(Preflist, ReqID, UUID, User) ->
     riak_core_vnode_master:command(Preflist,
@@ -109,6 +147,18 @@ add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
 revoke_key(Preflist, ReqID, UUID, KeyId) ->
     riak_core_vnode_master:command(Preflist,
                                    {revoke_key, ReqID, UUID, KeyId},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+add_yubikey(Preflist, ReqID, UUID, OTP) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {add_yubikey, ReqID, UUID, OTP},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+remove_yubikey(Preflist, ReqID, UUID, KeyId) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {remove_yubikey, ReqID, UUID, KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -188,105 +238,37 @@ revoke_prefix(Preflist, ReqID, User, Val) ->
 %%%===================================================================
 %%% VNode
 %%%===================================================================
-init([Partition]) ->
-    DB = list_to_atom(integer_to_list(Partition)),
-    fifo_db:start(DB),
-    {ok, #state {db = DB, node = node(), partition = Partition}}.
+init([Part]) ->
+    snarl_vnode:init(Part, <<"user">>, ?SERVICE, ?MODULE, snarl_user_state).
 
-%% Sample command: respond to a ping
-handle_command(ping, _Sender, State) ->
-    {reply, {pong, State#state.partition}, State};
+%%%===================================================================
+%%% General
+%%%===================================================================
 
-handle_command({repair, User, _VClock, #snarl_obj{} = Obj},
-               _Sender, State) ->
-    case fifo_db:get(State#state.db, <<"user">>, User) of
-        {ok, _O} when _O#snarl_obj.vclock =:= _VClock ->
-            fifo_db:put(State#state.db, <<"user">>, User, Obj);
-        not_found ->
-            fifo_db:put(State#state.db, <<"user">>, User, Obj);
-        _ ->
-            lager:warning("[USR:~s] Could not read repair, user changed.", [User])
-    end,
-    {noreply, State};
-
-handle_command({get, ReqID, User}, _Sender, State) ->
-    Res = case fifo_db:get(State#state.db, <<"user">>, User) of
-              {ok, #snarl_obj{val = V0} = R} ->
-                  R#snarl_obj{val = snarl_user_state:load(V0)};
-              not_found ->
-                  not_found
-          end,
-    NodeIdx = {State#state.partition, State#state.node},
-    {reply, {ok, ReqID, NodeIdx, Res}, State};
-
-handle_command({add, {ReqID, Coordinator} = ID, UUID, User}, _Sender, State) ->
-    User0 = snarl_user_state:new(),
+handle_command({add, {ReqID, Coordinator}=ID, UUID, User}, _Sender, State) ->
+    User0 = snarl_user_state:new(ID),
     User1 = snarl_user_state:name(ID, User, User0),
     User2 = snarl_user_state:uuid(ID, UUID, User1),
     User3 = snarl_user_state:grant(ID, [<<"users">>, UUID, <<"...">>], User2),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #snarl_obj{val=User3, vclock=VC},
-    fifo_db:put(State#state.db, <<"user">>, UUID, UserObj),
+    snarl_vnode:put(UUID, UserObj, State),
     {reply, {ok, ReqID}, State};
 
-handle_command({delete, {ReqID, _Coordinator}, User}, _Sender, State) ->
-    fifo_db:delete(State#state.db, <<"user">>, User),
-    {reply, {ok, ReqID}, State};
-
-handle_command({join = Action, {ReqID, Coordinator}, User, Group}, _Sender, State) ->
+handle_command({join = Action, {ReqID, _}=ID, User, Group}, _Sender, State) ->
     case snarl_group:get(Group) of
         not_found ->
             {reply, {ok, ReqID, not_found}, State};
         {ok, _GroupObj} ->
-            change_user(User, Action, [Group], Coordinator, State, ReqID)
+            snarl_vnode:change(User, Action, [Group], ID, State)
     end;
 
-handle_command({set, {ReqID, Coordinator}, User, Attributes}, _Sender, State) ->
-    case fifo_db:get(State#state.db, <<"user">>, User) of
-        {ok, #snarl_obj{val=H0} = O} ->
-            H1 = snarl_user_state:load(H0),
-            H2 = lists:foldr(
-                   fun ({Attribute, Value}, H) ->
-                           snarl_user_state:set_metadata(Coordinator,
-                                                         Attribute, Value, H)
-                   end, H1, Attributes),
-            fifo_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H2, Coordinator, O)),
-            {reply, {ok, ReqID}, State};
-        R ->
-            lager:error("[users] tried to write to a non existing user: ~p", [R]),
-            {reply, {ok, ReqID, not_found}, State}
-    end;
-
-handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender, State) ->
-    H1 = snarl_user_state:load(Data),
-    H2 = snarl_user_state:uuid(ID, UUID, H1),
-    case fifo_db:get(State#state.db, <<"user">>, UUID) of
-        {ok, O} ->
-            fifo_db:put(State#state.db, <<"user">>, UUID,
-                         snarl_obj:update(H2, Coordinator, O)),
-            {reply, {ok, ReqID}, State};
-        _R ->
-            VC0 = vclock:fresh(),
-            VC = vclock:increment(Coordinator, VC0),
-            UserObj = #snarl_obj{val=H2, vclock=VC},
-            fifo_db:put(State#state.db, <<"user">>, UUID, UserObj),
-            {reply, {ok, ReqID}, State}
-    end;
-
-handle_command({Action, {ReqID, Coordinator}, User, Param1, Param2}, _Sender, State) ->
-    change_user(User, Action, [Param1, Param2], Coordinator, State, ReqID);
-
-handle_command({Action, {ReqID, Coordinator}, User, Param}, _Sender, State) ->
-    change_user(User, Action, [Param], Coordinator, State, ReqID);
-
-handle_command(Message, _Sender, State) ->
-    lager:error("[user] Unknown message: ~p", [Message]),
-    {noreply, State}.
+handle_command(Message, Sender, State) ->
+    snarl_vnode:handle_command(Message, Sender, State).
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = fifo_db:fold(State#state.db, <<"user">>, Fun, Acc0),
+    Acc = fifo_db:fold(State#vstate.db, <<"user">>, Fun, Acc0),
     {reply, Acc, State};
 
 handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
@@ -313,17 +295,18 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, State) ->
     {User, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
-    V = snarl_user_state:load(Vin),
-    case fifo_db:get(State#state.db, <<"user">>, User) of
+    ID = snarl_vnode:mkid(handoff),
+    V = snarl_user_state:load(ID, Vin),
+    case fifo_db:get(State#vstate.db, <<"user">>, User) of
         {ok, #snarl_obj{val = V0}} ->
-            V1 = snarl_user_state:load(V0),
-            fifo_db:put(State#state.db, <<"user">>, User,
-                         Obj#snarl_obj{val = snarl_user_state:merge(V, V1)});
+            V1 = snarl_user_state:load(ID, V0),
+            UserObj = Obj#snarl_obj{val = snarl_user_state:merge(V, V1)},
+            snarl_vnode:put(User, UserObj, State);
         not_found ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(node(), VC0),
             UserObj = #snarl_obj{val=V, vclock=VC},
-            fifo_db:put(State#state.db, <<"user">>, User, UserObj)
+            snarl_vnode:put(User, UserObj, State)
     end,
     {reply, ok, State}.
 
@@ -331,123 +314,67 @@ encode_handoff_item(User, Data) ->
     term_to_binary({User, Data}).
 
 is_empty(State) ->
-    fifo_db:fold(State#state.db,
-                  <<"user">>,
-                  fun (_,_, _) ->
-                          {false, State}
-                  end, {true, State}).
+    snarl_vnode:is_empty(State).
 
 delete(State) ->
-    Trans = fifo_db:fold(State#state.db,
-                          <<"user">>,
-                          fun (K,_, A) ->
-                                  [{delete, <<"user", K/binary>>} | A]
-                          end, []),
-    fifo_db:transact(State#state.db, Trans),
-    {ok, State}.
+    snarl_vnode:delete(State).
 
-handle_coverage({find_key, KeyID}, _KeySpaces, {_, ReqID, _}, State) ->
-    Res = fifo_db:fold(State#state.db,
-                        <<"user">>,
-                        fun (UUID, #snarl_obj{val=U0}, not_found) ->
-                                U1 = snarl_user_state:load(U0),
-                                Ks = snarl_user_state:keys(U1),
-                                Ks1 = [key_to_id(K) || {_, K} <- Ks],
-                                case lists:member(KeyID, Ks1) of
-                                    true ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
-    {reply,
-     {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
-     State};
-
-handle_coverage({lookup, Name}, _KeySpaces, {_, ReqID, _}, State) ->
-    Res = fifo_db:fold(State#state.db,
-                        <<"user">>,
-                        fun (UUID, #snarl_obj{val = U0}, not_found) ->
-                                U1 = snarl_user_state:load(U0),
-                                case snarl_user_state:name(U1) of
-                                    Name ->
-                                        UUID;
-                                    _ ->
-                                        not_found
-                                end;
-                            (_U, _, Res) ->
-                                Res
-                        end, not_found),
-    {reply,
-     {ok, ReqID, {State#state.partition, State#state.node}, [Res]},
-     State};
-
-handle_coverage(list, _KeySpaces, {_, ReqID, _}, State) ->
-    List = fifo_db:fold(State#state.db,
-                         <<"user">>,
-                         fun (K, _, L) ->
-                                 [K|L]
-                         end, []),
-    {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, List},
-     State};
-
-handle_coverage({list, Requirements}, _KeySpaces, {_, ReqID, _}, State) ->
-    Getter = fun(#snarl_obj{val=S0}, <<"uuid">>) ->
-                     snarl_user_state:uuid(snarl_user_state:load(S0))
+handle_coverage({find_key, KeyID}, _KeySpaces, Sender, State) ->
+    ID = snarl_vnode:mkid(findkey),
+    FoldFn = fun (UUID, #snarl_obj{val=U0}, [not_found]) ->
+                     U1 = snarl_user_state:load(ID, U0),
+                     Ks = snarl_user_state:keys(U1),
+                     try
+                         Ks1 = [key_to_id(K) || {_, K} <- Ks],
+                         case lists:member(KeyID, Ks1) of
+                             true ->
+                                 [UUID];
+                             _ ->
+                                 [not_found]
+                         end
+                     catch
+                         Exception:Reason ->
+                             lager:warning("[key_find:~s] ~p:~p -> ~p",
+                                           [UUID, Exception, Reason, Ks]),
+                             [not_found]
+                     end;
+                 (_U, _, Res) ->
+                     Res
              end,
-    List = fifo_db:fold(State#state.db,
-                         <<"user">>,
-                         fun (Key, E, C) ->
-                                 case rankmatcher:match(E, Getter, Requirements) of
-                                     false ->
-                                         C;
-                                     Pts ->
-                                         [{Pts, Key} | C]
-                                 end
-                         end, []),
-    {reply,
-     {ok, ReqID, {State#state.partition, State#state.node}, List},
-     State};
+    snarl_vnode:fold(FoldFn, [not_found], Sender, State);
 
-handle_coverage(Req, _KeySpaces, _Sender, State) ->
-    lager:warning("Unknown coverage request: ~p", [Req]),
-    {stop, not_implemented, State}.
+handle_coverage(Req, KeySpaces, Sender, State) ->
+    snarl_vnode:handle_coverage(Req, KeySpaces, Sender, State).
 
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.
 
 terminate(_Reason, _State) ->
     ok.
+handle_info(Msg, State) ->
+    snarl_vnode:handle_info(Msg, State).
 
-change_user(User, Action, Vals, Coordinator, State, ReqID) ->
-    case fifo_db:get(State#state.db, <<"user">>, User) of
-        {ok, #snarl_obj{val=H0} = O} ->
-            H1 = snarl_user_state:load(H0),
-            ID = {ReqID, Coordinator},
-            H2 = case Vals of
-                     [Val] ->
-                         snarl_user_state:Action(ID, Val, H1);
-                     [Val1, Val2] ->
-                         snarl_user_state:Action(ID, Val1, Val2, H1)
-                 end,
-            fifo_db:put(State#state.db, <<"user">>, User,
-                         snarl_obj:update(H2, Coordinator, O)),
-            {reply, {ok, ReqID}, State};
-        R ->
-            lager:error("[users] tried to write to a non existing user: ~p", [R]),
-            {reply, {ok, ReqID, not_found}, State}
-    end.
+%%%===================================================================
+%%% Internal Functions
+%%%===================================================================
+
 -ifndef(old_hash).
 key_to_id(Key) ->
-    [_, ID0, _] = re:split(Key, " "),
-    ID1 = base64:decode(ID0),
-    crypto:hash(md5,ID1).
+    case re:split(Key, " ") of
+        [_, ID0, _] ->
+            ID1 = base64:decode(ID0),
+            crypto:hash(md5,ID1);
+        _ ->
+            <<>>
+    end.
 -else.
 key_to_id(Key) ->
-    [_, ID0, _] = re:split(Key, " "),
-    ID1 = base64:decode(ID0),
-    crypto:md5(ID1).
+    case re:split(Key, " ") of
+        [_, ID0, _] ->
+            ID1 = base64:decode(ID0),
+            crypto:md5(ID1);
+        _ ->
+            <<>>
+    end.
 -endif.
+
