@@ -62,7 +62,7 @@ start(_StartType, _StartArgs) ->
                     {ok, {IP, Port}} = application:get_env(snarl, sync_ip),
                     [A, B, C, D] = [list_to_integer(binary_to_list(P)) || P <- re:split(IP, "[.]")],
                     {ok, _} = ranch:start_listener(
-                                snarl, 1, ranch_tcp,
+                                snarl, 100, ranch_tcp,
                                 [{port, Port}, {ip, {A,B,C,D}}],
                                 snarl_sync_protocol, []);
                 _ ->

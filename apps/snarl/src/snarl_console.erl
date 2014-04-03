@@ -470,7 +470,8 @@ ringready([]) ->
 config(["show"]) ->
     io:format("Defaults~n  User Section~n"),
     print_config(defaults, users),
-    io:format("Yubikey~n~n"),
+    io:format("~n"
+              "Yubikey~n"),
     print_config(yubico, api),
     ok;
 
