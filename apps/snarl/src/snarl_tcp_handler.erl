@@ -240,15 +240,15 @@ message({user, passwd, User, Pass}, State) when
      snarl_user:passwd(User, Pass),
      State};
 
-message({user, join, User, Group}, State) when
+message({user, join, User, Role}, State) when
       is_binary(User),
-      is_binary(Group) ->
-    {reply, snarl_user:join(User, Group), State};
+      is_binary(Role) ->
+    {reply, snarl_user:join(User, Role), State};
 
-message({user, leave, User, Group}, State) when
+message({user, leave, User, Role}, State) when
       is_binary(User),
-      is_binary(Group) ->
-    {reply, snarl_user:leave(User, Group), State};
+      is_binary(Role) ->
+    {reply, snarl_user:leave(User, Role), State};
 
 message({user, grant, User, Permission}, State) when
       is_binary(User) ->
@@ -294,49 +294,49 @@ message({user, org, select, User, Org}, State) when
     {reply, snarl_user:select_org(User, Org), State};
 
 %%%===================================================================
-%%% Group Functions
+%%% Role Functions
 %%%===================================================================
 
-message({group, list}, State) ->
-    {reply, snarl_group:list(), State};
+message({role, list}, State) ->
+    {reply, snarl_role:list(), State};
 
-message({group, list, Requirements}, State) ->
-    message({group, list, Requirements, false}, State);
+message({role, list, Requirements}, State) ->
+    message({role, list, Requirements, false}, State);
 
-message({group, list, Requirements, Full}, State) ->
-    {reply, snarl_group:list(Requirements, Full), State};
+message({role, list, Requirements, Full}, State) ->
+    {reply, snarl_role:list(Requirements, Full), State};
 
-message({group, get, Group}, State) ->
-    {reply, snarl_group:get(Group), State};
+message({role, get, Role}, State) ->
+    {reply, snarl_role:get(Role), State};
 
-message({group, set, Group, Attribute, Value}, State) when
-      is_binary(Group) ->
+message({role, set, Role, Attribute, Value}, State) when
+      is_binary(Role) ->
     {reply,
-     snarl_group:set(Group, Attribute, Value),
+     snarl_role:set(Role, Attribute, Value),
      State};
 
-message({group, set, Group, Attributes}, State) when
-      is_binary(Group) ->
+message({role, set, Role, Attributes}, State) when
+      is_binary(Role) ->
     {reply,
-     snarl_group:set(Group, Attributes),
+     snarl_role:set(Role, Attributes),
      State};
 
-message({group, add, Group}, State) ->
-    {reply, snarl_group:add(Group), State};
+message({role, add, Role}, State) ->
+    {reply, snarl_role:add(Role), State};
 
-message({group, delete, Group}, State) ->
-    {reply, snarl_group:delete(Group), State};
+message({role, delete, Role}, State) ->
+    {reply, snarl_role:delete(Role), State};
 
-message({group, grant, Group, Permission}, State) when
-      is_binary(Group),
+message({role, grant, Role, Permission}, State) when
+      is_binary(Role),
       is_list(Permission)->
-    {reply, snarl_group:grant(Group, Permission), State};
+    {reply, snarl_role:grant(Role, Permission), State};
 
-message({group, revoke, Group, Permission}, State) ->
-    {reply, snarl_group:revoke(Group, Permission), State};
+message({role, revoke, Role, Permission}, State) ->
+    {reply, snarl_role:revoke(Role, Permission), State};
 
-message({group, revoke_prefix, Group, Prefix}, State) ->
-    {reply, snarl_group:revoke_prefix(Group, Prefix), State};
+message({role, revoke_prefix, Role, Prefix}, State) ->
+    {reply, snarl_role:revoke_prefix(Role, Prefix), State};
 
 message({cloud, status}, State) ->
     {reply,
@@ -349,10 +349,10 @@ message(Message, State) ->
 
 status() ->
     {ok, Us} = snarl_user:list(),
-    {ok, Gs} = snarl_group:list(),
+    {ok, Gs} = snarl_role:list(),
     {ok, Os} = snarl_org:list(),
     Resources = [{<<"users">>, length(Us)},
-                 {<<"groups">>, length(Gs)},
+                 {<<"roles">>, length(Gs)},
                  {<<"orgs">>, length(Os)}],
     Warnings = case riak_core_status:transfers() of
                    {[], []} ->

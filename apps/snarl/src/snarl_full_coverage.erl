@@ -112,6 +112,6 @@ merge_obj(Vs) ->
             snarl_user_state:to_json(V);
         #snarl_obj{val = V = #?ORG{}} ->
             snarl_org_state:to_json(V);
-        #snarl_obj{val = V = #?GROUP{}} ->
-            snarl_group_state:to_json(V)
+        #snarl_obj{val = V = #?ROLE{}} ->
+            snarl_role_state:to_json(V)
     end.

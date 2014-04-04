@@ -81,15 +81,15 @@ do_events([_|Ts], Event, Payload, N) ->
 do_events([], _Event, _Payload, N) ->
     N.
 
--spec do_event(Action::{grant, group, Group::fifo:group_id(), Template::template()} |
+-spec do_event(Action::{grant, role, Role::fifo:role_id(), Template::template()} |
                        {grant, user, User::fifo:user_id(), Template::template()} |
-                       {join, group, Group::fifo:group_id()} |
+                       {join, role, Role::fifo:role_id()} |
                        {join, org, Org::fifo:org_id()},
                Payload::template()) ->
                       ok.
 
-do_event({join, group, Group}, Payload) ->
-    snarl_user:join(Payload, Group),
+do_event({join, role, Role}, Payload) ->
+    snarl_user:join(Payload, Role),
     ok;
 
 do_event({join, org, Org}, Payload) ->
@@ -97,12 +97,12 @@ do_event({join, org, Org}, Payload) ->
     snarl_user:select_org(Payload, Org),
     ok;
 
-do_event({grant, group, Group, Template}, Payload) ->
-    snarl_group:grant(Group, build_template(Template, Payload)),
+do_event({grant, role, Role, Template}, Payload) ->
+    snarl_role:grant(Role, build_template(Template, Payload)),
     ok;
 
-do_event({grant, user, Group, Template}, Payload) ->
-    snarl_user:grant(Group, build_template(Template, Payload)),
+do_event({grant, user, Role, Template}, Payload) ->
+    snarl_user:grant(Role, build_template(Template, Payload)),
     ok.
 
 build_template(Template, Payload) ->

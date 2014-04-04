@@ -134,8 +134,8 @@ jsonify_trigger({Trigger, Action}) ->
     jsxd:set(<<"trigger">>, list_to_binary(atom_to_list(Trigger)),
              jsonify_action(Action)).
 
-jsonify_action({grant, group, Target, Permission}) ->
-    [{<<"action">>, <<"group_grant">>},
+jsonify_action({grant, role, Target, Permission}) ->
+    [{<<"action">>, <<"role_grant">>},
      {<<"permission">>, jsonify_permission(Permission)},
      {<<"target">>, Target}];
 
@@ -148,9 +148,9 @@ jsonify_action({join, org, Org}) ->
     [{<<"action">>, <<"join_org">>},
      {<<"target">>, Org}];
 
-jsonify_action({join, group, Group}) ->
-    [{<<"action">>, <<"join_group">>},
-     {<<"target">>, Group}].
+jsonify_action({join, role, Role}) ->
+    [{<<"action">>, <<"join_role">>},
+     {<<"target">>, Role}].
 
 
 jsonify_permission(Permission) ->

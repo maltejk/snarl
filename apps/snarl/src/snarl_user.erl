@@ -229,17 +229,17 @@ cache(User) ->
     case get_(User) of
         {ok, UserObj} ->
             {ok, lists:foldl(
-                   fun(Group, Permissions) ->
-                           case snarl_group:get_(Group) of
-                               {ok, GroupObj} ->
-                                   GrPerms = snarl_group_state:permissions(GroupObj),
+                   fun(Role, Permissions) ->
+                           case snarl_role:get_(Role) of
+                               {ok, RoleObj} ->
+                                   GrPerms = snarl_role_state:permissions(RoleObj),
                                    ordsets:union(Permissions, GrPerms);
                                _ ->
                                    Permissions
                            end
                    end,
                    snarl_user_state:permissions(UserObj),
-                   snarl_user_state:groups(UserObj))};
+                   snarl_user_state:roles(UserObj))};
         E ->
             E
     end.
@@ -313,14 +313,14 @@ add(undefined, User) ->
         {ok, UUID} ->
             lager:info("[~p:create] Created.", [UUID]),
             case snarl_opt:get(defaults, users,
-                               inital_group,
-                               user_inital_group, undefined) of
+                               inital_role,
+                               user_inital_role, undefined) of
                 undefined ->
-                    lager:info("[~p:create] No default group.",
+                    lager:info("[~p:create] No default role.",
                                [UUID]),
                     ok;
                 Grp ->
-                    lager:info("[~p:create] Assigning default group: ~s.",
+                    lager:info("[~p:create] Assigning default role: ~s.",
                                [UUID, Grp]),
                     join(UUID, Grp)
             end,
@@ -396,19 +396,19 @@ passwd(User, Passwd) ->
 import(User, Data) ->
     do_write(User, import, Data).
 
--spec join(User::fifo:user_id(), Group::fifo:group_id()) ->
+-spec join(User::fifo:user_id(), Role::fifo:role_id()) ->
                   not_found |
                   {error, timeout} |
                   ok.
-join(User, Group) ->
-    do_write(User, join, Group).
+join(User, Role) ->
+    do_write(User, join, Role).
 
--spec leave(User::fifo:user_id(), Group::fifo:group_id()) ->
+-spec leave(User::fifo:user_id(), Role::fifo:role_id()) ->
                    not_found |
                    {error, timeout} |
                    ok.
-leave(User, Group) ->
-    do_write(User, leave, Group).
+leave(User, Role) ->
+    do_write(User, leave, Role).
 
 
 -spec join_org(User::fifo:user_id(), Org::fifo:org_id()) ->
@@ -497,22 +497,22 @@ do_write(User, Op, Val) ->
             R
     end.
 
-test_groups(_Permission, []) ->
+test_roles(_Permission, []) ->
     false;
 
-test_groups(Permission, [Group|Groups]) ->
-    case snarl_group:get_(Group) of
-        {ok, GroupObj} ->
+test_roles(Permission, [Role|Roles]) ->
+    case snarl_role:get_(Role) of
+        {ok, RoleObj} ->
             case libsnarlmatch:test_perms(
                    Permission,
-                   snarl_group_state:permissions(GroupObj)) of
+                   snarl_role_state:permissions(RoleObj)) of
                 true ->
                     true;
                 false ->
-                    test_groups(Permission, Groups)
+                    test_roles(Permission, Roles)
             end;
         _ ->
-            test_groups(Permission, Groups)
+            test_roles(Permission, Roles)
     end.
 
 test_user(UserObj, Permission) ->
@@ -522,7 +522,7 @@ test_user(UserObj, Permission) ->
         true ->
             true;
         false ->
-            test_groups(Permission, snarl_user_state:groups(UserObj))
+            test_roles(Permission, snarl_user_state:roles(UserObj))
     end.
 
 check_pw(UserR, Passwd) ->

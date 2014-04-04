@@ -40,7 +40,7 @@ start(_StartType, _StartArgs) ->
     case snarl_sup:start_link() of
         {ok, Pid} ->
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
-            ?SRV_WITH_AAE(snarl_group_vnode, snarl_group),
+            ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
             ?SRV_WITH_AAE(snarl_org_vnode, snarl_org),
 
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),

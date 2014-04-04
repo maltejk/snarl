@@ -5,7 +5,7 @@
 %%% @end
 %%% Created : 23 Aug 2012 by Heinz Nikolaus Gies <heinz@licenser.net>
 
--module(snarl_group_state).
+-module(snarl_role_state).
 
 -include("snarl.hrl").
 
@@ -26,7 +26,7 @@
          is_a/1
         ]).
 
--export_type([group/0, any_group/0]).
+-export_type([role/0, any_role/0]).
 
 -ignore_xref([
               new/1,
@@ -39,18 +39,18 @@
               to_json/1
              ]).
 
--type group() :: #?GROUP{}.
+-type role() :: #?ROLE{}.
 
--type any_group() ::
-        #group_0_1_0{} |
-        #?GROUP{} |
+-type any_role() ::
+        #role_0_1_0{} |
+        #?ROLE{} |
         statebox:statebox().
 
 getter(#snarl_obj{val=S0}, <<"uuid">>) ->
     ID = snarl_vnode:mkid(getter),
     uuid(load(ID, S0)).
 
-is_a(#?GROUP{}) ->
+is_a(#?ROLE{}) ->
     true;
 is_a(_) ->
     false.
@@ -59,17 +59,32 @@ is_a(_) ->
 new({T, _ID}) ->
     {ok, UUID} = ?NEW_LWW(<<>>, T),
     {ok, Name} = ?NEW_LWW(<<>>, T),
-    #?GROUP{
+    #?ROLE{
         uuid = UUID,
         name = Name,
         permissions = riak_dt_orswot:new(),
         metadata = snarl_map:new()
        }.
 
-%%-spec load({integer(), atom()}, any_group()) -> group().
+%%-spec load({integer(), atom()}, any_role()) -> role().
 
-load(_, #?GROUP{} = Group) ->
-    Group;
+load(_, #?ROLE{} = Role) ->
+    Role;
+
+load({T, ID},
+     #group_0_1_1{
+        uuid = UUID1,
+        name = Name1,
+        permissions = Permissions1,
+        metadata = Metadata1
+       }) ->
+    load({T, ID},
+         #role_0_1_0{
+            uuid = UUID1,
+            name = Name1,
+            permissions = Permissions1,
+            metadata = Metadata1
+           });
 
 load({T, ID},
      #group_0_1_0{
@@ -90,14 +105,14 @@ load({T, ID},
             metadata = Metadata1
            });
 
-load(IDT, GroupSB) ->
-    Size = ?ENV(group_bucket_size, 50),
-    Group = statebox:value(GroupSB),
-    {ok, Name} = jsxd:get([<<"name">>], Group),
-    {ok, UUID} = jsxd:get([<<"uuid">>], Group),
+load(IDT, RoleSB) ->
+    Size = ?ENV(role_bucket_size, 50),
+    Role = statebox:value(RoleSB),
+    {ok, Name} = jsxd:get([<<"name">>], Role),
+    {ok, UUID} = jsxd:get([<<"uuid">>], Role),
     ID0 = {{0,0,0}, load},
-    Permissions0 = jsxd:get([<<"permissions">>], [], Group),
-    Metadata = jsxd:get([<<"metadata">>], [], Group),
+    Permissions0 = jsxd:get([<<"permissions">>], [], Role),
+    Metadata = jsxd:get([<<"metadata">>], [], Role),
     Permissions = lists:foldl(
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
@@ -110,7 +125,7 @@ load(IDT, GroupSB) ->
             metadata = statebox:new(fun () -> Metadata end)
            }).
 
-to_json(#?GROUP{
+to_json(#?ROLE{
             uuid = UUID,
             name = Name,
             permissions = Permissions,
@@ -124,60 +139,60 @@ to_json(#?GROUP{
        {<<"metadata">>, snarl_map:value(Metadata)}
       ]).
 
--spec merge(group(), group()) -> group().
+-spec merge(role(), role()) -> role().
 
-merge(#?GROUP{
+merge(#?ROLE{
           uuid = UUID1,
           name = Name1,
           permissions = Permissions1,
           metadata = Metadata1
          },
-      #?GROUP{
+      #?ROLE{
           uuid = UUID2,
           name = Name2,
           permissions = Permissions2,
           metadata = Metadata2
          }) ->
-    #?GROUP{
+    #?ROLE{
         uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
         name = riak_dt_lwwreg:merge(Name1, Name2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
         metadata = snarl_map:merge(Metadata1, Metadata2)
        }.
 
-name(Group) ->
-    riak_dt_lwwreg:value(Group#?GROUP.name).
+name(Role) ->
+    riak_dt_lwwreg:value(Role#?ROLE.name).
 
-name({T, _ID}, Name, Group) ->
-    {ok, V} = riak_dt_lwwreg:update({assign, Name, T}, none, Group#?GROUP.name),
-    Group#?GROUP{name = V}.
+name({T, _ID}, Name, Role) ->
+    {ok, V} = riak_dt_lwwreg:update({assign, Name, T}, none, Role#?ROLE.name),
+    Role#?ROLE{name = V}.
 
-uuid(Group) ->
-    riak_dt_lwwreg:value(Group#?GROUP.uuid).
+uuid(Role) ->
+    riak_dt_lwwreg:value(Role#?ROLE.uuid).
 
--spec uuid(Actor::term(), UUID::binary(), Group) ->
-                  Group.
-uuid({T, _ID}, UUID, Group = #?GROUP{}) ->
-    {ok, V} = riak_dt_lwwreg:update({assign, UUID, T}, none, Group#?GROUP.uuid),
-    Group#?GROUP{uuid = V}.
+-spec uuid(Actor::term(), UUID::binary(), Role) ->
+                  Role.
+uuid({T, _ID}, UUID, Role = #?ROLE{}) ->
+    {ok, V} = riak_dt_lwwreg:update({assign, UUID, T}, none, Role#?ROLE.uuid),
+    Role#?ROLE{uuid = V}.
 
-permissions(Group) ->
-    riak_dt_orswot:value(Group#?GROUP.permissions).
+permissions(Role) ->
+    riak_dt_orswot:value(Role#?ROLE.permissions).
 
-grant({_T, ID}, Permission, Group = #?GROUP{}) ->
+grant({_T, ID}, Permission, Role = #?ROLE{}) ->
     {ok, V} = riak_dt_orswot:update({add, Permission},
-                                    ID, Group#?GROUP.permissions),
-    Group#?GROUP{permissions = V}.
+                                    ID, Role#?ROLE.permissions),
+    Role#?ROLE{permissions = V}.
 
 
-revoke({_T, ID}, Permission, Group) ->
+revoke({_T, ID}, Permission, Role) ->
     {ok, V} =  riak_dt_orswot:update({remove, Permission},
-                                     ID, Group#?GROUP.permissions),
-    Group#?GROUP{permissions = V}.
+                                     ID, Role#?ROLE.permissions),
+    Role#?ROLE{permissions = V}.
 
-revoke_prefix({_T, ID}, Prefix, Group) ->
-    P0 = Group#?GROUP.permissions,
-    Ps = permissions(Group),
+revoke_prefix({_T, ID}, Prefix, Role) ->
+    P0 = Role#?ROLE.permissions,
+    Ps = permissions(Role),
     P1 = lists:foldl(fun (P, PAcc) ->
                              case lists:prefix(Prefix, P) of
                                  true ->
@@ -188,58 +203,58 @@ revoke_prefix({_T, ID}, Prefix, Group) ->
                                      PAcc
                              end
                      end, P0, Ps),
-    Group#?GROUP{
+    Role#?ROLE{
              permissions = P1
             }.
 
-metadata(Group) ->
-    Group#?GROUP.metadata.
+metadata(Role) ->
+    Role#?ROLE.metadata.
 
-set_metadata({T, ID}, P, Value, Group) when is_binary(P) ->
-    set_metadata({T, ID}, snarl_map:split_path(P), Value, Group);
+set_metadata({T, ID}, P, Value, Role) when is_binary(P) ->
+    set_metadata({T, ID}, snarl_map:split_path(P), Value, Role);
 
-set_metadata({_T, ID}, Attribute, delete, Group) ->
-    {ok, M1} = snarl_map:remove(Attribute, ID, Group#?GROUP.metadata),
-    Group#?GROUP{metadata = M1};
+set_metadata({_T, ID}, Attribute, delete, Role) ->
+    {ok, M1} = snarl_map:remove(Attribute, ID, Role#?ROLE.metadata),
+    Role#?ROLE{metadata = M1};
 
-set_metadata({T, ID}, Attribute, Value, Group) ->
-    {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Group#?GROUP.metadata),
-    Group#?GROUP{metadata = M1}.
+set_metadata({T, ID}, Attribute, Value, Role) ->
+    {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Role#?ROLE.metadata),
+    Role#?ROLE{metadata = M1}.
 
 -ifdef(TEST).
 mkid() ->
     {ecrdt:timestamp_us(), test}.
 
 to_json_test() ->
-    Group = new(mkid()),
-    GroupJ = [{<<"metadata">>,[]},
+    Role = new(mkid()),
+    RoleJ = [{<<"metadata">>,[]},
               {<<"name">>,<<>>},
               {<<"permissions">>,[]},
               {<<"uuid">>,<<>>}],
-    ?assertEqual(GroupJ, to_json(Group)).
+    ?assertEqual(RoleJ, to_json(Role)).
 
 name_test() ->
     Name0 = <<"Test0">>,
-    Group0 = new(mkid()),
-    Group1 = name(mkid(), Name0, Group0),
+    Role0 = new(mkid()),
+    Role1 = name(mkid(), Name0, Role0),
     Name1 = <<"Test1">>,
-    Group2 = name(mkid(), Name1, Group1),
-    ?assertEqual(Name0, name(Group1)),
-    ?assertEqual(Name1, name(Group2)).
+    Role2 = name(mkid(), Name1, Role1),
+    ?assertEqual(Name0, name(Role1)),
+    ?assertEqual(Name1, name(Role2)).
 
 permissions_test() ->
     P0 = [<<"P0">>],
     P1 = [<<"P1">>],
-    Group0 = new(mkid()),
-    Group1 = grant(mkid(), P0, Group0),
-    Group2 = grant(mkid(), P1, Group1),
-    Group3 = grant(mkid(), P0, Group2),
-    Group4 = revoke(mkid(), P0, Group3),
-    Group5 = revoke(mkid(), P1, Group3),
-    ?assertEqual([P0], permissions(Group1)),
-    ?assertEqual([P0, P1], permissions(Group2)),
-    ?assertEqual([P0, P1], permissions(Group3)),
-    ?assertEqual([P1], permissions(Group4)),
-    ?assertEqual([P0], permissions(Group5)).
+    Role0 = new(mkid()),
+    Role1 = grant(mkid(), P0, Role0),
+    Role2 = grant(mkid(), P1, Role1),
+    Role3 = grant(mkid(), P0, Role2),
+    Role4 = revoke(mkid(), P0, Role3),
+    Role5 = revoke(mkid(), P1, Role3),
+    ?assertEqual([P0], permissions(Role1)),
+    ?assertEqual([P0, P1], permissions(Role2)),
+    ?assertEqual([P0, P1], permissions(Role3)),
+    ?assertEqual([P1], permissions(Role4)),
+    ?assertEqual([P0], permissions(Role5)).
 
 -endif.

@@ -19,7 +19,7 @@
          name/1, name/3,
          password/1, password/3,
          permissions/1, grant/3, revoke/3, revoke_prefix/3,
-         groups/1, join/3, leave/3,
+         roles/1, join/3, leave/3,
          join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
          add_key/4, revoke_key/3, keys/1,
          metadata/1, set_metadata/4,
@@ -38,7 +38,7 @@
               name/1, name/3,
               password/1, password/3,
               permissions/1, grant/3, revoke/3, revoke_prefix/3,
-              groups/1, join/3, leave/3,
+              roles/1, join/3, leave/3,
               add_key/4, revoke_key/3, keys/1,
               metadata/1, set_metadata/4,
               join_org/3, leave_org/3, select_org/3, orgs/1, active_org/1,
@@ -78,7 +78,7 @@ load({_, _},
             password = Passwd1,
             active_org = ActiveOrg1,
             permissions = Permissions1,
-            groups = Groups1,
+            roles = Roles1,
             ssh_keys = Keys1,
             orgs = Orgs1,
             metadata = Metadata1
@@ -89,7 +89,7 @@ load({_, _},
        password = Passwd1,
        active_org = ActiveOrg1,
        permissions = Permissions1,
-       groups = Groups1,
+       roles = Roles1,
        ssh_keys = Keys1,
        orgs = Orgs1,
        yubikeys = riak_dt_orswot:new(),
@@ -103,7 +103,7 @@ load({T, ID},
         password = Passwd,
         permissions = Permissions,
         active_org = ActiveOrg,
-        groups = Groups,
+        roles = Roles,
         ssh_keys = Keys,
         orgs = Orgs,
         metadata = Metadata}) ->
@@ -112,7 +112,7 @@ load({T, ID},
     {ok, Passwd1} = ?NEW_LWW(vlwwregister:value(Passwd), T),
     {ok, ActiveOrg1} = ?NEW_LWW(vlwwregister:value(ActiveOrg), T),
     {ok, Permissions1} = ?CONVERT_VORSET(Permissions),
-    {ok, Groups1} = ?CONVERT_VORSET(Groups),
+    {ok, Roles1} = ?CONVERT_VORSET(Roles),
     {ok, Keys1} = ?CONVERT_VORSET(Keys),
     {ok, Orgs1} = ?CONVERT_VORSET(Orgs),
     Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), ID, T),
@@ -123,7 +123,7 @@ load({T, ID},
             password = Passwd1,
             active_org = ActiveOrg1,
             permissions = Permissions1,
-            groups = Groups1,
+            roles = Roles1,
             ssh_keys = Keys1,
             orgs = Orgs1,
             metadata = Metadata1
@@ -135,7 +135,7 @@ load(CT,
         name = Name,
         password = Passwd,
         permissions = Permissions,
-        groups = Groups,
+        roles = Roles,
         ssh_keys = Keys,
         metadata = Metadata
        }) ->
@@ -147,7 +147,7 @@ load(CT,
             password = Passwd,
             permissions = Permissions,
             active_org = vlwwregister:new(<<"">>),
-            groups = Groups,
+            roles = Roles,
             ssh_keys = Keys,
             orgs = vorsetg:new(Size),
             metadata = Metadata
@@ -159,7 +159,7 @@ load(CT,
         name = Name,
         password = Passwd,
         permissions = Permissions,
-        groups = Groups,
+        roles = Roles,
         metadata = Metadata
        }) ->
     Size = ?ENV(user_bucket_size, 50),
@@ -169,7 +169,7 @@ load(CT,
             name = Name,
             password = Passwd,
             permissions = Permissions,
-            groups = Groups,
+            roles = Roles,
             ssh_keys = vorsetg:new(Size),
             metadata = Metadata});
 
@@ -180,13 +180,13 @@ load(CT, UserSB) ->
     {ok, UUID} = jsxd:get([<<"uuid">>], User),
     Password = jsxd:get([<<"password">>], <<>>, User),
     ID0 = {{0,0,0}, load},
-    Groups0 = jsxd:get([<<"groups">>], [], User),
+    Roles0 = jsxd:get([<<"roles">>], [], User),
     Permissions0 = jsxd:get([<<"permissions">>], [], User),
     Metadata = jsxd:get([<<"metadata">>], [], User),
-    Groups = lists:foldl(
+    Roles = lists:foldl(
                fun (G, Acc) ->
                        vorsetg:add(ID0, G, Acc)
-               end, vorsetg:new(Size), Groups0),
+               end, vorsetg:new(Size), Roles0),
     Permissions = lists:foldl(
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
@@ -196,7 +196,7 @@ load(CT, UserSB) ->
             uuid = vlwwregister:new(UUID),
             name = vlwwregister:new(Name),
             password = vlwwregister:new(Password),
-            groups = Groups,
+            roles = Roles,
             permissions = Permissions,
             metadata = statebox:new(fun() -> Metadata end)}).
 
@@ -210,7 +210,7 @@ new({T, _ID}) ->
         name = Name,
         password = Passwd,
         active_org = ActiveOrg,
-        groups = riak_dt_orswot:new(),
+        roles = riak_dt_orswot:new(),
         permissions = riak_dt_orswot:new(),
         yubikeys = riak_dt_orswot:new(),
         ssh_keys = riak_dt_orswot:new(),
@@ -221,7 +221,7 @@ new({T, _ID}) ->
 to_json(#?USER{
             uuid = UUID,
             name = Name,
-            groups = Groups,
+            roles = Roles,
             ssh_keys = Keys,
             permissions = Permissions,
             active_org = Org,
@@ -233,7 +233,7 @@ to_json(#?USER{
       [
        {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
        {<<"name">>, riak_dt_lwwreg:value(Name)},
-       {<<"groups">>, riak_dt_orswot:value(Groups)},
+       {<<"roles">>, riak_dt_orswot:value(Roles)},
        {<<"permissions">>, riak_dt_orswot:value(Permissions)},
        {<<"yubikeys">>, riak_dt_orswot:value(YubiKeys)},
        {<<"keys">>, riak_dt_orswot:value(Keys)},
@@ -246,7 +246,7 @@ merge(#?USER{
           uuid = UUID1,
           name = Name1,
           password = Password1,
-          groups = Groups1,
+          roles = Roles1,
           permissions = Permissions1,
           ssh_keys = Keys1,
           active_org = Org1,
@@ -258,7 +258,7 @@ merge(#?USER{
           uuid = UUID2,
           name = Name2,
           password = Password2,
-          groups = Groups2,
+          roles = Roles2,
           permissions = Permissions2,
           ssh_keys = Keys2,
           active_org = Org2,
@@ -271,7 +271,7 @@ merge(#?USER{
         name = riak_dt_lwwreg:merge(Name1, Name2),
         password = riak_dt_lwwreg:merge(Password1, Password2),
         active_org = riak_dt_lwwreg:merge(Org1, Org2),
-        groups = riak_dt_orswot:merge(Groups1, Groups2),
+        roles = riak_dt_orswot:merge(Roles1, Roles2),
         ssh_keys = riak_dt_orswot:merge(Keys1, Keys2),
         yubikeys = riak_dt_orswot:merge(YubiKeys1, YubiKeys2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
@@ -375,17 +375,17 @@ revoke_prefix({_T, ID}, Prefix, User) ->
             permissions = P1
            }.
 
-groups(User) ->
-    riak_dt_orswot:value(User#?USER.groups).
+roles(User) ->
+    riak_dt_orswot:value(User#?USER.roles).
 
 
-join({_T, ID}, Group, User) ->
-    {ok, G} = riak_dt_orswot:update({add, Group}, ID, User#?USER.groups),
-    User#?USER{groups = G}.
+join({_T, ID}, Role, User) ->
+    {ok, G} = riak_dt_orswot:update({add, Role}, ID, User#?USER.roles),
+    User#?USER{roles = G}.
 
-leave({_T, ID}, Group, User) ->
-    {ok, G} = riak_dt_orswot:update({remove, Group}, ID, User#?USER.groups),
-    User#?USER{groups = G}.
+leave({_T, ID}, Role, User) ->
+    {ok, G} = riak_dt_orswot:update({remove, Role}, ID, User#?USER.roles),
+    User#?USER{roles = G}.
 
 metadata(User) ->
     User#?USER.metadata.
@@ -408,15 +408,17 @@ mkid() ->
 
 to_json_test() ->
     User = new(mkid()),
-    UserJ = [{<<"groups">>, []},
+    UserJ = [
              {<<"keys">>, []},
              {<<"metadata">>, []},
              {<<"name">>, <<>>},
              {<<"org">>, <<>>},
              {<<"orgs">>, []},
              {<<"permissions">>, []},
+             {<<"roles">>, []},
              {<<"uuid">>, <<>> },
-             {<<"yubikeys">>, []}],
+             {<<"yubikeys">>, []}
+            ],
     ?assertEqual(UserJ, to_json(User)).
 
 name_test() ->
@@ -457,7 +459,7 @@ permissions_test() ->
     ?assertEqual([P1], permissions(User4)),
     ?assertEqual([P0], permissions(User5)).
 
-groups_test() ->
+roles_test() ->
     G0 = "G0",
     G1 = "G1",
     User0 = new(mkid()),
@@ -466,10 +468,10 @@ groups_test() ->
     User3 = join(mkid(), G0, User2),
     User4 = leave(mkid(), G0, User3),
     User5 = leave(mkid(), G1, User3),
-    ?assertEqual([G0], groups(User1)),
-    ?assertEqual([G0, G1], groups(User2)),
-    ?assertEqual([G0, G1], groups(User3)),
-    ?assertEqual([G1], groups(User4)),
-    ?assertEqual([G0], groups(User5)).
+    ?assertEqual([G0], roles(User1)),
+    ?assertEqual([G0, G1], roles(User2)),
+    ?assertEqual([G0, G1], roles(User3)),
+    ?assertEqual([G1], roles(User4)),
+    ?assertEqual([G0], roles(User5)).
 
 -endif.
