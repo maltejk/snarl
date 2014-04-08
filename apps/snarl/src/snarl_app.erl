@@ -51,12 +51,6 @@ start(_StartType, _StartArgs) ->
 
             statman_server:add_subscriber(statman_aggregator),
             snarl_snmp_handler:start(),
-            case application:get_env(newrelic,license_key) of
-                undefined ->
-                    ok;
-                _ ->
-                    newrelic_poller:start_link(fun newrelic_statman:poll/0)
-            end,
             case application:get_env(snarl, sync) of
                 {ok, on} ->
                     {ok, {IP, Port}} = application:get_env(snarl, sync_ip),
