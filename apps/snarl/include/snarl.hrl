@@ -116,6 +116,19 @@
           metadata    = riak_dt_map:new()    :: riak_dt_map:map()
          }).
 
+-record(user_0_1_5, {
+          uuid        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          name        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          password    = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          active_org  = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          permissions = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          roles       = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          ssh_keys    = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          orgs        = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          yubikeys    = riak_dt_orswot:new() :: riak_dt_orswot:orswot(),
+          metadata    = riak_dt_map:new()    :: riak_dt_map:map()
+         }).
+
 -record(group_0_1_0, {
           uuid             :: vlwwregister:vlwwregister(),
           name             :: vlwwregister:vlwwregister(),
@@ -159,9 +172,16 @@
           metadata    = riak_dt_map:new()    :: riak_dt_map:map()
          }).
 
--define(USER, user_0_1_4).
+-record(organisation_0_1_3, {
+          uuid        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          name        = riak_dt_lwwreg:new() :: riak_dt_lwwreg:lwwreg(),
+          triggers    = riak_dt_map:new()    :: riak_dt_map:map(),
+          metadata    = riak_dt_map:new()    :: riak_dt_map:map()
+         }).
+
+-define(USER, user_0_1_5).
 -define(ROLE, role_0_1_0).
--define(ORG, organisation_0_1_2).
+-define(ORG, organisation_0_1_3).
 
 
 -define(NEW_LWW(V, T), riak_dt_lwwreg:update(

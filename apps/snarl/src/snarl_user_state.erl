@@ -50,6 +50,7 @@
 -type user() :: #?USER{}.
 
 -type any_user() :: user() |
+                    #user_0_1_5{} |
                     #user_0_1_4{} |
                     #user_0_1_3{} |
                     #user_0_1_2{} |
@@ -66,35 +67,62 @@ is_a(#?USER{}) ->
 is_a(_) ->
     false.
 
-% -spec load({non_neg_integer(), atom()}, any_user()) -> user().
+%% -spec load({non_neg_integer(), atom()}, any_user()) -> user().
 
 load(_, #?USER{} = User) ->
     User;
 
-load({_, _},
+load(TID,
+     #user_0_1_4{
+        uuid = UUID,
+        name = Name,
+        password = Passwd,
+        active_org = ActiveOrg,
+        permissions = Permissions,
+        roles = Roles,
+        ssh_keys = Keys,
+        orgs = Orgs,
+        yubikeys = YubiKeys,
+        metadata = Metadata
+       }) ->
+    U = #user_0_1_5{
+           uuid = UUID,
+           name = Name,
+           password = Passwd,
+           active_org = ActiveOrg,
+           permissions = Permissions,
+           roles = Roles,
+           ssh_keys = Keys,
+           orgs = Orgs,
+           yubikeys = YubiKeys,
+           metadata = Metadata
+          },
+    load(TID, update_permissions(TID, U));
+
+load(TID,
      #user_0_1_3{
-            uuid = UUID1,
-            name = Name1,
-            password = Passwd1,
-            active_org = ActiveOrg1,
-            permissions = Permissions1,
-            roles = Roles1,
-            ssh_keys = Keys1,
-            orgs = Orgs1,
-            metadata = Metadata1
-           }) ->
-    #user_0_1_4{
-       uuid = UUID1,
-       name = Name1,
-       password = Passwd1,
-       active_org = ActiveOrg1,
-       permissions = Permissions1,
-       roles = Roles1,
-       ssh_keys = Keys1,
-       orgs = Orgs1,
-       yubikeys = riak_dt_orswot:new(),
-       metadata = Metadata1
-      };
+        uuid = UUID1,
+        name = Name1,
+        password = Passwd1,
+        active_org = ActiveOrg1,
+        permissions = Permissions1,
+        roles = Roles1,
+        ssh_keys = Keys1,
+        orgs = Orgs1,
+        metadata = Metadata1
+       }) ->
+    load(TID, #user_0_1_4{
+                 uuid = UUID1,
+                 name = Name1,
+                 password = Passwd1,
+                 active_org = ActiveOrg1,
+                 permissions = Permissions1,
+                 roles = Roles1,
+                 ssh_keys = Keys1,
+                 orgs = Orgs1,
+                 yubikeys = riak_dt_orswot:new(),
+                 metadata = Metadata1
+                });
 
 load({T, ID},
      #user_0_1_2{
@@ -184,9 +212,9 @@ load(CT, UserSB) ->
     Permissions0 = jsxd:get([<<"permissions">>], [], User),
     Metadata = jsxd:get([<<"metadata">>], [], User),
     Roles = lists:foldl(
-               fun (G, Acc) ->
-                       vorsetg:add(ID0, G, Acc)
-               end, vorsetg:new(Size), Roles0),
+              fun (G, Acc) ->
+                      vorsetg:add(ID0, G, Acc)
+              end, vorsetg:new(Size), Roles0),
     Permissions = lists:foldl(
                     fun (G, Acc) ->
                             vorsetg:add(ID0, G, Acc)
@@ -407,10 +435,52 @@ set_metadata({T, ID}, Attribute, Value, User) ->
     {ok, M1} = snarl_map:set(Attribute, Value, ID, T, User#?USER.metadata),
     User#?USER{metadata = M1}.
 
+update_permissions(TID, U) ->
+    Permissions = permissions(U),
+    lists:foldl(fun ([<<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [<<"roles">> | R], Acc0);
+                    ([F, <<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [F, <<"roles">> | R], Acc0);
+                    ([F, S, <<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [F, S, <<"roles">> | R], Acc0);
+                    ([F, S, T, <<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [F, S, T, <<"roles">> | R], Acc0);
+                    (_, Acc) ->
+                        Acc
+                end, U, Permissions).
+
 -ifdef(TEST).
 
 mkid() ->
     {ecrdt:timestamp_us(), test}.
+
+update_perms_test() ->
+    %% Prepare permissions and expected update results
+    P1 = [<<"groups">>, <<"g1">>, <<"get">>],
+    P1u = [<<"roles">>, <<"g1">>, <<"get">>],
+    P2 = [<<"cloud">>, <<"groups">>, <<"list">>],
+    P2u = [<<"cloud">>, <<"roles">>, <<"list">>],
+    P3 = [<<"vms">>, <<"v1">>, <<"get">>],
+
+    %% Create user and grant permissions
+    U = new(mkid()),
+    U1 = grant(mkid(), P1, U),
+    U2 = grant(mkid(), P2, U1),
+    U3 = grant(mkid(), P3, U2),
+    %% Check if the result is as expected
+    Ps1 = lists:sort([P1, P2, P3]),
+    RPs1 = permissions(U3),
+    ?assertEqual(Ps1, RPs1),
+
+    %% Update and check for changes.
+    U4 = update_permissions(mkid(), U3),
+    Ps1u = lists:sort([P1u, P2u, P3]),
+    RPs1u = permissions(U4),
+    ?assertEqual(Ps1u, RPs1u).
 
 to_json_test() ->
     User = new(mkid()),

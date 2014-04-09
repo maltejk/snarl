@@ -42,8 +42,9 @@
 -type role() :: #?ROLE{}.
 
 -type any_role() ::
-        #role_0_1_0{} |
         #?ROLE{} |
+        #group_0_1_1{} |
+        #group_0_1_0{} |
         statebox:statebox().
 
 getter(#snarl_obj{val=S0}, <<"uuid">>) ->
@@ -71,20 +72,20 @@ new({T, _ID}) ->
 load(_, #?ROLE{} = Role) ->
     Role;
 
-load({T, ID},
+load(TID,
      #group_0_1_1{
-        uuid = UUID1,
-        name = Name1,
-        permissions = Permissions1,
-        metadata = Metadata1
+        uuid = UUID,
+        name = Name,
+        permissions = Permissions,
+        metadata = Metadata
        }) ->
-    load({T, ID},
-         #role_0_1_0{
-            uuid = UUID1,
-            name = Name1,
-            permissions = Permissions1,
-            metadata = Metadata1
-           });
+    Rl = #role_0_1_0{
+           uuid = UUID,
+           name = Name,
+           permissions = Permissions,
+           metadata = Metadata
+          },
+    load(TID, update_permissions(TID, Rl));
 
 load({T, ID},
      #group_0_1_0{
@@ -204,8 +205,8 @@ revoke_prefix({_T, ID}, Prefix, Role) ->
                              end
                      end, P0, Ps),
     Role#?ROLE{
-             permissions = P1
-            }.
+            permissions = P1
+           }.
 
 metadata(Role) ->
     Role#?ROLE.metadata.
@@ -221,16 +222,58 @@ set_metadata({T, ID}, Attribute, Value, Role) ->
     {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Role#?ROLE.metadata),
     Role#?ROLE{metadata = M1}.
 
+update_permissions(TID, Rl) ->
+    Permissions = permissions(Rl),
+    lists:foldl(fun ([<<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [<<"roles">> | R], Acc0);
+                    ([F, <<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [F, <<"roles">> | R], Acc0);
+                    ([F, S, <<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [F, S, <<"roles">> | R], Acc0);
+                    ([F, S, T, <<"groups">> | R] = P, Acc) ->
+                        Acc0 = revoke(TID, P, Acc),
+                        grant(TID, [F, S, T, <<"roles">> | R], Acc0);
+                    (_, Acc) ->
+                        Acc
+                end, Rl, Permissions).
+
 -ifdef(TEST).
 mkid() ->
     {ecrdt:timestamp_us(), test}.
 
+update_perms_test() ->
+    %% Prepare permissions and expected update results
+    P1 = [<<"groups">>, <<"g1">>, <<"get">>],
+    P1u = [<<"roles">>, <<"g1">>, <<"get">>],
+    P2 = [<<"cloud">>, <<"groups">>, <<"list">>],
+    P2u = [<<"cloud">>, <<"roles">>, <<"list">>],
+    P3 = [<<"vms">>, <<"v1">>, <<"get">>],
+
+    %% Create role and grant permissions
+    R = new(mkid()),
+    R1 = grant(mkid(), P1, R),
+    R2 = grant(mkid(), P2, R1),
+    R3 = grant(mkid(), P3, R2),
+    %% Check if the result is as expected
+    Ps1 = lists:sort([P1, P2, P3]),
+    RPs1 = permissions(R3),
+    ?assertEqual(Ps1, RPs1),
+
+    %% Update and check for changes.
+    R4 = update_permissions(mkid(), R3),
+    Ps1u = lists:sort([P1u, P2u, P3]),
+    RPs1u = permissions(R4),
+    ?assertEqual(Ps1u, RPs1u).
+
 to_json_test() ->
     Role = new(mkid()),
     RoleJ = [{<<"metadata">>,[]},
-              {<<"name">>,<<>>},
-              {<<"permissions">>,[]},
-              {<<"uuid">>,<<>>}],
+             {<<"name">>,<<>>},
+             {<<"permissions">>,[]},
+             {<<"uuid">>,<<>>}],
     ?assertEqual(RoleJ, to_json(Role)).
 
 name_test() ->

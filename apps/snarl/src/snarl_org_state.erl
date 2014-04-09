@@ -75,6 +75,21 @@ new({T, _ID}) ->
 load(_, #?ORG{} = Org) ->
     Org;
 
+load(TID,
+     #organisation_0_1_2{
+        uuid = UUID,
+        name = Name,
+        triggers = Triggers,
+        metadata = Metadata
+       }) ->
+    O = #organisation_0_1_3{
+           uuid = UUID,
+           name = Name,
+           triggers = Triggers,
+           metadata = Metadata
+          },
+    load(TID, update_triggers(TID, O));
+
 load({T, ID},
      #organisation_0_1_1{
         uuid = UUID,
@@ -249,14 +264,80 @@ remove_target(TID, Target, Org) ->
                              T =:= Target],
     JoinTriggers = [UUID || {UUID, {_, {join, _, T}}} <- Triggers,
                             T =:= Target],
-    io:format("~s <- ~p -> ~p + ~p~n", [Target, Triggers, GrantTriggers, JoinTriggers]),
     lists:foldl(fun(UUID, Acc) ->
                         remove_trigger(TID, UUID, Acc)
                 end, Org, GrantTriggers ++ JoinTriggers).
 
+
+update_triggers(TID, Org) ->
+    lists:foldl(fun ({UUID, {A, {grant, group, R, T}}}, Acc) ->
+                        Acc1 = remove_trigger(TID, UUID, Acc),
+                        add_trigger(TID, UUID, {A, {grant, role, R, replace_group(T)}}, Acc1);
+                    ({UUID, {A, {grant, E, R, T}}}, Acc) ->
+                        Acc1 = remove_trigger(TID, UUID, Acc),
+                        add_trigger(TID, UUID, {A, {grant, E, R, replace_group(T)}}, Acc1);
+                    ({UUID, {A, {join, group, R}}}, Acc) ->
+                        Acc1 = remove_trigger(TID, UUID, Acc),
+                        add_trigger(TID, UUID, {A, {join, role, R}}, Acc1)
+                end, Org, triggers(Org)).
+
+replace_group(R) ->
+    replace_group(R, []).
+
+replace_group([<<"groups">> | R], Acc) ->
+    replace_group(R, [<<"roles">> | Acc]);
+
+replace_group([F | R], Acc) ->
+    replace_group(R, [F | Acc]);
+
+replace_group([], Acc) ->
+    lists:reverse(Acc).
+
+
+
 -ifdef(TEST).
 mkid() ->
     {ecrdt:timestamp_us(), test}.
+
+trigger_update_test() ->
+    O = new(mkid()),
+    %% Initialize a (old) trigger and the expected new one.
+    U1 = uuid:uuid4s(),
+    T1 = {vm_create, {grant, group, <<"bla">>,
+                      [<<"groups">>, '$', <<"grant">>]}},
+    T1u = {vm_create, {grant, role, <<"bla">>,
+                       [<<"roles">>, '$', <<"grant">>]}},
+
+
+    %% Create a org and add the trigger, test that the trigger is there
+    O1 = add_trigger(mkid(), U1, T1, O),
+    Ts = lists:sort([{U1, T1}]),
+    RTs = lists:sort(triggers(O1)),
+    ?assertEqual(Ts, RTs),
+
+    %% Now update the trigger and compare the results
+    O2 = update_triggers(mkid(), O1),
+    Tsu = lists:sort([{U1, T1u}]),
+    RTsu = lists:sort(triggers(O2)),
+    ?assertEqual(Tsu, RTsu),
+
+    %% Prepare a secdont trigger and add it to the unchanged org
+    U2 = uuid:uuid4s(),
+    T2 = {vm_create, {join, group, <<"bla">>}},
+    T2u = {vm_create, {join, role, <<"bla">>}},
+    O3 = add_trigger(mkid(), U2, T2, O1),
+
+    %% Make sure both triggers are there.
+    Ts1 = lists:sort([{U1, T1}, {U2, T2}]),
+    RTs1 = lists:sort(triggers(O3)),
+    ?assertEqual(Ts1, RTs1),
+
+    %% Then update and check both triggers were updated correctly
+    O4 = update_triggers(mkid(), O3),
+    Tsu1 = lists:sort([{U1, T1u}, {U2, T2u}]),
+    RTsu1 = lists:sort(triggers(O4)),
+    ?assertEqual(Tsu1, RTsu1).
+
 
 to_json_test() ->
     Org = new(mkid()),
