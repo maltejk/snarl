@@ -459,7 +459,18 @@ leave_org(User, Org) ->
                     {error, timeout} |
                     ok.
 delete(User) ->
-    do_write(User, delete).
+    Res = do_write(User, delete),
+    spawn(
+      fun () ->
+              Prefix = [<<"users">>, User],
+              {ok, Users} = snarl_user:list(),
+              [snarl_user:revoke_prefix(U, Prefix) || U <- Users],
+              {ok, Roles} = list(),
+              [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(),
+              [snarl_org:remove_target(O, User) || O <- Orgs]
+      end),
+    Res.
 
 -spec grant(User::fifo:user_id(),
             Permission::fifo:permission()) ->

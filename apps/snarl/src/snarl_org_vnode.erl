@@ -36,6 +36,7 @@
          import/4,
          delete/3,
          add_trigger/4, remove_trigger/4,
+         remove_target/4,
          repair/4, sync_repair/4
         ]).
 
@@ -46,6 +47,7 @@
               add/4,
               delete/3,
               add_trigger/4, remove_trigger/4,
+              remove_target/4,
               set/4,
               import/4,
               repair/4, sync_repair/4
@@ -136,6 +138,12 @@ add_trigger(Preflist, ReqID, Org, {UUID, Trigger}) ->
 remove_trigger(Preflist, ReqID, Org, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {remove_trigger, ReqID, Org, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+remove_target(Preflist, ReqID, Org, Target) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {remove_target, ReqID, Org, Target},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 %%%===================================================================

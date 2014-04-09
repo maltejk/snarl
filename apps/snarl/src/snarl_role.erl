@@ -80,9 +80,9 @@ get(Role) ->
     end.
 
 -spec get_(Role::fifo:role_id()) ->
-                 not_found |
-                 {error, timeout} |
-                 {ok, Role::#?ROLE{}}.
+                  not_found |
+                  {error, timeout} |
+                  {ok, Role::#?ROLE{}}.
 get_(Role) ->
     case snarl_entity_read_fsm:start(
            {snarl_role_vnode, snarl_role},
@@ -153,7 +153,22 @@ create(UUID, Role) ->
                     {error, timeout}.
 
 delete(Role) ->
-    do_write(Role, delete).
+    Res = do_write(Role, delete),
+    spawn(
+      fun () ->
+              Prefix = [<<"roles">>, Role],
+              {ok, Users} = snarl_user:list(),
+              [begin
+                   snarl_user:leave(U, Role),
+                   snarl_user:revoke_prefix(U, Prefix)
+               end
+               || U <- Users],
+              {ok, Roles} = list(),
+              [revoke_prefix(R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(),
+              [snarl_org:remove_target(O, Role) || O <- Orgs]
+      end),
+    Res.
 
 -spec grant(Role::fifo:role_id(), fifo:permission()) ->
                    ok |

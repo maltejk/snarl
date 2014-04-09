@@ -18,7 +18,8 @@
          create/2,
          import/2,
          trigger/3,
-         add_trigger/2, remove_trigger/2
+         add_trigger/2, remove_trigger/2,
+         remove_target/2
         ]).
 
 -ignore_xref([
@@ -57,6 +58,9 @@ ping() ->
 
 add_trigger(Org, Trigger) ->
     do_write(Org, add_trigger, {uuid:uuid4s(), Trigger}).
+
+remove_target(Org, Target) ->
+    do_write(Org, remove_target, Target).
 
 remove_trigger(Org, Trigger) ->
     do_write(Org, remove_trigger, Trigger).
@@ -217,7 +221,22 @@ create(UUID, Org) ->
                     {error, timeout}.
 
 delete(Org) ->
-    do_write(Org, delete).
+    Res = do_write(Org, delete),
+    spawn(
+      fun () ->
+              Prefix = [<<"orgs">>, Org],
+              {ok, Users} = snarl_user:list(),
+              [begin
+                   snarl_user:leave_org(U, Org),
+                   snarl_user:revoke_prefix(U, Prefix)
+               end || U <- Users],
+              {ok, Roles} = list(),
+              [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(),
+              [snarl_org:remove_target(O, Org) || O <- Orgs]
+      end),
+    Res.
+
 
 -spec set(Org::fifo:org_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
                  not_found |

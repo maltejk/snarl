@@ -283,9 +283,15 @@ join_org({_T, ID}, Org, User) ->
     {ok, O1} = riak_dt_orswot:update({add, Org}, ID, User#?USER.orgs),
     User#?USER{orgs = O1}.
 
-leave_org({_T, ID}, Org, User) ->
+leave_org(TID={_T, ID}, Org, User) ->
     {ok, O1} = riak_dt_orswot:update({remove, Org}, ID, User#?USER.orgs),
-    User#?USER{orgs = O1}.
+    User1 = User#?USER{orgs = O1},
+    case active_org(User1) of
+        _O when _O =:= Org ->
+            select_org(TID, <<>>, User1);
+        _ ->
+            User1
+    end.
 
 select_org({T, _ID}, Org, User) ->
     {ok, O1} = riak_dt_lwwreg:update({assign, Org, T}, none, User#?USER.active_org),

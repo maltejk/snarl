@@ -20,6 +20,7 @@
          name/1, name/3,
          triggers/1, add_trigger/4, remove_trigger/3,
          metadata/1, set_metadata/4,
+         remove_target/3,
          merge/2,
          to_json/1,
          getter/2,
@@ -35,6 +36,7 @@
               name/1, name/3,
               triggers/1, add_trigger/4, remove_trigger/3,
               metadata/1, set_metadata/4,
+              remove_target/3,
               merge/2,
               to_json/1,
               getter/2,
@@ -240,6 +242,18 @@ set_metadata({T, ID}, Attribute, Value, Org) ->
 trigger_uuid(UUID, Trigger) ->
     list_to_binary(uuid:to_string(uuid:uuid5(UUID, term_to_binary(Trigger)))).
 
+
+remove_target(TID, Target, Org) ->
+    Triggers = triggers(Org),
+    GrantTriggers = [UUID || {UUID, {_, {grant, _, T, _}}} <- Triggers,
+                             T =:= Target],
+    JoinTriggers = [UUID || {UUID, {_, {join, _, T}}} <- Triggers,
+                            T =:= Target],
+    io:format("~s <- ~p -> ~p + ~p~n", [Target, Triggers, GrantTriggers, JoinTriggers]),
+    lists:foldl(fun(UUID, Acc) ->
+                        remove_trigger(TID, UUID, Acc)
+                end, Org, GrantTriggers ++ JoinTriggers).
+
 -ifdef(TEST).
 mkid() ->
     {ecrdt:timestamp_us(), test}.
@@ -260,5 +274,41 @@ name_test() ->
     Org2 = name(mkid(), Name1, Org1),
     ?assertEqual(Name0, name(Org1)),
     ?assertEqual(Name1, name(Org2)).
+
+
+remove_target_test() ->
+    Org0 = new(mkid()),
+
+    %% Add a grant trigger.
+    Target1 = uuid:uuid4s(),
+    UUID1 = uuid:uuid4s(),
+    Tr1 = {vm_create, {grant, group, Target1, a}},
+    Org1 = add_trigger(mkid(), UUID1, Tr1, Org0),
+
+    %% Add a join trigger
+    Target2 = uuid:uuid4s(),
+    UUID2 = uuid:uuid4s(),
+    Tr2 = {vm_create, {join, group, Target2}},
+    Org2 = add_trigger(mkid(), UUID2, Tr2, Org1),
+
+    %% Test if both triggers are added
+    Ts1 = lists:sort([{UUID1, Tr1}, {UUID2, Tr2}]),
+    ResTs1 = lists:sort(triggers(Org2)),
+    ?assertEqual(Ts1, ResTs1),
+
+    %% Remove the first trigger
+    Org3 = remove_target(mkid(), Target1, Org2),
+    Ts2 = lists:sort([{UUID2, Tr2}]),
+    ResTs2 = lists:sort(triggers(Org3)),
+    ?assertEqual(Ts2, ResTs2),
+
+    %% Remove the seconds trigger
+    Org4 = remove_target(mkid(), Target2, Org3),
+    Ts3 = [],
+    ResTs3 = lists:sort(triggers(Org4)),
+    ?assertEqual(Ts3, ResTs3),
+
+    ok.
+
 
 -endif.
