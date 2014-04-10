@@ -71,7 +71,7 @@ get_type([K|R], Os) ->
 
 opts() ->
     [{"defaults",
-      [{"users", [{"inital_group", binary}, {"inital_org", binary}]}]},
+      [{"users", [{"inital_role", binary}, {"inital_org", binary}]}]},
      {"yubico",
       [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].
 

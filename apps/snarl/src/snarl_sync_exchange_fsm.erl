@@ -96,7 +96,7 @@ init([IP, Port, Diff, Get, Push]) ->
 %% @end
 %%--------------------------------------------------------------------
 
-vnode(snarl_group) -> snarl_group_vnode;
+vnode(snarl_role) -> snarl_role_vnode;
 vnode(snarl_user) -> snarl_user_vnode;
 vnode(snarl_org) -> snarl_org_vnode.
 

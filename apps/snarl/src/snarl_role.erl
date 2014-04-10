@@ -1,4 +1,4 @@
--module(snarl_group).
+-module(snarl_role).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
@@ -28,33 +28,33 @@ sync_repair(UUID, Obj) ->
 %% @doc Pings a random vnode to make sure communication is functional
 ping() ->
     DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_group),
+    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_role),
     [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_group_vnode_master).
+    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_role_vnode_master).
 
-import(Group, Data) ->
-    do_write(Group, import, Data).
+import(Role, Data) ->
+    do_write(Role, import, Data).
 
--spec lookup(Group::binary()) ->
+-spec lookup(Role::binary()) ->
                     not_found |
                     {error, timeout} |
-                    {ok, Group::fifo:group()}.
-lookup(Group) ->
-    case lookup_(Group) of
+                    {ok, Role::fifo:role()}.
+lookup(Role) ->
+    case lookup_(Role) of
         {ok, Obj} ->
-            {ok, snarl_group_state:to_json(Obj)};
+            {ok, snarl_role_state:to_json(Obj)};
         R ->
             R
     end.
 
--spec lookup_(Group::binary()) ->
+-spec lookup_(Role::binary()) ->
                      not_found |
                      {error, timeout} |
-                     {ok, Group::#?GROUP{}}.
-lookup_(Group) ->
+                     {ok, Role::#?ROLE{}}.
+lookup_(Role) ->
     {ok, Res} = snarl_coverage:start(
-                  snarl_group_vnode_master, snarl_group,
-                  {lookup, Group}),
+                  snarl_role_vnode_master, snarl_role,
+                  {lookup, Role}),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -62,31 +62,31 @@ lookup_(Group) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            snarl_group:get_(UUID);
+            snarl_role:get_(UUID);
         R ->
             R
     end.
 
--spec get(Group::fifo:group_id()) ->
+-spec get(Role::fifo:role_id()) ->
                  not_found |
                  {error, timeout} |
-                 {ok, Group::fifo:group()}.
-get(Group) ->
-    case get_(Group) of
-        {ok, GroupObj} ->
-            {ok, snarl_group_state:to_json(GroupObj)};
+                 {ok, Role::fifo:role()}.
+get(Role) ->
+    case get_(Role) of
+        {ok, RoleObj} ->
+            {ok, snarl_role_state:to_json(RoleObj)};
         R  ->
             R
     end.
 
--spec get_(Group::fifo:group_id()) ->
-                 not_found |
-                 {error, timeout} |
-                 {ok, Group::#?GROUP{}}.
-get_(Group) ->
+-spec get_(Role::fifo:role_id()) ->
+                  not_found |
+                  {error, timeout} |
+                  {ok, Role::#?ROLE{}}.
+get_(Role) ->
     case snarl_entity_read_fsm:start(
-           {snarl_group_vnode, snarl_group},
-           get, Group
+           {snarl_role_vnode, snarl_role},
+           get, Role
           ) of
         {ok, not_found} ->
             not_found;
@@ -94,17 +94,17 @@ get_(Group) ->
             R
     end.
 
-raw(Group) ->
-    snarl_entity_read_fsm:start({snarl_group_vnode, snarl_group}, get,
-                                Group, undefined, true).
+raw(Role) ->
+    snarl_entity_read_fsm:start({snarl_role_vnode, snarl_role}, get,
+                                Role, undefined, true).
 
--spec list() -> {ok, [fifo:group_id()]} |
+-spec list() -> {ok, [fifo:role_id()]} |
                 not_found |
                 {error, timeout}.
 
 list() ->
     snarl_coverage:start(
-      snarl_group_vnode_master, snarl_group,
+      snarl_role_vnode_master, snarl_role,
       list).
 
 
@@ -117,89 +117,104 @@ list() ->
 
 list(Requirements, true) ->
     {ok, Res} = snarl_full_coverage:start(
-                  snarl_group_vnode_master, snarl_group,
+                  snarl_role_vnode_master, snarl_role,
                   {list, Requirements, true}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)};
 
 list(Requirements, false) ->
     {ok, Res} = snarl_coverage:start(
-                  snarl_group_vnode_master, snarl_group,
+                  snarl_role_vnode_master, snarl_role,
                   {list, Requirements}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
--spec add(Group::binary()) ->
-                 {ok, UUID::fifo:group_id()} |
+-spec add(Role::binary()) ->
+                 {ok, UUID::fifo:role_id()} |
                  douplicate |
                  {error, timeout}.
 
-add(Group) ->
+add(Role) ->
     UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    create(UUID, Group).
+    create(UUID, Role).
 
-create(UUID, Group) ->
-    case snarl_group:lookup_(Group) of
+create(UUID, Role) ->
+    case snarl_role:lookup_(Role) of
         not_found ->
-            ok = do_write(UUID, add, Group),
+            ok = do_write(UUID, add, Role),
             {ok, UUID};
-        {ok, _GroupObj} ->
+        {ok, _RoleObj} ->
             duplicate
     end.
 
--spec delete(Group::fifo:group_id()) ->
+-spec delete(Role::fifo:role_id()) ->
                     ok |
                     not_found|
                     {error, timeout}.
 
-delete(Group) ->
-    do_write(Group, delete).
+delete(Role) ->
+    Res = do_write(Role, delete),
+    spawn(
+      fun () ->
+              Prefix = [<<"roles">>, Role],
+              {ok, Users} = snarl_user:list(),
+              [begin
+                   snarl_user:leave(U, Role),
+                   snarl_user:revoke_prefix(U, Prefix)
+               end
+               || U <- Users],
+              {ok, Roles} = list(),
+              [revoke_prefix(R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(),
+              [snarl_org:remove_target(O, Role) || O <- Orgs]
+      end),
+    Res.
 
--spec grant(Group::fifo:group_id(), fifo:permission()) ->
+-spec grant(Role::fifo:role_id(), fifo:permission()) ->
                    ok |
                    not_found|
                    {error, timeout}.
 
-grant(Group, Permission) ->
-    do_write(Group, grant, Permission).
+grant(Role, Permission) ->
+    do_write(Role, grant, Permission).
 
--spec revoke(Group::fifo:group_id(), fifo:permission()) ->
+-spec revoke(Role::fifo:role_id(), fifo:permission()) ->
                     ok |
                     not_found|
                     {error, timeout}.
 
-revoke(Group, Permission) ->
-    do_write(Group, revoke, Permission).
+revoke(Role, Permission) ->
+    do_write(Role, revoke, Permission).
 
--spec revoke_prefix(Group::fifo:group_id(), fifo:permission()) ->
+-spec revoke_prefix(Role::fifo:role_id(), fifo:permission()) ->
                            ok |
                            not_found|
                            {error, timeout}.
 
-revoke_prefix(Group, Prefix) ->
-    do_write(Group, revoke_prefix, Prefix).
+revoke_prefix(Role, Prefix) ->
+    do_write(Role, revoke_prefix, Prefix).
 
--spec set(Group::fifo:group_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
+-spec set(Role::fifo:role_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
                  not_found |
                  {error, timeout} |
                  ok.
-set(Group, Attribute, Value) ->
-    set(Group, [{Attribute, Value}]).
+set(Role, Attribute, Value) ->
+    set(Role, [{Attribute, Value}]).
 
--spec set(Group::fifo:group_id(), Attirbutes::fifo:attr_list()) ->
+-spec set(Role::fifo:role_id(), Attirbutes::fifo:attr_list()) ->
                  not_found |
                  {error, timeout} |
                  ok.
-set(Group, Attributes) ->
-    do_write(Group, set, Attributes).
+set(Role, Attributes) ->
+    do_write(Role, set, Attributes).
 
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
 
-do_write(Group, Op) ->
-    snarl_entity_write_fsm:write({snarl_group_vnode, snarl_group}, Group, Op).
+do_write(Role, Op) ->
+    snarl_entity_write_fsm:write({snarl_role_vnode, snarl_role}, Role, Op).
 
-do_write(Group, Op, Val) ->
-    snarl_entity_write_fsm:write({snarl_group_vnode, snarl_group}, Group, Op, Val).
+do_write(Role, Op, Val) ->
+    snarl_entity_write_fsm:write({snarl_role_vnode, snarl_role}, Role, Op, Val).

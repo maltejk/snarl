@@ -256,12 +256,12 @@ handle_command({add, {ReqID, Coordinator}=ID, UUID, User}, _Sender, State) ->
     snarl_vnode:put(UUID, UserObj, State),
     {reply, {ok, ReqID}, State};
 
-handle_command({join = Action, {ReqID, _}=ID, User, Group}, _Sender, State) ->
-    case snarl_group:get(Group) of
+handle_command({join = Action, {ReqID, _}=ID, User, Role}, _Sender, State) ->
+    case snarl_role:get(Role) of
         not_found ->
             {reply, {ok, ReqID, not_found}, State};
-        {ok, _GroupObj} ->
-            snarl_vnode:change(User, Action, [Group], ID, State)
+        {ok, _RoleObj} ->
+            snarl_vnode:change(User, Action, [Role], ID, State)
     end;
 
 handle_command(Message, Sender, State) ->

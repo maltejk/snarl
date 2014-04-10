@@ -141,7 +141,7 @@ handle_info(timeout, State = #state{version = Vsn}) ->
              _ ->
                  []
          end,
-    Gs = case snarl_group:list() of
+    Gs = case snarl_role:list() of
              {ok, GsX} ->
                  GsX;
              _ ->
@@ -154,7 +154,7 @@ handle_info(timeout, State = #state{version = Vsn}) ->
                  ok
          end,
     snarl_sync_read_fsm:update(snarl_user, Vsn1, Us, self()),
-    snarl_sync_read_fsm:update(snarl_group, Vsn1, Gs, self()),
+    snarl_sync_read_fsm:update(snarl_role, Vsn1, Gs, self()),
     snarl_sync_read_fsm:update(snarl_org, Vsn1, Os, self()),
     {noreply, State#state{version = Vsn1}};
 handle_info(_Info, State) ->
