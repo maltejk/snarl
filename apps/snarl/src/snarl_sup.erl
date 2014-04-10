@@ -20,8 +20,8 @@ start_link() ->
 %% ===================================================================
 
 init(_Args) ->
-    GroupVMaster = {snarl_group_vnode_master,
-                    {riak_core_vnode_master, start_link, [snarl_group_vnode]},
+    RoleVMaster = {snarl_role_vnode_master,
+                    {riak_core_vnode_master, start_link, [snarl_role_vnode]},
                     permanent, 5000, worker, [riak_core_vnode_master]},
 
     UserVMaster = {snarl_user_vnode_master,
@@ -56,10 +56,10 @@ init(_Args) ->
           [snarl_user, snarl_user_vnode]},
          permanent, 30000, worker, [riak_core_entropy_manager]},
 
-    EntropyManagerGroup =
-        {snarl_group_entropy_manager,
+    EntropyManagerRole =
+        {snarl_role_entropy_manager,
          {riak_core_entropy_manager, start_link,
-          [snarl_group, snarl_group_vnode]},
+          [snarl_role, snarl_role_vnode]},
          permanent, 30000, worker, [riak_core_entropy_manager]},
 
     EntropyManagerOrg =
@@ -84,7 +84,7 @@ init(_Args) ->
         permanent, 5000, worker, []},
        {snarl_sync_tree, {snarl_sync_tree, start_link, []},
         permanent, 5000, worker, []},
-       GroupVMaster, UserVMaster, TokenVMaster,
+       RoleVMaster, UserVMaster, TokenVMaster,
        OrgVMaster,
-       EntropyManagerUser, EntropyManagerGroup, EntropyManagerOrg,
+       EntropyManagerUser, EntropyManagerRole, EntropyManagerOrg,
        ReadFSMs, WriteFSMs, CoverageFSMs]}}.

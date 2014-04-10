@@ -62,8 +62,8 @@ ring_status(get) ->
             {value, 4}
     end.
 
-keys(get, <<"group">>) ->
-    {ok, L} = snarl_group:list(),
+keys(get, <<"role">>) ->
+    {ok, L} = snarl_role:list(),
     {value, length(L)};
 keys(get, <<"user">>) ->
     {ok, L} = snarl_user:list(),
@@ -99,8 +99,8 @@ mean(get, Prefix) ->
 max(get, Prefix) ->
     percentile_get(max, Prefix, total).
 
-percentile_get(mean, Prefix, Grouping) ->
-    Data = generate_percentile(Prefix, Grouping),
+percentile_get(mean, Prefix, Roleing) ->
+    Data = generate_percentile(Prefix, Roleing),
     case lists:keyfind(mean, 1, Data) of
         {mean, R} ->
             {value, trunc(R)};
@@ -108,8 +108,8 @@ percentile_get(mean, Prefix, Grouping) ->
             {value, 0}
     end;
 
-percentile_get(What, Prefix, Grouping) ->
-    Data = generate_percentile(Prefix, Grouping),
+percentile_get(What, Prefix, Roleing) ->
+    Data = generate_percentile(Prefix, Roleing),
     case lists:keyfind(What, 1, Data) of
         {What, R} ->
             {value, R};
@@ -117,18 +117,18 @@ percentile_get(What, Prefix, Grouping) ->
             {value, 0}
     end.
 
-generate_percentile(Prefix, Grouping) ->
+generate_percentile(Prefix, Roleing) ->
     L = byte_size(Prefix),
     {ok, Data} = statman_aggregator:get_window(60),
     Data1 = [ D || [{key,{
                        <<ThisPrefix:L/binary, _/binary>>,
-                       ThisGrouping}},
+                       ThisRoleing}},
                     _,
                     {type,histogram},
                     {value, D},
                     _] <- Data,
                    ThisPrefix =:= Prefix,
-                   ThisGrouping =:= Grouping
+                   ThisRoleing =:= Roleing
             ],
     Data2 = lists:sort(lists:flatten(Data1)),
     Data3 = lists:foldl(fun ({T, C}, [{T, C1} | Acc]) ->

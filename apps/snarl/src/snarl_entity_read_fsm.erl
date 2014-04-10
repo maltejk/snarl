@@ -266,28 +266,28 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) ->
-                       snarl_user_state:user() | snarl_user_state:group().
-%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) -> snarl_user_state:user();
-%%               ([A :: snarl_user_state:group()]) -> snarl_user_state:group().
+-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:role() ]) ->
+                       snarl_user_state:user() | snarl_user_state:role().
+%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:role() ]) -> snarl_user_state:user();
+%%               ([A :: snarl_user_state:role()]) -> snarl_user_state:role().
 
 reconcile([V | Vs]) ->
     case {snarl_user_state:is_a(V),
-          snarl_group_state:is_a(V),
+          snarl_role_state:is_a(V),
           snarl_org_state:is_a(V)} of
         {true, _, _} ->
             reconcile_user(Vs, V);
         {_, true, _} ->
-            reconcile_group(Vs, V);
+            reconcile_role(Vs, V);
         {_, _, true} ->
             reconcile_org(Vs, V);
         _ ->
             V
     end.
 
-reconcile_group([G | R], Acc) ->
-    reconcile_group(R, snarl_group_state:merge(Acc, G));
-reconcile_group(_, Acc) ->
+reconcile_role([G | R], Acc) ->
+    reconcile_role(R, snarl_role_state:merge(Acc, G));
+reconcile_role(_, Acc) ->
     Acc.
 
 reconcile_user([U | R], Acc) ->
@@ -341,8 +341,8 @@ unique(L) ->
 
 stat_name(snarl_user_vnode) ->
     "user";
-stat_name(snarl_group_vnode) ->
-    "group";
+stat_name(snarl_role_vnode) ->
+    "role";
 stat_name(snarl_org_vnode) ->
     "org";
 stat_name(snarl_token_vnode) ->
