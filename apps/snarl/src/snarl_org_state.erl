@@ -278,7 +278,9 @@ update_triggers(TID, Org) ->
                         add_trigger(TID, UUID, {A, {grant, E, R, replace_group(T)}}, Acc1);
                     ({UUID, {A, {join, group, R}}}, Acc) ->
                         Acc1 = remove_trigger(TID, UUID, Acc),
-                        add_trigger(TID, UUID, {A, {join, role, R}}, Acc1)
+                        add_trigger(TID, UUID, {A, {join, role, R}}, Acc1);
+                    (_, Acc) ->
+                        Acc
                 end, Org, triggers(Org)).
 
 replace_group(R) ->
