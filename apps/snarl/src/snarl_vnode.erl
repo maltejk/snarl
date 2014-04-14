@@ -104,7 +104,14 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
        State=#vstate{state=Mod}) ->
     case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
         {ok, #snarl_obj{val=H0} = O} ->
-            H1 = Mod:load(ID, H0),
+            H1 = case Mod:load(ID, H0) of
+                     _H when _H =:= H0 ->
+                         H0;
+                     Hx ->
+                         O1 = O#snarl_obj{val=Hx},
+                         fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
+                         Hx
+                 end,
             H2 = case Vals of
                      [Val] ->
                          Mod:Action(ID, Val, H1);
