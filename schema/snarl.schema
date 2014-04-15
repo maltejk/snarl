@@ -107,7 +107,7 @@
 { translation,
   "riak_core.anti_entropy",
   fun(Conf) ->
-    Setting = cuttlefish_util:conf_get_value("anti_entropy", Conf),
+    Setting = cuttlefish:conf_get("anti_entropy", Conf),
     case Setting of
       on -> {on, []};
       debug -> {on, [debug]};
@@ -118,30 +118,14 @@
 }.
 
 %% @doc The TCP endpoint that will be broadcasted.
-{mapping, "ip", "snarl.endpoint",
+{mapping, "ip", "mdns_server_lib.listener",
  [{default, {"{{snarl_ip}}", {{snarl_port}} }},
   {datatype, ip}]}.
 
 {translation,
- "mdns_server_lib.ip",
- fun(Conf) ->
-         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
-         IP
- end
-}.
-
-{translation,
- "mdns_server_lib.port",
- fun(Conf) ->
-         {_IP, Port} = cuttlefish_util:conf_get_value("ip", Conf),
-         Port
- end
-}.
-
-{translation,
  "mdns_client_lib.interface",
  fun(Conf) ->
-         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         {IP, _Port} = cuttlefish:conf_get("ip", Conf),
          [A, B, C, D] = [list_to_integer(O) ||
                             O <- re:split(IP, "\\.", [{return, list}])],
          {A, B, C, D}
@@ -151,7 +135,7 @@
 {translation,
  "mdns_server_lib.interface",
  fun(Conf) ->
-         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         {IP, _Port} = cuttlefish:conf_get("ip", Conf),
          [A, B, C, D] = [list_to_integer(O) ||
                             O <- re:split(IP, "\\.", [{return, list}])],
          {A, B, C, D}
@@ -166,28 +150,28 @@
 {translation,
  "riak_core.platform_data_dir",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
 {translation,
  "leveldb.data_root",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
 {translation,
  "hanoidb.data_root",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
 {translation,
  "bitcask.data_root",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
@@ -214,7 +198,7 @@
 {translation,
  "mdns_server_lib.handler",
  fun(Conf) ->
-         Setting = cuttlefish_util:conf_get_value("tcp_callback", Conf),
+         Setting = cuttlefish:conf_get("tcp_callback", Conf),
          list_to_atom(Setting)
  end
 }.
@@ -295,9 +279,9 @@
 { translation,
   "snarl.snarl_user",
   fun(Conf) ->
-          N = cuttlefish_util:conf_get_value("user.n", Conf),
-          R = cuttlefish_util:conf_get_value("user.r", Conf),
-          W = cuttlefish_util:conf_get_value("user.w", Conf),
+          N = cuttlefish:conf_get("user.n", Conf),
+          R = cuttlefish:conf_get("user.r", Conf),
+          W = cuttlefish:conf_get("user.w", Conf),
           {N, R, W}
   end
 }.
@@ -332,9 +316,9 @@
 { translation,
   "snarl.snarl_role",
   fun(Conf) ->
-          N = cuttlefish_util:conf_get_value("role.n", Conf),
-          R = cuttlefish_util:conf_get_value("role.r", Conf),
-          W = cuttlefish_util:conf_get_value("role.w", Conf),
+          N = cuttlefish:conf_get("role.n", Conf),
+          R = cuttlefish:conf_get("role.r", Conf),
+          W = cuttlefish:conf_get("role.w", Conf),
           {N, R, W}
   end
 }.
@@ -369,9 +353,9 @@
 { translation,
   "snarl.snarl_org",
   fun(Conf) ->
-          N = cuttlefish_util:conf_get_value("org.n", Conf),
-          R = cuttlefish_util:conf_get_value("org.r", Conf),
-          W = cuttlefish_util:conf_get_value("org.w", Conf),
+          N = cuttlefish:conf_get("org.n", Conf),
+          R = cuttlefish:conf_get("org.r", Conf),
+          W = cuttlefish:conf_get("org.w", Conf),
           {N, R, W}
   end
 }.
