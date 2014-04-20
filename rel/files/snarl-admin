@@ -110,11 +110,11 @@ case "$1" in
                 ;;
             join)
                 shift
-                run snarl_console join_group $@
+                run snarl_console join_role $@
                 ;;
             leave)
                 shift
-                run snarl_console leave_group $@
+                run snarl_console leave_role $@
                 ;;
             passwd)
                 shift
@@ -147,39 +147,39 @@ case "$1" in
                 ;;
         esac
         ;;
-    groups)
+    roles)
         shift
         case "$1" in
             list)
                 shift
-                run snarl_console list_group $@
+                run snarl_console list_role $@
                 ;;
             add)
                 shift
-                run snarl_console add_group $@
+                run snarl_console add_role $@
                 ;;
             grant)
                 shift
-                run snarl_console grant_group $@
+                run snarl_console grant_role $@
                 ;;
             revoke)
                 shift
-                run snarl_console revoke_group $@
+                run snarl_console revoke_role $@
                 ;;
             "delete")
                 shift
-                run snarl_console delete_group $@
+                run snarl_console delete_role $@
                 ;;
             "export")
                 shift
-                run snarl_console export_group $@
+                run snarl_console export_role $@
                 ;;
             "import")
                 shift
-                run snarl_console import_group $@
+                run snarl_console import_role $@
                 ;;
             *)
-                echo "Usage: snarl-admin groups { list | add | grant | revoke }."
+                echo "Usage: snarl-admin roles { list | add | grant | revoke }."
                 exit 1
                 ;;
         esac
@@ -287,24 +287,24 @@ case "$1" in
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
         echo "                 ring_status | status}"
-        echo "               config show                          - shows global config options."
-        echo "               config set <key> <value>             - sets global config options."
-        echo "               users list                           - list users."
-        echo "               users add <user>                     - adds a new user."
-        echo "               users delete <uuid>                  - deletes a user."
-        echo "               users passwd <user> <passwd>         - sets user password."
-        echo "               users grant <user> <permission>      - grants a permission."
-        echo "               users revoke <user> <permission>     - revokes a permission"
-        echo "               users join <user> <group>            - adds user to a group."
-        echo "               users leave <user> <group>           - removes user from a group."
-        echo "               users export <uuid>                  - Exports a user to a json file."
-        echo "               users import <file>                  - imports a user json file."
-        echo "               groups add <group>                   - adds a group."
-        echo "               groups delete <uuid>                 - deletes a group."
-        echo "               groups grant <group> <permission>    - grants a permission."
-        echo "               groups revoke <group> <permission>   - revokes a permission."
-        echo "               groups export <uuid>                 - Exports a group to a json file."
-        echo "               gorups import <file>                 - imports a group json file."
+        echo "               config show                        - shows global config options."
+        echo "               config set <key> <value>           - sets global config options."
+        echo "               users list                         - list users."
+        echo "               users add <user>                   - adds a new user."
+        echo "               users delete <uuid>                - deletes a user."
+        echo "               users passwd <user> <passwd>       - sets user password."
+        echo "               users grant <user> <permission>    - grants a permission."
+        echo "               users revoke <user> <permission>   - revokes a permission"
+        echo "               users join <user> <role>           - adds user to a role."
+        echo "               users leave <user> <role>          - removes user from a role."
+        echo "               users export <uuid>                - Exports a user to a json file."
+        echo "               users import <file>                - imports a user json file."
+        echo "               roles add <role>                   - adds a role."
+        echo "               roles delete <uuid>                - deletes a role."
+        echo "               roles grant <role> <permission>    - grants a permission."
+        echo "               roles revoke <role> <permission>   - revokes a permission."
+        echo "               roles export <uuid>                - Exports a role to a json file."
+        echo "               gorups import <file>               - imports a role json file."
         exit 1
         ;;
 esac

@@ -11,7 +11,7 @@ case $2 in
         then
             echo "Image version supported"
         else
-            echo "This image version is not supported please use the base64 13.2.1 image."
+            echo "This image version is not supported please use the base64 13.2.1 image or later."
             exit 1
         fi
         if grep "^$GROUP:" /etc/group > /dev/null 2>&1
