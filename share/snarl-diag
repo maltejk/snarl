@@ -1,0 +1,53 @@
+#!/usr/bin/bash
+date=$(date +%F-%H-%M-%S)
+base=/var/tmp/snarl-diag
+dir=$base/$date
+mkdir -p $dir
+log_file=$dir/snarl-diag.log
+echo '========================================' > $log_file
+echo "Snarl Diagnostics ${date}" >> $log_file
+echo '========================================' >> $log_file
+function log_run(){
+  echo >> $log_file
+  echo >> $log_file
+  echo '----------------------------------------' >> $log_file
+  echo $* >> $log_file
+  echo '----------------------------------------' >> $log_file
+  $* >> $log_file
+}
+echo "Gathering System information."
+log_run ifconfig
+echo >> $log_file >> $log_file
+echo >> $log_file
+echo '----------------------------------------' >> $log_file
+echo 'pkgin list | grep fifo-snarl' >> $log_file
+echo '----------------------------------------' >> $log_file
+pkgin list | grep fifo-snarl >> $log_file
+log_run svcs svc:/network/snarl:default
+log_run df -h
+log_run zonememstat
+log_run prstat 1 1
+
+
+echo "Gathering Cluster information."
+log_run snaadm status
+log_run snaadm ringready
+log_run snaadm services
+log_run snaadm ring_status
+log_run snaadm member_status
+
+echo "Copying Logfiles"
+cp -r /var/log/snarl $dir/logs
+cp /var/svc/log/network-snarl:default.log $dir/logs
+
+echo "Copying config files"
+mkdir $dir/config
+cp /opt/local/fifo-snarl/etc/snarl.conf* $dir/config
+cp -r /var/db/snarl/generated.configs/ $dir/config
+
+echo "Compressing data"
+(cd $base; tar cfz snarl-diag-$date.tgz $date)
+
+echo
+echo
+echo Diagnostics run complete the the file can be found in $base/snarl-diag-$date.tgz the data provided can be inspected in $base/$date.
