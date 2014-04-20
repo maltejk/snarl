@@ -27,7 +27,7 @@ log_run svcs svc:/network/snarl:default
 log_run df -h
 log_run zonememstat
 log_run prstat 1 1
-
+log_run sysinfo
 
 echo "Gathering Cluster information."
 log_run snaadm status
