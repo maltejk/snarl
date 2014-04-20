@@ -35,6 +35,11 @@ log_run snaadm ringready
 log_run snaadm services
 log_run snaadm ring_status
 log_run snaadm member_status
+log_run snaadm aae-status
+
+pid=$(pgrep -f /opt/local/fifo-snarl/*/bin/beam.smp)
+log_run lsof -P $pid
+log_run lsof -F $pid
 
 echo "Copying Logfiles"
 cp -r /var/log/snarl $dir/logs
