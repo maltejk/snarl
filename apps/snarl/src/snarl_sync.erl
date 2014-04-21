@@ -153,7 +153,9 @@ handle_cast({write, Node, VNode, System, ID, Op, Val},
              end,
     {noreply, State0};
 
-handle_cast(reconnect, State = #state{ip=IP, port=Port, timeout=Timeout}) ->
+handle_cast(reconnect, State = #state{socket = Old, ip=IP, port=Port,
+                                      timeout=Timeout}) ->
+    gen_tcp:close(Old),
     case gen_tcp:connect(IP, Port,
                          [binary, {active,false}, {packet,4}],
                          Timeout) of
