@@ -72,11 +72,7 @@ init(_Args) ->
     FSMs = [ReadFSMs, WriteFSMs, CoverageFSMs],
     AAE = [EntropyManagerUser, EntropyManagerRole, EntropyManagerOrg],
     AdditionalServices =
-        [{statman_server, {statman_server, start_link, [1000]},
-          permanent, 5000, worker, []},
-         {statman_aggregator, {statman_aggregator, start_link, []},
-          permanent, 5000, worker, []},
-         {snarl_sync_sup, {snarl_sync_sup, start_link, []},
+        [{snarl_sync_sup, {snarl_sync_sup, start_link, []},
           permanent, 5000, supervisor, []},
          {snarl_sync_read_sup, {snarl_sync_read_sup, start_link, []},
           permanent, 5000, supervisor, []},
