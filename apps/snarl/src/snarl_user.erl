@@ -389,9 +389,20 @@ set(User, Attributes) ->
                     {error, timeout} |
                     ok.
 passwd(User, Passwd) ->
-    {ok, Salt} = bcrypt:gen_salt(),
-    {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
-    do_write(User, passwd, {bcrypt, list_to_binary(Hash)}).
+    H = case application:get_env(snarl, hash_fun) of
+            {ok, sha512} ->
+                Salt = crypto:rand_bytes(64),
+                Hash = hash(sha512, Salt, Passwd),
+
+                {Salt, Hash};
+            %% {ok, bcrypt} ->
+            %% undefined ->
+            _ ->
+                {ok, Salt} = bcrypt:gen_salt(),
+                {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
+                {bcrypt, list_to_binary(Hash)}
+        end,
+    do_write(User, passwd, H).
 
 import(User, Data) ->
     do_write(User, import, Data).
