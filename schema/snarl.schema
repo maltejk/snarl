@@ -59,6 +59,14 @@
  end
 }.
 
+%% @doc Snarl usually uses bcrypt to hash passwords to increase security
+%% for some systems so this is too slow so it is possible to revert back
+%% to bcrypt.
+
+{mapping, "hash_fun", "snarl.hash_fun", [
+  {datatype, {enum, [bcrypt, sha512]}},
+  {default, bcrypt}
+]}.
 
 %% @doc The full syncronisation will dynamically update it's data
 %% whenever a change is made to a object local to this node
@@ -96,7 +104,6 @@
   {commented, "1s"},
   {datatype, {duration, ms}}]
 }.
-
 
 %% @doc enable active anti-entropy subsystem
 {mapping, "anti_entropy", "riak_core.anti_entropy", [
