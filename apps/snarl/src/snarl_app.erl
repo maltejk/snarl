@@ -49,7 +49,6 @@ start(_StartType, _StartArgs) ->
             ok = riak_core_ring_events:add_guarded_handler(snarl_ring_event_handler, []),
             ok = riak_core_node_watcher_events:add_guarded_handler(snarl_node_event_handler, []),
 
-            statman_server:add_subscriber(statman_aggregator),
             snarl_snmp_handler:start(),
             case application:get_env(snarl, sync) of
                 {ok, on} ->

@@ -176,15 +176,9 @@ waiting({ok, ReqID, IdxNode, Obj},
             case merge(Replies) of
                 not_found ->
                     ?DT_READ_NOT_FOUND_RETURN(SD0#state.entity, SD0#state.op),
-                    statman_histogram:record_value(
-                      {list_to_binary(stat_name(SD0#state.vnode) ++ "/read"), total},
-                      SD0#state.start),
                     From ! {ReqID, ok, not_found};
                 Merged ->
                     ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
-                    statman_histogram:record_value(
-                      {list_to_binary(stat_name(SD0#state.vnode) ++ "/read"), total},
-                      SD0#state.start),
                     Reply = case SD#state.raw of
                                 false ->
                                     snarl_obj:val(Merged);
@@ -226,12 +220,8 @@ finalize(timeout, SD=#state{
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
-            Start = now(),
             lager:warning("[read] performing read repair on '~p'.", [Entity]),
             repair(VNode, Entity, MObj, Replies),
-            statman_histogram:record_value(
-              {list_to_binary(stat_name(SD#state.vnode) ++ "/repair"), total},
-              Start),
             {stop, normal, SD};
         false ->
             {stop, normal, SD}
@@ -339,11 +329,11 @@ repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
 unique(L) ->
     sets:to_list(sets:from_list(L)).
 
-stat_name(snarl_user_vnode) ->
-    "user";
-stat_name(snarl_role_vnode) ->
-    "role";
-stat_name(snarl_org_vnode) ->
-    "org";
-stat_name(snarl_token_vnode) ->
-    "token".
+%%stat_name(snarl_user_vnode) ->
+%%    "user";
+%%stat_name(snarl_role_vnode) ->
+%%    "role";
+%%stat_name(snarl_org_vnode) ->
+%%    "org";
+%%stat_name(snarl_token_vnode) ->
+%%    "token".

@@ -162,9 +162,6 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     lager:info("Write(~p) ok", [NumW]),
     if
         NumW =:= W ->
-            statman_histogram:record_value(
-              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
-              SD0#state.start),
             case From of
                 undefined ->
                     ok;
@@ -182,9 +179,6 @@ waiting({ok, ReqID, Reply},
     lager:info("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= W ->
-            statman_histogram:record_value(
-              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
-              SD0#state.start),
             if
                 is_pid(From) ->
                     From ! {ReqID, ok, Reply};
@@ -214,11 +208,11 @@ terminate(_Reason, _SN, _SD) ->
 %%% Internal Functions
 %%%===================================================================
 
-stat_name(snarl_user_vnode) ->
-    "user";
-stat_name(snarl_role_vnode) ->
-    "role";
-stat_name(snarl_org_vnode) ->
-    "org";
-stat_name(snarl_token_vnode) ->
-    "token".
+%%stat_name(snarl_user_vnode) ->
+%%    "user";
+%%stat_name(snarl_role_vnode) ->
+%%    "role";
+%%stat_name(snarl_org_vnode) ->
+%%    "org";
+%%stat_name(snarl_token_vnode) ->
+%%    "token".
