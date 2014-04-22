@@ -85,7 +85,7 @@ get(Role) ->
                   {ok, Role::#?ROLE{}}.
 get_(Role) ->
     case snarl_entity_read_fsm:start(
-           {snarl_role_vnode, snarl_role},
+           {snarl_role_vnode, snarl_role, <<"snarl_group">>},
            get, Role
           ) of
         {ok, not_found} ->
@@ -95,7 +95,7 @@ get_(Role) ->
     end.
 
 raw(Role) ->
-    snarl_entity_read_fsm:start({snarl_role_vnode, snarl_role}, get,
+    snarl_entity_read_fsm:start({snarl_role_vnode, snarl_role, <<"snarl_group">>}, get,
                                 Role, undefined, true).
 
 -spec list() -> {ok, [fifo:role_id()]} |

@@ -56,6 +56,7 @@
                 timeout=?DEFAULT_TIMEOUT,
                 val,
                 vnode,
+                bucket,
                 system,
                 replies=[]}).
 
@@ -64,7 +65,10 @@
 %%%===================================================================
 
 start_link(ReqID, {VNode, System}, Op, From, Entity, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val, Raw], []).
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val, Raw], []);
+
+start_link(ReqID, {VNode, System, Bucket}, Op, From, Entity, Val, Raw) ->
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System, Bucket}, Op, From, Entity, Val, Raw], []).
 
 start(VNodeInfo, Op) ->
     start(VNodeInfo, Op, undefined).
@@ -94,15 +98,19 @@ start(VNodeInfo, Op, User, Val, Raw) ->
 %%%===================================================================
 
 %% Intiailize state data.
-init([ReqId, {VNode, System}, Op, From, Entity, Val, Raw]) ->
+init([ReqId, {VNode, System} | R]) ->
+    init([ReqId, {VNode, System, list_to_binary(atom_to_list(System))} | R]);
+
+init([ReqId, {VNode, System, Bucket}, Op, From, Entity, Val, Raw]) ->
     ?DT_READ_ENTRY(Entity, Op),
     {N, R, _W} = ?NRW(System),
-    SD = #state{raw = Raw,
+    SD = #state{raw=Raw,
+                bucket=Bucket,
                 req_id=ReqId,
                 from=From,
                 op=Op,
-                n = N,
-                r = R,
+                n=N,
+                r=R,
                 val=Val,
                 start=now(),
                 vnode=VNode,
@@ -110,9 +118,10 @@ init([ReqId, {VNode, System}, Op, From, Entity, Val, Raw]) ->
                 entity=Entity},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System}, Op, From, Entity]) ->
+init([ReqId, {VNode, System, Bucket}, Op, From, Entity]) ->
     ?DT_READ_ENTRY(Entity, Op),
     SD = #state{req_id=ReqId,
+                bucket=Bucket,
                 from=From,
                 op=Op,
                 start=now(),
@@ -121,9 +130,10 @@ init([ReqId, {VNode, System}, Op, From, Entity]) ->
                 entity=Entity},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System}, Op, From]) ->
+init([ReqId, {VNode, System, Bucket}, Op, From]) ->
     ?DT_READ_ENTRY("undefined", Op),
     SD = #state{req_id=ReqId,
+                bucket=Bucket,
                 from=From,
                 vnode=VNode,
                 start=now(),
@@ -133,9 +143,9 @@ init([ReqId, {VNode, System}, Op, From]) ->
 
 %% @doc Calculate the Preflist.
 prepare(timeout, SD0=#state{entity=Entity,
+                            bucket=Bucket,
                             n = N,
                             system=System}) ->
-    Bucket = list_to_binary(atom_to_list(System)),
     DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
     Prelist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Prelist},
