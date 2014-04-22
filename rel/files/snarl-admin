@@ -282,11 +282,35 @@ case "$1" in
         shift
         run snarl_console status $@
         ;;
+    ring)
+        run snarl_console get_ring
+        ;;
+    db)
+        shift
+        case "$1" in
+            list)
+                shift
+                run snarl_console db_keys $@
+                ;;
+            get)
+                shift
+                run snarl_console db_get $@
+                ;;
+            delete)
+                shift
+                run snarl_console db_delete $@
+                ;;
+        esac
+        ;;
 
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
         echo "                 ring_status | status}"
+        echo "               db list [-p <prefix>]              - lists db entries."
+        echo "               db list <hash> [<prefix>]          - lists db entries for a hash."
+        echo "               db get <hash> <prefix> <key>       - gets raw data from the db."
+        echo "               db delete <hash> <prefix> <key>    - deletes directly from db."
         echo "               config show                        - shows global config options."
         echo "               config set <key> <value>           - sets global config options."
         echo "               users list                         - list users."
