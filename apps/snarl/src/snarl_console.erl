@@ -9,6 +9,9 @@
          down/1,
          reip/1,
          config/1,
+         db_keys/1,
+         db_get/1,
+         db_delete/1,
          status/1,
          aae_status/1,
          staged_join/1,
@@ -33,9 +36,12 @@
          list_user/1,
          grant_user/1,
          revoke_user/1,
-         passwd/1]).
+         passwd/1,
+         get_ring/1]).
 
 -ignore_xref([
+              db_keys/1,
+              db_get/1,
               join/1,
               leave/1,
               delete_user/1,
@@ -60,10 +66,106 @@
               grant_user/1,
               revoke_user/1,
               revoke_role/1,
+              get_ring/1,
               passwd/1,
               config/1,
-              status/1
+              status/1,
+              db_delete/1
              ]).
+
+get_ring([]) ->
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHash} = riak_core_ring:chash(RingData),
+    io:format("Hash                "
+              "                    "
+              "          "
+              " Node~n"),
+    io:format("--------------------"
+              "--------------------"
+              "----------"
+              " ---------------~n", []),
+    lists:map(fun({K, H}) ->
+                      io:format("~50b ~-15s~n", [K, H])
+              end, CHash),
+    ok.
+
+is_prefix(Prefix, K) ->
+    binary:longest_common_prefix([Prefix, K]) =:= byte_size(Prefix).
+
+db_delete([CHashS, CatS, KeyS]) ->
+    Cat = list_to_binary(CatS),
+    Key = list_to_binary(KeyS),
+    CHash = list_to_integer(CHashS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    case lists:keyfind(CHash, 1, CHashs) of
+        false ->
+            io:format("C-Hash ~b does not exist.~n", [CHash]),
+            error;
+        _ ->
+            CHashA = list_to_atom(CHashS),
+            fifo_db:delete(CHashA, Cat, Key)
+    end.
+db_get([CHashS, CatS, KeyS]) ->
+    Cat = list_to_binary(CatS),
+    Key = list_to_binary(KeyS),
+    CHash = list_to_integer(CHashS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    case lists:keyfind(CHash, 1, CHashs) of
+        false ->
+            io:format("C-Hash ~b does not exist.~n", [CHash]),
+            error;
+        _ ->
+            CHashA = list_to_atom(CHashS),
+            case fifo_db:get(CHashA, Cat, Key) of
+                {ok, E} ->
+                    io:format("~p~n", [E]);
+                _ ->
+                    io:format("Not found.~n", []),
+                    error
+            end
+    end.
+
+db_keys([]) ->
+    db_keys(["-p", ""]);
+
+db_keys(["-p", PrefixS]) ->
+    Prefix = list_to_binary(PrefixS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    lists:map(fun({Hash, H}) ->
+                      io:format("~n~50b ~-15s~n", [Hash, H]),
+                      io:format("--------------------"
+                                "--------------------"
+                                "--------------------"
+                                "------~n", []),
+                      CHashA = list_to_atom(integer_to_list(Hash)),
+                      Keys = fifo_db:list_keys(CHashA, <<>>),
+                      [io:format("~s~n", [K])
+                       || K <- Keys,
+                          is_prefix(Prefix, K) =:= true]
+              end, CHashs),
+    ok;
+
+db_keys([CHashS]) ->
+    db_keys([CHashS, ""]);
+
+db_keys([CHashS, PrefixS]) ->
+    Prefix = list_to_binary(PrefixS),
+    CHash = list_to_integer(CHashS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    case lists:keyfind(CHash, 1, CHashs) of
+        false ->
+            io:format("C-Hash ~b does not exist.", [CHash]),
+            error;
+        _ ->
+            CHashA = list_to_atom(CHashS),
+            Keys = fifo_db:list_keys(CHashA, Prefix),
+            [io:format("~s~n", [K]) || K <- Keys],
+            ok
+    end.
 
 list_user([]) ->
     {ok, Users} = snarl_user:list(),
