@@ -3,15 +3,19 @@
 
 -include("snarl.hrl").
 
+-export([
+         db_keys/1,
+         db_get/1,
+         db_delete/1,
+         get_ring/1
+        ]).
+
 -export([join/1,
          leave/1,
          remove/1,
          down/1,
          reip/1,
          config/1,
-         db_keys/1,
-         db_get/1,
-         db_delete/1,
          status/1,
          aae_status/1,
          staged_join/1,
@@ -36,12 +40,13 @@
          list_user/1,
          grant_user/1,
          revoke_user/1,
-         passwd/1,
-         get_ring/1]).
+         passwd/1]).
 
 -ignore_xref([
               db_keys/1,
               db_get/1,
+              db_delete/1,
+              get_ring/1,
               join/1,
               leave/1,
               delete_user/1,
@@ -66,11 +71,9 @@
               grant_user/1,
               revoke_user/1,
               revoke_role/1,
-              get_ring/1,
               passwd/1,
               config/1,
-              status/1,
-              db_delete/1
+              status/1
              ]).
 
 get_ring([]) ->
@@ -330,7 +333,7 @@ grant_role([Role | P]) ->
     case snarl_role:lookup_(list_to_binary(Role)) of
         {ok, RoleObj} ->
             case snarl_role:grant(snarl_role_state:uuid(RoleObj),
-                                   build_permission(P)) of
+                                  build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
@@ -381,7 +384,7 @@ revoke_role([Role | P]) ->
     case snarl_role:lookup_(list_to_binary(Role)) of
         {ok, RoleObj} ->
             case snarl_role:revoke(snarl_role_state:uuid(RoleObj),
-                                    build_permission(P)) of
+                                   build_permission(P)) of
                 ok ->
                     io:format("Revoked.~n", []),
                     ok;
@@ -718,7 +721,7 @@ fields(F, Vs) ->
 %%     fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
 
 fields([{_, S}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
-                                     orelse is_binary(V) ->
+                                               orelse is_binary(V) ->
     %% there is a space that matters here ------------v
     fields(R, Vs, {[$~ | integer_to_list(S) ++ [$s, $\  | Fmt]], [V | Vars]});
 
