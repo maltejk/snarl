@@ -2,7 +2,7 @@
 
 USER=snarl
 GROUP=$USER
-DBID=2
+DBID=3
 BACKUP_FILE=/var/db/snarl/backup_$DBID.tar.gz
 
 case $2 in
