@@ -53,6 +53,7 @@ getter(#snarl_obj{val=S0}, <<"uuid">>) ->
 
 is_a(#?ROLE{}) ->
     true;
+
 is_a(_) ->
     false.
 
@@ -80,11 +81,11 @@ load(TID,
         metadata = Metadata
        }) ->
     Rl = #role_0_1_0{
-           uuid = UUID,
-           name = Name,
-           permissions = Permissions,
-           metadata = Metadata
-          },
+            uuid = UUID,
+            name = Name,
+            permissions = Permissions,
+            metadata = Metadata
+           },
     load(TID, update_permissions(TID, Rl));
 
 load({T, ID},

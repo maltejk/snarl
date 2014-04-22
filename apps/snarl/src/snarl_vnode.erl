@@ -216,8 +216,16 @@ handle_command({repair, UUID, _VClock, Obj = #snarl_obj{}}, _Sender,
 
 handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
     Res = case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
-              {ok, #snarl_obj{val = V0} = R} ->
-                  R#snarl_obj{val = Mod:load({ReqID, load}, V0)};
+              {ok, #snarl_obj{val = V0} = O} ->
+                  ID = {ReqID, load},
+                  case Mod:load(ID, V0) of
+                      _V when _V =:= V0 ->
+                          O;
+                      Hx ->
+                          O1 = O#snarl_obj{val=Hx},
+                          fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
+                          O1
+                  end;
               not_found ->
                   not_found
           end,
