@@ -98,7 +98,7 @@ put(Key, Obj, State) ->
     fifo_db:put(State#vstate.db, State#vstate.bucket, Key, Obj),
     snarl_sync_tree:update(State#vstate.service, Key, Obj),
     riak_core_aae_vnode:update_hashtree(
-      State#vstate.bucket, Key, term_to_binary(Obj), State#vstate.hashtrees).
+      State#vstate.bucket, Key, Obj#snarl_obj.vclock, State#vstate.hashtrees).
 
 change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
        State=#vstate{state=Mod}) ->
@@ -298,9 +298,9 @@ handle_command({hashtree_pid, Node}, _, State) ->
 handle_command({rehash, {_, UUID}}, _,
                State=#vstate{bucket=Bucket, hashtrees=HT}) ->
     case get(UUID, State) of
-        {ok, Term} ->
-            Bin = term_to_binary(Term),
-            riak_core_aae_vnode:update_hashtree(Bucket, UUID, Bin, HT);
+        {ok, Obj} ->
+            riak_core_aae_vnode:update_hashtree(
+              Bucket, UUID, Obj#snarl_obj.vclock, HT);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
             riak_core_index_hashtree:delete({State#vstate.bucket, UUID}, HT)
