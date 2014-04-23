@@ -214,7 +214,9 @@ set(Role, Attributes) ->
 %%%===================================================================
 
 do_write(Role, Op) ->
-    snarl_entity_write_fsm:write({snarl_role_vnode, snarl_role}, Role, Op).
+    snarl_entity_write_fsm:write(
+      {node(), snarl_role_vnode, snarl_role, <<"snarl_group">>}, Role, Op).
 
 do_write(Role, Op, Val) ->
-    snarl_entity_write_fsm:write({snarl_role_vnode, snarl_role}, Role, Op, Val).
+    snarl_entity_write_fsm:write(
+      {node(), snarl_role_vnode, snarl_role, <<"snarl_group">>}, Role, Op, Val).

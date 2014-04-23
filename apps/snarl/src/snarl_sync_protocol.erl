@@ -52,8 +52,8 @@ handle_info({_OK, Socket, BinData}, State = #state{
         {delete, System, UUID} ->
             System:delete(UUID),
             {noreply, State};
-        {write, Node, VNode, System, Entity, Op, Val} ->
-            NVS = {{remote, Node}, VNode, System},
+        {write, Node, VNode, System, Bucket, Entity, Op, Val} ->
+            NVS = {{remote, Node}, VNode, System, Bucket},
             snarl_entity_write_fsm:write(NVS, Entity, Op, Val),
             {noreply, State}
     end;
