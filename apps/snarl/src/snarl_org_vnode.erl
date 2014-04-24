@@ -64,9 +64,8 @@
 master() ->
     ?MASTER.
 
-hash_object(BKey, RObj) ->
-    lager:debug("Hashing Key: ~p", [BKey]),
-    list_to_binary(integer_to_list(erlang:phash2({BKey, RObj}))).
+hash_object(Key, Obj) ->
+    snarl_vnode:hash_object(Key, Obj).
 
 aae_repair(_, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),

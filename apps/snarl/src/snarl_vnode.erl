@@ -15,9 +15,15 @@
          handle_info/2,
          mkid/0,
          mkid/1,
+         hash_object/2,
          mk_reqid/0]).
 
 -ignore_xref([mkid/0]).
+
+hash_object(Key, Obj) ->
+    Hash = term_to_binary(erlang:phash2({Key, Obj})),
+    lager:debug("Hashing Key: ~p -> ~p", [Key, Hash]),
+    Hash.
 
 mkid() ->
     mkid(node()).
