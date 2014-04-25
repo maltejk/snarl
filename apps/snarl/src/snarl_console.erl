@@ -7,7 +7,8 @@
          db_keys/1,
          db_get/1,
          db_delete/1,
-         get_ring/1
+         get_ring/1,
+         db_update/1
         ]).
 
 -export([join/1,
@@ -76,6 +77,13 @@
               config/1,
               status/1
              ]).
+
+db_update(["users"]) ->
+    {ok, US} = snarl_user:list_(),
+    US1 = [{snarl_user_state:uuid(V), U} || {_, U = #snarl_obj{val = V}} <- US],
+    [snarl_user:wipe(UUID) || {UUID, _} <- US1],
+    [snarl_user:sync_repair(UUID, O) || {UUID, O} <- US1],
+    ok.
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),

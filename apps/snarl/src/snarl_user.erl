@@ -30,7 +30,8 @@
          add_key/3, revoke_key/2, keys/1,
          add_yubikey/2, remove_yubikey/2, yubikeys/1,
          active/1,
-         orgs/1
+         orgs/1,
+         wipe/1
         ]).
 
 -ignore_xref([
@@ -42,6 +43,9 @@
 -define(TIMEOUT, 5000).
 
 %% Public API
+wipe(UUID) ->
+    snarl_coverage:start(snarl_user_vnode_master, snarl_user,
+                         {wipe, UUID}).
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
