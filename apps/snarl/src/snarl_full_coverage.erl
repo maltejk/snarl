@@ -13,9 +13,8 @@
 
 -record(state, {replies, r, reqid, from, reqs, raw = false}).
 
-start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true}) ->
-    start(VNodeMaster, NodeCheckService,
-          Request = {list, Requirements, true, false});
+start(VNodeMaster, NodeCheckService, {list, Requirements, true}) ->
+    start(VNodeMaster, NodeCheckService, {list, Requirements, true, false});
 
 start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
     ReqID = mk_reqid(),
