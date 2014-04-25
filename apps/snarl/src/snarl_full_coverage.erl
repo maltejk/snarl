@@ -26,16 +26,12 @@ start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
             ok;
         {ok, Result} ->
             {ok, Result}
-            %%;
-            %%Else ->
-            %%lager:error("Unknown coverage reply: ~p", [Else]),
-            %%{error, unknown_reply}
     after 10000 ->
             {error, timeout}
     end.
 
 %% The first is the vnode service used
-init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request, Raw}) ->
+init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Requirements, Full, Raw}}) ->
     {NVal, R, _W} = ?NRW(NodeCheckService),
     %% all - full coverage; allup - partial coverage
     VNodeSelector = allup,
@@ -46,6 +42,7 @@ init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request, Raw})
     State = #state{replies = dict:new(), r = R,
                    from = From, reqid = ReqID,
                    reqs = Requirements, raw = Raw},
+    Request = {Cmd, Requirements, Full},
     {Request, VNodeSelector, NVal, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
