@@ -47,6 +47,7 @@
               db_get/1,
               db_delete/1,
               get_ring/1,
+              db_update/1,
               join/1,
               leave/1,
               delete_user/1,

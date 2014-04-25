@@ -11,9 +11,13 @@
          start/3
         ]).
 
--record(state, {replies, r, reqid, from, reqs}).
+-record(state, {replies, r, reqid, from, reqs, raw = false}).
 
 start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true}) ->
+    start(VNodeMaster, NodeCheckService,
+          Request = {list, Requirements, true, false});
+
+start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
     ReqID = mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, Requirements},
@@ -32,7 +36,7 @@ start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true}) ->
     end.
 
 %% The first is the vnode service used
-init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request}) ->
+init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request, Raw}) ->
     {NVal, R, _W} = ?NRW(NodeCheckService),
     %% all - full coverage; allup - partial coverage
     VNodeSelector = allup,
@@ -42,7 +46,7 @@ init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, Request}) ->
     Timeout = 5000,
     State = #state{replies = dict:new(), r = R,
                    from = From, reqid = ReqID,
-                   reqs = Requirements},
+                   reqs = Requirements, raw = Raw},
     {Request, VNodeSelector, NVal, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
@@ -65,7 +69,12 @@ finish(clean, State = #state{replies = Replies,
                                           _L when _L < R ->
                                               Res;
                                           _ ->
-                                              Mgd = merge(Es),
+                                              Mgd = case State#state.raw of
+                                                        false ->
+                                                            merge(Es);
+                                                        true ->
+                                                            raw_merge(Es)
+                                                    end,
                                               lager:debug("Merged: ~p-> ~p", [Es, Mgd]),
                                               [Mgd | Res]
                                       end
@@ -85,6 +94,21 @@ mk_reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
     (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
+raw_merge([{Score, V} | R]) ->
+    raw_merge(R, Score, [V]).
+
+raw_merge([], recalculate, Vs) ->
+    {0, snarl_obj:merge(snarl_entity_read_fsm, Vs)};
+
+raw_merge([], Score, Vs) ->
+    {Score, snarl_obj:merge(snarl_entity_read_fsm, Vs)};
+
+
+raw_merge([{Score, V} | R], Score, Vs) ->
+    raw_merge(R, Score, [V | Vs]);
+
+raw_merge([{_Score1, V} | R], _Score2, Vs) when _Score1 =/= _Score2->
+    raw_merge(R, recalculate, [V | Vs]).
 
 merge([{Score, V} | R]) ->
     merge(R, Score, [V]).

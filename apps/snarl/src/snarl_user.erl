@@ -10,6 +10,7 @@
          sync_repair/2,
          ping/0,
          list/0,
+         list_/0,
          list/2,
          auth/3,
          find_key/1,
@@ -34,7 +35,7 @@
 
 -ignore_xref([
               join_org/2, leave_org/2, select_org/2,
-              lookup_/1,
+              lookup_/1, list_/0,
               ping/0, raw/1, sync_repair/2
              ]).
 
@@ -283,6 +284,13 @@ list() ->
     snarl_coverage:start(
       snarl_user_vnode_master, snarl_user,
       list).
+
+list_() ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, [], true, true}),
+    Res1 = rankmatcher:apply_scales(Res),
+    {ok,  lists:sort(Res1)}.
 
 -spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
 
