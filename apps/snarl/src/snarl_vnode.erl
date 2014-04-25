@@ -20,8 +20,9 @@
 -ignore_xref([mkid/0]).
 
 hash_object(Key, Obj) ->
-    Hash = term_to_binary(erlang:phash2({Key, Obj})),
-    lager:debug("Hashing Key: ~p -> ~p", [Key, Hash]),
+    Obj1 = lists:sort(Obj),
+    Hash = term_to_binary(erlang:phash2({Key, Obj1})),
+    lager:debug("Hashing Key: ~p + ~p -> ~p", [Key, Obj1, Hash]),
     Hash.
 
 mkid() ->
