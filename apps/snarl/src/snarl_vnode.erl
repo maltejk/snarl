@@ -85,12 +85,6 @@ list(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
              end,
     fold(FoldFn, [], Sender, State).
 
-fold_with_bucket(Fun, Acc0, Sender, State) ->
-    FoldFn = fun(K, V, O) ->
-                     Fun({State#vstate.bucket, K}, V, O)
-             end,
-    fold(FoldFn, Acc0, Sender, State).
-
 fold(Fun, Acc0, Sender, State=#vstate{db=DB, bucket=Bucket}) ->
     AsyncWork = fun() ->
                         fifo_db:fold(DB, Bucket, Fun, Acc0)
@@ -318,7 +312,10 @@ handle_command({rehash, {_, UUID}}, _,
     {noreply, State};
 
 handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender, State) ->
-    fold_with_bucket(Fun, Acc0, Sender, State);
+    FoldFn = fun(K, V, O) ->
+                     Fun({State#vstate.service_bin, K}, V, O)
+             end,
+    fold(FoldFn, Acc0, Sender, State);
 
 handle_command({Action, ID, UUID, Param1, Param2}, _Sender, State) ->
     change(UUID, Action, [Param1, Param2], ID, State);
