@@ -6,7 +6,6 @@
 -export([init/5,
          is_empty/1,
          delete/1,
-         %%fold_with_bucket/4,
          put/3,
          change/5,
          fold/4,
