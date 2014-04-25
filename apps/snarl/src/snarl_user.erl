@@ -293,8 +293,8 @@ list_() ->
     {ok, Res} = snarl_full_coverage:start(
                   snarl_user_vnode_master, snarl_user,
                   {list, [], true, true}),
-    Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)}.
+    Res1 = [R || {_, R} <- Res],
+    {ok,  Res1}.
 
 -spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
 
