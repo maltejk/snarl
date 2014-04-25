@@ -6,6 +6,7 @@
          sync_repair/2,
          ping/0,
          list/0,
+         list_/0,
          list/2,
          get/1,
          get_/1,
@@ -19,7 +20,8 @@
          import/2,
          trigger/3,
          add_trigger/2, remove_trigger/2,
-         remove_target/2
+         remove_target/2,
+         wipe/1
         ]).
 
 -ignore_xref([
@@ -44,6 +46,10 @@
 
 -type template() :: [binary()|placeholder].
 %% Public API
+
+wipe(UUID) ->
+    snarl_coverage:start(snarl_org_vnode_master, snarl_org,
+                         {wipe, UUID}).
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
@@ -171,6 +177,13 @@ get_(Org) ->
 raw(Org) ->
     snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
                                 Org, undefined, true).
+
+list_() ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {list, [], true, true}),
+    Res1 = [R || {_, R} <- Res],
+    {ok,  Res1}.
 
 -spec list() -> {ok, [fifo:org_id()]} |
                 not_found |

@@ -5,7 +5,7 @@
 -export([
          sync_repair/2,
          ping/0,
-         list/0, list/2,
+         list/0, list/2, list_/0,
          get/1, get_/1, raw/1,
          lookup/1, lookup_/1,
          add/1, delete/1,
@@ -13,7 +13,7 @@
          set/2, set/3,
          create/2,
          revoke_prefix/2,
-         import/2
+         import/2, wipe/1
         ]).
 
 -ignore_xref([ping/0, create/2, raw/1, sync_repair/2]).
@@ -21,6 +21,10 @@
 -define(TIMEOUT, 5000).
 
 %% Public API
+
+wipe(UUID) ->
+    snarl_coverage:start(snarl_role_vnode_master, snarl_role,
+                         {wipe, UUID}).
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
@@ -107,6 +111,12 @@ list() ->
       snarl_role_vnode_master, snarl_role,
       list).
 
+list_() ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_role_vnode_master, snarl_role,
+                  {list, [], true, true}),
+    Res1 = [R || {_, R} <- Res],
+    {ok,  Res1}.
 
 
 %%--------------------------------------------------------------------
@@ -215,8 +225,8 @@ set(Role, Attributes) ->
 
 do_write(Role, Op) ->
     snarl_entity_write_fsm:write(
-      {node(), snarl_role_vnode, snarl_role, <<"snarl_group">>}, Role, Op).
+      {node(), snarl_role_vnode, snarl_role}, Role, Op).
 
 do_write(Role, Op, Val) ->
     snarl_entity_write_fsm:write(
-      {node(), snarl_role_vnode, snarl_role, <<"snarl_group">>}, Role, Op, Val).
+      {node(), snarl_role_vnode, snarl_role}, Role, Op, Val).

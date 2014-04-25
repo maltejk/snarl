@@ -78,12 +78,31 @@
               status/1
              ]).
 
+db_update([]) ->
+    [db_update([E]) || E <- ["users", "roles", "orgs"]],
+    ok;
+
 db_update(["users"]) ->
     {ok, US} = snarl_user:list_(),
-    US1 = [{snarl_user_state:uuid(V), U} || {_, U = #snarl_obj{val = V}} <- US],
+    US1 = [{snarl_user_state:uuid(V), U} || U = #snarl_obj{val = V} <- US],
     [snarl_user:wipe(UUID) || {UUID, _} <- US1],
     [snarl_user:sync_repair(UUID, O) || {UUID, O} <- US1],
+    ok;
+
+db_update(["roles"]) ->
+    {ok, US} = snarl_role:list_(),
+    US1 = [{snarl_role_state:uuid(V), U} || U = #snarl_obj{val = V} <- US],
+    [snarl_role:wipe(UUID) || {UUID, _} <- US1],
+    [snarl_role:sync_repair(UUID, O) || {UUID, O} <- US1],
+    ok;
+
+db_update(["orgs"]) ->
+    {ok, US} = snarl_org:list_(),
+    US1 = [{snarl_org_state:uuid(V), U} || U = #snarl_obj{val = V} <- US],
+    [snarl_org:wipe(UUID) || {UUID, _} <- US1],
+    [snarl_org:sync_repair(UUID, O) || {UUID, O} <- US1],
     ok.
+
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
