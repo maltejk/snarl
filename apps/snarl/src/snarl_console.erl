@@ -103,7 +103,6 @@ db_update(["orgs"]) ->
     [snarl_org:sync_repair(UUID, O) || {UUID, O} <- US1],
     ok.
 
-
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
     {_S, CHash} = riak_core_ring:chash(RingData),
