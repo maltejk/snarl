@@ -300,6 +300,10 @@ case "$1" in
                 shift
                 run snarl_console db_delete $@
                 ;;
+            update)
+                shift
+                run snarl_console db_update $@
+                ;;
         esac
         ;;
 
@@ -308,6 +312,7 @@ case "$1" in
         echo "                 services | wait-for-service | member_status |"
         echo "                 ring_status | status}"
         echo "               ring                               - shows the ring."
+        echo "               db update [<section>]              - lists db entries."
         echo "               db list [-p <prefix>]              - lists db entries."
         echo "               db list <hash> [<prefix>]          - lists db entries for a hash."
         echo "               db get <hash> <prefix> <key>       - gets raw data from the db."

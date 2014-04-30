@@ -10,6 +10,7 @@
          sync_repair/2,
          ping/0,
          list/0,
+         list_/0,
          list/2,
          auth/3,
          find_key/1,
@@ -29,18 +30,22 @@
          add_key/3, revoke_key/2, keys/1,
          add_yubikey/2, remove_yubikey/2, yubikeys/1,
          active/1,
-         orgs/1
+         orgs/1,
+         wipe/1
         ]).
 
 -ignore_xref([
               join_org/2, leave_org/2, select_org/2,
-              lookup_/1,
+              lookup_/1, list_/0,
               ping/0, raw/1, sync_repair/2
              ]).
 
 -define(TIMEOUT, 5000).
 
 %% Public API
+wipe(UUID) ->
+    snarl_coverage:start(snarl_user_vnode_master, snarl_user,
+                         {wipe, UUID}).
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
@@ -283,6 +288,13 @@ list() ->
     snarl_coverage:start(
       snarl_user_vnode_master, snarl_user,
       list).
+
+list_() ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, [], true, true}),
+    Res1 = [R || {_, R} <- Res],
+    {ok,  Res1}.
 
 -spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
 

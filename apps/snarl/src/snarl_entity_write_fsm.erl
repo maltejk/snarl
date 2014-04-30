@@ -141,7 +141,7 @@ prepare(timeout, SD0=#state{
                         n = N,
                         system = System
                        }) ->
-    DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
+    DocIdx = riak_core_util:chash_key({Bucket, Entity}),
     Preflist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Preflist},
     {next_state, execute, SD, 0}.
