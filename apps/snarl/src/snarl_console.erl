@@ -763,7 +763,7 @@ do_update(MainMod, StateMod) ->
            end|| U = #snarl_obj{val = V} <- US],
     io:format(" done.~n"),
 
-    io:format("  Wiping old entries"),
+    io:format("  Wipeing old entries"),
     [begin
          io:format("."),
          MainMod:wipe(UUID)
