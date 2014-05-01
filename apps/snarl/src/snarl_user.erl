@@ -35,6 +35,8 @@
         ]).
 
 -ignore_xref([
+              wipe/1,
+              list_/0,
               join_org/2, leave_org/2, select_org/2,
               lookup_/1, list_/0,
               ping/0, raw/1, sync_repair/2

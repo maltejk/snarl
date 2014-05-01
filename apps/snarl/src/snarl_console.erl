@@ -83,25 +83,16 @@ db_update([]) ->
     ok;
 
 db_update(["users"]) ->
-    {ok, US} = snarl_user:list_(),
-    US1 = [{snarl_user_state:uuid(V), U} || U = #snarl_obj{val = V} <- US],
-    [snarl_user:wipe(UUID) || {UUID, _} <- US1],
-    [snarl_user:sync_repair(UUID, O) || {UUID, O} <- US1],
-    ok;
+    io:format("Updating users...~n"),
+    do_update(snarl_user, snarl_user_state);
 
 db_update(["roles"]) ->
-    {ok, US} = snarl_role:list_(),
-    US1 = [{snarl_role_state:uuid(V), U} || U = #snarl_obj{val = V} <- US],
-    [snarl_role:wipe(UUID) || {UUID, _} <- US1],
-    [snarl_role:sync_repair(UUID, O) || {UUID, O} <- US1],
-    ok;
+    io:format("Updating roles...~n"),
+    do_update(snarl_role, snarl_role_state);
 
 db_update(["orgs"]) ->
-    {ok, US} = snarl_org:list_(),
-    US1 = [{snarl_org_state:uuid(V), U} || U = #snarl_obj{val = V} <- US],
-    [snarl_org:wipe(UUID) || {UUID, _} <- US1],
-    [snarl_org:sync_repair(UUID, O) || {UUID, O} <- US1],
-    ok.
+    io:format("Updating orgs...~n"),
+    do_update(snarl_org, snarl_org_state).
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
@@ -759,3 +750,31 @@ fields([{_, S}|R], [V | Vs], {Fmt, Vars}) ->
 
 fields([], [], {Fmt, Vars}) ->
     io:format(Fmt, Vars).
+
+
+do_update(MainMod, StateMod) ->
+    {ok, US} = MainMod:list_(),
+    io:format("  Entries found: ~p~n", [length(US)]),
+
+    io:format("  Grabbing UUIDs"),
+    US1 = [begin
+               io:format("."),
+               {StateMod:uuid(V), U}
+           end|| U = #snarl_obj{val = V} <- US],
+    io:format(" done.~n"),
+
+    io:format("  Wipeing old entries"),
+    [begin
+         io:format("."),
+         MainMod:wipe(UUID)
+     end || {UUID, _} <- US1],
+    io:format(" done.~n"),
+
+    io:format("  Restoring entries"),
+    [begin
+         io:format("."),
+         MainMod:sync_repair(UUID, O)
+     end || {UUID, O} <- US1],
+    io:format(" done.~n"),
+    io:format("Update complete.~n"),
+    ok.

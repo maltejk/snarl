@@ -25,6 +25,8 @@
         ]).
 
 -ignore_xref([
+              wipe/1,
+              list_/0,
               ping/0,
               list/0,
               get/1,
