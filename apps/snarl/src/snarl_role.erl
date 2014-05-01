@@ -16,7 +16,10 @@
          import/2, wipe/1
         ]).
 
--ignore_xref([ping/0, create/2, raw/1, sync_repair/2]).
+-ignore_xref([
+              wipe/1,
+              list_/0,
+              ping/0, create/2, raw/1, sync_repair/2]).
 
 -define(TIMEOUT, 5000).
 
