@@ -6,7 +6,6 @@
 -export([init/5,
          is_empty/1,
          delete/1,
-         %%fold_with_bucket/4,
          put/3,
          change/5,
          fold/4,
@@ -15,9 +14,16 @@
          handle_info/2,
          mkid/0,
          mkid/1,
+         hash_object/2,
          mk_reqid/0]).
 
 -ignore_xref([mkid/0]).
+
+hash_object(Key, Obj) ->
+    Obj1 = lists:sort(Obj),
+    Hash = term_to_binary(erlang:phash2({Key, Obj1})),
+    lager:debug("Hashing Key: ~p + ~p -> ~p", [Key, Obj1, Hash]),
+    Hash.
 
 mkid() ->
     mkid(node()).
@@ -38,6 +44,7 @@ init(Partition, Bucket, Service, VNode, StateMod) ->
     FoldWorkerPool = {pool, snarl_worker, WorkerPoolSize, []},
     {ok,
      #vstate{db=DB, hashtrees=HT, partition=Partition, node=node(),
+             service_bin=list_to_binary(atom_to_list(Service)),
              service=Service, bucket=Bucket, state=StateMod, vnode=VNode},
      [FoldWorkerPool]}.
 
@@ -79,12 +86,6 @@ list(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
              end,
     fold(FoldFn, [], Sender, State).
 
-fold_with_bucket(Fun, Acc0, Sender, State) ->
-    FoldFn = fun(K, V, O) ->
-                     Fun({State#vstate.bucket, K}, V, O)
-             end,
-    fold(FoldFn, Acc0, Sender, State).
-
 fold(Fun, Acc0, Sender, State=#vstate{db=DB, bucket=Bucket}) ->
     AsyncWork = fun() ->
                         fifo_db:fold(DB, Bucket, Fun, Acc0)
@@ -98,13 +99,20 @@ put(Key, Obj, State) ->
     fifo_db:put(State#vstate.db, State#vstate.bucket, Key, Obj),
     snarl_sync_tree:update(State#vstate.service, Key, Obj),
     riak_core_aae_vnode:update_hashtree(
-      State#vstate.bucket, Key, term_to_binary(Obj), State#vstate.hashtrees).
+      State#vstate.service_bin, Key, Obj#snarl_obj.vclock, State#vstate.hashtrees).
 
 change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
        State=#vstate{state=Mod}) ->
     case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
         {ok, #snarl_obj{val=H0} = O} ->
-            H1 = Mod:load(ID, H0),
+            H1 = case Mod:load(ID, H0) of
+                     _H when _H =:= H0 ->
+                         H0;
+                     Hx ->
+                         O1 = O#snarl_obj{val=Hx},
+                         fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
+                         Hx
+                 end,
             H2 = case Vals of
                      [Val] ->
                          Mod:Action(ID, Val, H1);
@@ -137,6 +145,10 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
 load_obj(ID, Mod, Obj = #snarl_obj{val = V}) ->
     Obj#snarl_obj{val = Mod:load(ID, V)}.
 
+handle_coverage({wipe, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
+    fifo_db:delete(State#vstate.db, State#vstate.bucket, UUID),
+    {reply, {ok, ReqID}, State};
+
 handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
     ID = snarl_vnode:mkid(lookup),
     FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
@@ -165,6 +177,7 @@ handle_coverage({list, Requirements, Full}, _KeySpaces, Sender,
         false ->
             list_keys(fun Mod:getter/2, Requirements, Sender, State)
     end;
+
 handle_coverage(Req, _KeySpaces, _Sender, State) ->
     lager:warning("Unknown coverage request: ~p", [Req]),
     {stop, not_implemented, State}.
@@ -209,8 +222,16 @@ handle_command({repair, UUID, _VClock, Obj = #snarl_obj{}}, _Sender,
 
 handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
     Res = case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
-              {ok, #snarl_obj{val = V0} = R} ->
-                  R#snarl_obj{val = Mod:load({ReqID, load}, V0)};
+              {ok, #snarl_obj{val = V0} = O} ->
+                  ID = {ReqID, load},
+                  case Mod:load(ID, V0) of
+                      _V when _V =:= V0 ->
+                          O;
+                      Hx ->
+                          O1 = O#snarl_obj{val=Hx},
+                          fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
+                          O1
+                  end;
               not_found ->
                   not_found
           end,
@@ -220,7 +241,7 @@ handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
 handle_command({delete, {ReqID, _Coordinator}, UUID}, _Sender, State) ->
     fifo_db:delete(State#vstate.db, State#vstate.bucket, UUID),
     riak_core_index_hashtree:delete(
-      {State#vstate.bucket, UUID}, State#vstate.hashtrees),
+      {State#vstate.service_bin, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
 
 handle_command({set, {ReqID, Coordinator}=ID, UUID, Attributes}, _Sender,
@@ -281,19 +302,22 @@ handle_command({hashtree_pid, Node}, _, State) ->
     end;
 
 handle_command({rehash, {_, UUID}}, _,
-               State=#vstate{bucket=Bucket, hashtrees=HT}) ->
+               State=#vstate{service_bin=ServiceBin, hashtrees=HT}) ->
     case get(UUID, State) of
-        {ok, Term} ->
-            Bin = term_to_binary(Term),
-            riak_core_aae_vnode:update_hashtree(Bucket, UUID, Bin, HT);
+        {ok, Obj} ->
+            riak_core_aae_vnode:update_hashtree(
+              ServiceBin, UUID, Obj#snarl_obj.vclock, HT);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
-            riak_core_index_hashtree:delete({State#vstate.bucket, UUID}, HT)
+            riak_core_index_hashtree:delete({ServiceBin, UUID}, HT)
     end,
     {noreply, State};
 
 handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender, State) ->
-    fold_with_bucket(Fun, Acc0, Sender, State);
+    FoldFn = fun(K, V, O) ->
+                     Fun({State#vstate.service_bin, K}, V, O)
+             end,
+    fold(FoldFn, Acc0, Sender, State);
 
 handle_command({Action, ID, UUID, Param1, Param2}, _Sender, State) ->
     change(UUID, Action, [Param1, Param2], ID, State);

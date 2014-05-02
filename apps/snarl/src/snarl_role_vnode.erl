@@ -1,4 +1,4 @@
--module(snarl_group_vnode).
+-module(snarl_role_vnode).
 -behaviour(riak_core_vnode).
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
@@ -55,9 +55,9 @@
               handle_info/2
              ]).
 
--define(SERVICE, snarl_group).
+-define(SERVICE, snarl_role).
 
--define(MASTER, snarl_group_vnode_master).
+-define(MASTER, snarl_role_vnode_master).
 
 %%%===================================================================
 %%% AAE
@@ -66,13 +66,12 @@
 master() ->
     ?MASTER.
 
-hash_object(BKey, RObj) ->
-    lager:debug("Hashing Key: ~p", [BKey]),
-    list_to_binary(integer_to_list(erlang:phash2({BKey, RObj}))).
+hash_object(Key, Obj) ->
+    snarl_vnode:hash_object(Key, Obj).
 
 aae_repair(_, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_group:get_(Key).
+    snarl_role:get_(Key).
 
 %%%===================================================================
 %%% API
@@ -82,9 +81,9 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 
-repair(IdxNode, Group, VClock, Obj) ->
+repair(IdxNode, Role, VClock, Obj) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, Group, VClock, Obj},
+                                   {repair, Role, VClock, Obj},
                                    ignore,
                                    ?MASTER).
 
@@ -92,9 +91,9 @@ repair(IdxNode, Group, VClock, Obj) ->
 %%% API - reads
 %%%===================================================================
 
-get(Preflist, ReqID, Group) ->
+get(Preflist, ReqID, Role) ->
     riak_core_vnode_master:command(Preflist,
-                                   {get, ReqID, Group},
+                                   {get, ReqID, Role},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -126,53 +125,53 @@ gc(Preflist, ReqID, UUID, GCable) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add(Preflist, ReqID, UUID, Group) ->
+add(Preflist, ReqID, UUID, Role) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, UUID, Group},
+                                   {add, ReqID, UUID, Role},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-delete(Preflist, ReqID, Group) ->
+delete(Preflist, ReqID, Role) ->
     riak_core_vnode_master:command(Preflist,
-                                   {delete, ReqID, Group},
+                                   {delete, ReqID, Role},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-grant(Preflist, ReqID, Group, Val) ->
+grant(Preflist, ReqID, Role, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {grant, ReqID, Group, Val},
+                                   {grant, ReqID, Role, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-revoke(Preflist, ReqID, Group, Val) ->
+revoke(Preflist, ReqID, Role, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {revoke, ReqID, Group, Val},
+                                   {revoke, ReqID, Role, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-revoke_prefix(Preflist, ReqID, Group, Val) ->
+revoke_prefix(Preflist, ReqID, Role, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {revoke_prefix, ReqID, Group, Val},
+                                   {revoke_prefix, ReqID, Role, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 %%%===================================================================
 %%% VNode
 %%%===================================================================
 init([Part]) ->
-    snarl_vnode:init(Part, <<"group">>, ?SERVICE, ?MODULE, snarl_group_state).
+    snarl_vnode:init(Part, <<"group">>, ?SERVICE, ?MODULE, snarl_role_state).
 
 %%%===================================================================
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator} = ID, UUID, Group}, _Sender, State) ->
-    Group0 = snarl_group_state:new(ID),
-    Group1 = snarl_group_state:name(ID, Group, Group0),
-    Group2 = snarl_group_state:uuid(ID, UUID, Group1),
+handle_command({add, {ReqID, Coordinator} = ID, UUID, Role}, _Sender, State) ->
+    Role0 = snarl_role_state:new(ID),
+    Role1 = snarl_role_state:name(ID, Role, Role0),
+    Role2 = snarl_role_state:uuid(ID, UUID, Role1),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    GroupObj = #snarl_obj{val=Group2, vclock=VC},
-    snarl_vnode:put(UUID, GroupObj, State),
+    RoleObj = #snarl_obj{val=Role2, vclock=VC},
+    snarl_vnode:put(UUID, RoleObj, State),
     {reply, {ok, ReqID}, State};
 
 handle_command(Message, Sender, State) ->
@@ -205,24 +204,24 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {Group, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
+    {Role, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
     ID = snarl_vnode:mkid(handoff),
-    V = snarl_group_state:load(ID, Vin),
-    case fifo_db:get(State#vstate.db, <<"group">>, Group) of
+    V = snarl_role_state:load(ID, Vin),
+    case fifo_db:get(State#vstate.db, <<"group">>, Role) of
         {ok, #snarl_obj{val = V0}} ->
-            V1 = snarl_group_state:load(ID, V0),
-            GroupObj = Obj#snarl_obj{val = snarl_group_state:merge(V, V1)},
-            snarl_vnode:put(Group, GroupObj, State);
+            V1 = snarl_role_state:load(ID, V0),
+            RoleObj = Obj#snarl_obj{val = snarl_role_state:merge(V, V1)},
+            snarl_vnode:put(Role, RoleObj, State);
         not_found ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(node(), VC0),
-            GroupObj = #snarl_obj{val=V, vclock=VC},
-            snarl_vnode:put(Group, GroupObj, State)
+            RoleObj = #snarl_obj{val=V, vclock=VC},
+            snarl_vnode:put(Role, RoleObj, State)
     end,
     {reply, ok, State}.
 
-encode_handoff_item(Group, Data) ->
-    term_to_binary({Group, Data}).
+encode_handoff_item(Role, Data) ->
+    term_to_binary({Role, Data}).
 
 is_empty(State) ->
     snarl_vnode:is_empty(State).

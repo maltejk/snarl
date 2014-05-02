@@ -6,6 +6,7 @@
          sync_repair/2,
          ping/0,
          list/0,
+         list_/0,
          list/2,
          get/1,
          get_/1,
@@ -18,10 +19,14 @@
          create/2,
          import/2,
          trigger/3,
-         add_trigger/2, remove_trigger/2
+         add_trigger/2, remove_trigger/2,
+         remove_target/2,
+         wipe/1
         ]).
 
 -ignore_xref([
+              wipe/1,
+              list_/0,
               ping/0,
               list/0,
               get/1,
@@ -44,6 +49,10 @@
 -type template() :: [binary()|placeholder].
 %% Public API
 
+wipe(UUID) ->
+    snarl_coverage:start(snarl_org_vnode_master, snarl_org,
+                         {wipe, UUID}).
+
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
 
@@ -57,6 +66,9 @@ ping() ->
 
 add_trigger(Org, Trigger) ->
     do_write(Org, add_trigger, {uuid:uuid4s(), Trigger}).
+
+remove_target(Org, Target) ->
+    do_write(Org, remove_target, Target).
 
 remove_trigger(Org, Trigger) ->
     do_write(Org, remove_trigger, Trigger).
@@ -81,15 +93,15 @@ do_events([_|Ts], Event, Payload, N) ->
 do_events([], _Event, _Payload, N) ->
     N.
 
--spec do_event(Action::{grant, group, Group::fifo:group_id(), Template::template()} |
+-spec do_event(Action::{grant, role, Role::fifo:role_id(), Template::template()} |
                        {grant, user, User::fifo:user_id(), Template::template()} |
-                       {join, group, Group::fifo:group_id()} |
+                       {join, role, Role::fifo:role_id()} |
                        {join, org, Org::fifo:org_id()},
                Payload::template()) ->
                       ok.
 
-do_event({join, group, Group}, Payload) ->
-    snarl_user:join(Payload, Group),
+do_event({join, role, Role}, Payload) ->
+    snarl_user:join(Payload, Role),
     ok;
 
 do_event({join, org, Org}, Payload) ->
@@ -97,12 +109,12 @@ do_event({join, org, Org}, Payload) ->
     snarl_user:select_org(Payload, Org),
     ok;
 
-do_event({grant, group, Group, Template}, Payload) ->
-    snarl_group:grant(Group, build_template(Template, Payload)),
+do_event({grant, role, Role, Template}, Payload) ->
+    snarl_role:grant(Role, build_template(Template, Payload)),
     ok;
 
-do_event({grant, user, Group, Template}, Payload) ->
-    snarl_user:grant(Group, build_template(Template, Payload)),
+do_event({grant, user, Role, Template}, Payload) ->
+    snarl_user:grant(Role, build_template(Template, Payload)),
     ok.
 
 build_template(Template, Payload) ->
@@ -168,6 +180,13 @@ raw(Org) ->
     snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
                                 Org, undefined, true).
 
+list_() ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_org_vnode_master, snarl_org,
+                  {list, [], true, true}),
+    Res1 = [R || {_, R} <- Res],
+    {ok,  Res1}.
+
 -spec list() -> {ok, [fifo:org_id()]} |
                 not_found |
                 {error, timeout}.
@@ -217,7 +236,22 @@ create(UUID, Org) ->
                     {error, timeout}.
 
 delete(Org) ->
-    do_write(Org, delete).
+    Res = do_write(Org, delete),
+    spawn(
+      fun () ->
+              Prefix = [<<"orgs">>, Org],
+              {ok, Users} = snarl_user:list(),
+              [begin
+                   snarl_user:leave_org(U, Org),
+                   snarl_user:revoke_prefix(U, Prefix)
+               end || U <- Users],
+              {ok, Roles} = list(),
+              [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(),
+              [snarl_org:remove_target(O, Org) || O <- Orgs]
+      end),
+    Res.
+
 
 -spec set(Org::fifo:org_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
                  not_found |

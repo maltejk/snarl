@@ -59,6 +59,14 @@
  end
 }.
 
+%% @doc Snarl usually uses bcrypt to hash passwords to increase security
+%% for some systems so this is too slow so it is possible to revert back
+%% to bcrypt.
+
+{mapping, "hash_fun", "snarl.hash_fun", [
+  {datatype, {enum, [bcrypt, sha512]}},
+  {default, bcrypt}
+]}.
 
 %% @doc The full syncronisation will dynamically update it's data
 %% whenever a change is made to a object local to this node
@@ -97,17 +105,16 @@
   {datatype, {duration, ms}}]
 }.
 
-
 %% @doc enable active anti-entropy subsystem
 {mapping, "anti_entropy", "riak_core.anti_entropy", [
   {datatype, {enum, [on, off, debug]}},
-  {default, on}
+  {default, off}
 ]}.
 
 { translation,
   "riak_core.anti_entropy",
   fun(Conf) ->
-    Setting = cuttlefish_util:conf_get_value("anti_entropy", Conf),
+    Setting = cuttlefish:conf_get("anti_entropy", Conf),
     case Setting of
       on -> {on, []};
       debug -> {on, [debug]};
@@ -118,30 +125,14 @@
 }.
 
 %% @doc The TCP endpoint that will be broadcasted.
-{mapping, "ip", "snarl.endpoint",
+{mapping, "ip", "mdns_server_lib.listener",
  [{default, {"{{snarl_ip}}", {{snarl_port}} }},
   {datatype, ip}]}.
 
 {translation,
- "mdns_server_lib.ip",
- fun(Conf) ->
-         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
-         IP
- end
-}.
-
-{translation,
- "mdns_server_lib.port",
- fun(Conf) ->
-         {_IP, Port} = cuttlefish_util:conf_get_value("ip", Conf),
-         Port
- end
-}.
-
-{translation,
  "mdns_client_lib.interface",
  fun(Conf) ->
-         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         {IP, _Port} = cuttlefish:conf_get("ip", Conf),
          [A, B, C, D] = [list_to_integer(O) ||
                             O <- re:split(IP, "\\.", [{return, list}])],
          {A, B, C, D}
@@ -151,7 +142,7 @@
 {translation,
  "mdns_server_lib.interface",
  fun(Conf) ->
-         {IP, _Port} = cuttlefish_util:conf_get_value("ip", Conf),
+         {IP, _Port} = cuttlefish:conf_get("ip", Conf),
          [A, B, C, D] = [list_to_integer(O) ||
                             O <- re:split(IP, "\\.", [{return, list}])],
          {A, B, C, D}
@@ -166,28 +157,28 @@
 {translation,
  "riak_core.platform_data_dir",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
 {translation,
  "leveldb.data_root",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
 {translation,
  "hanoidb.data_root",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
 {translation,
  "bitcask.data_root",
  fun(Conf) ->
-         cuttlefish_util:conf_get_value("data_dir", Conf)
+         cuttlefish:conf_get("data_dir", Conf)
  end
 }.
 
@@ -214,7 +205,7 @@
 {translation,
  "mdns_server_lib.handler",
  fun(Conf) ->
-         Setting = cuttlefish_util:conf_get_value("tcp_callback", Conf),
+         Setting = cuttlefish:conf_get("tcp_callback", Conf),
          list_to_atom(Setting)
  end
 }.
@@ -295,16 +286,16 @@
 { translation,
   "snarl.snarl_user",
   fun(Conf) ->
-          N = cuttlefish_util:conf_get_value("user.n", Conf),
-          R = cuttlefish_util:conf_get_value("user.r", Conf),
-          W = cuttlefish_util:conf_get_value("user.w", Conf),
+          N = cuttlefish:conf_get("user.n", Conf),
+          R = cuttlefish:conf_get("user.r", Conf),
+          W = cuttlefish:conf_get("user.w", Conf),
           {N, R, W}
   end
 }.
 
 %% @doc The number of copies of the data that is keeped.
 %% For good consistency N  < (R + W) should be true.
-{mapping, "group.n", "snarl.snarl_group",
+{mapping, "role.n", "snarl.snarl_role",
  [{datatype, integer},
   {level, advanced},
   {default, 3},
@@ -313,7 +304,7 @@
 %% @doc The number of replies requried for a read request to succeed
 %% The lower the value the faster the replies but the more likely stale
 %% data is returend.
-{mapping, "group.r", "snarl.snarl_group",
+{mapping, "role.r", "snarl.snarl_role",
  [{datatype, integer},
   {level, advanced},
   {default, 2},
@@ -323,18 +314,18 @@
 %% @doc The number of replies requried for a write request to succeed
 %% The lower the value the faster the write but the more likely to only
 %% write partial data.
-{mapping, "group.w", "snarl.snarl_group",
+{mapping, "role.w", "snarl.snarl_role",
  [{datatype, integer},
   {level, advanced},
   {default, 3},
   {commented, 3}]}.
 
 { translation,
-  "snarl.snarl_group",
+  "snarl.snarl_role",
   fun(Conf) ->
-          N = cuttlefish_util:conf_get_value("group.n", Conf),
-          R = cuttlefish_util:conf_get_value("group.r", Conf),
-          W = cuttlefish_util:conf_get_value("group.w", Conf),
+          N = cuttlefish:conf_get("role.n", Conf),
+          R = cuttlefish:conf_get("role.r", Conf),
+          W = cuttlefish:conf_get("role.w", Conf),
           {N, R, W}
   end
 }.
@@ -369,9 +360,9 @@
 { translation,
   "snarl.snarl_org",
   fun(Conf) ->
-          N = cuttlefish_util:conf_get_value("org.n", Conf),
-          R = cuttlefish_util:conf_get_value("org.r", Conf),
-          W = cuttlefish_util:conf_get_value("org.w", Conf),
+          N = cuttlefish:conf_get("org.n", Conf),
+          R = cuttlefish:conf_get("org.r", Conf),
+          W = cuttlefish:conf_get("org.w", Conf),
           {N, R, W}
   end
 }.

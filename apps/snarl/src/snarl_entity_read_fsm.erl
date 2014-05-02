@@ -56,6 +56,7 @@
                 timeout=?DEFAULT_TIMEOUT,
                 val,
                 vnode,
+                bucket,
                 system,
                 replies=[]}).
 
@@ -64,7 +65,10 @@
 %%%===================================================================
 
 start_link(ReqID, {VNode, System}, Op, From, Entity, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val, Raw], []).
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val, Raw], []);
+
+start_link(ReqID, {VNode, System, Bucket}, Op, From, Entity, Val, Raw) ->
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System, Bucket}, Op, From, Entity, Val, Raw], []).
 
 start(VNodeInfo, Op) ->
     start(VNodeInfo, Op, undefined).
@@ -94,15 +98,19 @@ start(VNodeInfo, Op, User, Val, Raw) ->
 %%%===================================================================
 
 %% Intiailize state data.
-init([ReqId, {VNode, System}, Op, From, Entity, Val, Raw]) ->
+init([ReqId, {VNode, System} | R]) ->
+    init([ReqId, {VNode, System, list_to_binary(atom_to_list(System))} | R]);
+
+init([ReqId, {VNode, System, Bucket}, Op, From, Entity, Val, Raw]) ->
     ?DT_READ_ENTRY(Entity, Op),
     {N, R, _W} = ?NRW(System),
-    SD = #state{raw = Raw,
+    SD = #state{raw=Raw,
+                bucket=Bucket,
                 req_id=ReqId,
                 from=From,
                 op=Op,
-                n = N,
-                r = R,
+                n=N,
+                r=R,
                 val=Val,
                 start=now(),
                 vnode=VNode,
@@ -110,9 +118,10 @@ init([ReqId, {VNode, System}, Op, From, Entity, Val, Raw]) ->
                 entity=Entity},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System}, Op, From, Entity]) ->
+init([ReqId, {VNode, System, Bucket}, Op, From, Entity]) ->
     ?DT_READ_ENTRY(Entity, Op),
     SD = #state{req_id=ReqId,
+                bucket=Bucket,
                 from=From,
                 op=Op,
                 start=now(),
@@ -121,9 +130,10 @@ init([ReqId, {VNode, System}, Op, From, Entity]) ->
                 entity=Entity},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System}, Op, From]) ->
+init([ReqId, {VNode, System, Bucket}, Op, From]) ->
     ?DT_READ_ENTRY("undefined", Op),
     SD = #state{req_id=ReqId,
+                bucket=Bucket,
                 from=From,
                 vnode=VNode,
                 start=now(),
@@ -133,10 +143,10 @@ init([ReqId, {VNode, System}, Op, From]) ->
 
 %% @doc Calculate the Preflist.
 prepare(timeout, SD0=#state{entity=Entity,
+                            bucket=Bucket,
                             n = N,
                             system=System}) ->
-    Bucket = list_to_binary(atom_to_list(System)),
-    DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
+    DocIdx = riak_core_util:chash_key({Bucket, Entity}),
     Prelist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Prelist},
     {next_state, execute, SD, 0}.
@@ -176,15 +186,9 @@ waiting({ok, ReqID, IdxNode, Obj},
             case merge(Replies) of
                 not_found ->
                     ?DT_READ_NOT_FOUND_RETURN(SD0#state.entity, SD0#state.op),
-                    statman_histogram:record_value(
-                      {list_to_binary(stat_name(SD0#state.vnode) ++ "/read"), total},
-                      SD0#state.start),
                     From ! {ReqID, ok, not_found};
                 Merged ->
                     ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
-                    statman_histogram:record_value(
-                      {list_to_binary(stat_name(SD0#state.vnode) ++ "/read"), total},
-                      SD0#state.start),
                     Reply = case SD#state.raw of
                                 false ->
                                     snarl_obj:val(Merged);
@@ -226,12 +230,8 @@ finalize(timeout, SD=#state{
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
-            Start = now(),
             lager:warning("[read] performing read repair on '~p'.", [Entity]),
             repair(VNode, Entity, MObj, Replies),
-            statman_histogram:record_value(
-              {list_to_binary(stat_name(SD#state.vnode) ++ "/repair"), total},
-              Start),
             {stop, normal, SD};
         false ->
             {stop, normal, SD}
@@ -266,28 +266,28 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) ->
-                       snarl_user_state:user() | snarl_user_state:group().
-%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:group() ]) -> snarl_user_state:user();
-%%               ([A :: snarl_user_state:group()]) -> snarl_user_state:group().
+-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:role() ]) ->
+                       snarl_user_state:user() | snarl_user_state:role().
+%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:role() ]) -> snarl_user_state:user();
+%%               ([A :: snarl_user_state:role()]) -> snarl_user_state:role().
 
 reconcile([V | Vs]) ->
     case {snarl_user_state:is_a(V),
-          snarl_group_state:is_a(V),
+          snarl_role_state:is_a(V),
           snarl_org_state:is_a(V)} of
         {true, _, _} ->
             reconcile_user(Vs, V);
         {_, true, _} ->
-            reconcile_group(Vs, V);
+            reconcile_role(Vs, V);
         {_, _, true} ->
             reconcile_org(Vs, V);
         _ ->
             V
     end.
 
-reconcile_group([G | R], Acc) ->
-    reconcile_group(R, snarl_group_state:merge(Acc, G));
-reconcile_group(_, Acc) ->
+reconcile_role([G | R], Acc) ->
+    reconcile_role(R, snarl_role_state:merge(Acc, G));
+reconcile_role(_, Acc) ->
     Acc.
 
 reconcile_user([U | R], Acc) ->
@@ -339,11 +339,11 @@ repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
 unique(L) ->
     sets:to_list(sets:from_list(L)).
 
-stat_name(snarl_user_vnode) ->
-    "user";
-stat_name(snarl_group_vnode) ->
-    "group";
-stat_name(snarl_org_vnode) ->
-    "org";
-stat_name(snarl_token_vnode) ->
-    "token".
+%%stat_name(snarl_user_vnode) ->
+%%    "user";
+%%stat_name(snarl_role_vnode) ->
+%%    "role";
+%%stat_name(snarl_org_vnode) ->
+%%    "org";
+%%stat_name(snarl_token_vnode) ->
+%%    "token".

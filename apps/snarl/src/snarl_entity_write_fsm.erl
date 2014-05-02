@@ -50,6 +50,7 @@
                 vnode,
                 start,
                 system,
+                bucket,
                 w,
                 n,
                 cordinator :: node(),
@@ -61,42 +62,48 @@
 %%% API
 %%%===================================================================
 
-start_link({VNode, System}, ReqID, From, Entity, Op) ->
-    start_link({node(), VNode, System}, ReqID, From, Entity, Op);
+start_link({VNode, System, Bucket}, ReqID, From, Entity, Op) ->
+    start_link({node(), VNode, System, Bucket}, ReqID, From, Entity, Op);
 
-start_link({Node, VNode, System}, ReqID, From, Entity, Op) ->
-    start_link({Node, VNode, System}, ReqID, From, Entity, Op, undefined).
+start_link({Node, VNode, System, Bucket}, ReqID, From, Entity, Op) ->
+    start_link({Node, VNode, System, Bucket}, ReqID, From, Entity, Op, undefined).
 
-start_link({VNode, System}, ReqID, From, Entity, Op, Val) ->
-    start_link({node(), VNode, System}, ReqID, From, Entity, Op, Val);
+start_link({VNode, System, Bucket}, ReqID, From, Entity, Op, Val) ->
+    start_link({node(), VNode, System, Bucket}, ReqID, From, Entity, Op, Val);
 
-
-start_link({Node, VNode, System}, ReqID, From, Entity, Op, Val) ->
-    gen_fsm:start_link(?MODULE, [{Node, VNode, System}, ReqID, From, Entity, Op, Val], []).
+start_link({Node, VNode, System, Bucket}, ReqID, From, Entity, Op, Val) ->
+    gen_fsm:start_link(?MODULE, [{Node, VNode, System, Bucket}, ReqID, From,
+                                 Entity, Op, Val], []).
 
 write({VNode, System}, User, Op) ->
     write({node(), VNode, System}, User, Op);
 
 write({Node, VNode, System}, User, Op) ->
-    write({Node, VNode, System}, User, Op, undefined).
+    write({Node, VNode, System, list_to_binary(atom_to_list(System))}, User, Op);
+
+write({Node, VNode, System, Bucket}, User, Op) ->
+    write({Node, VNode, System, Bucket}, User, Op, undefined).
 
 write({VNode, System}, User, Op, Val) ->
     write({node(), VNode, System}, User, Op, Val);
 
-write({{remote, Node}, VNode, System}, User, Op, Val) ->
+write({Node, VNode, System}, User, Op, Val) ->
+    write({Node, VNode, System, list_to_binary(atom_to_list(System))}, User, Op, Val);
+
+write({{remote, Node}, VNode, System, Bucket}, User, Op, Val) ->
     lager:info("[sync-write:~p] executing sync write", [System]),
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, undefined, User, Op, Val]);
+    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System, Bucket}, ReqID, undefined, User, Op, Val]);
 
-write({Node, VNode, System}, User, Op, Val) ->
+write({Node, VNode, System, Bucket}, User, Op, Val) ->
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, self(), User, Op, Val]),
+    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System, Bucket}, ReqID, self(), User, Op, Val]),
     receive
         {ReqID, ok} ->
-            snarl_sync:sync_op(Node, VNode, System, User, Op, Val),
+            snarl_sync:sync_op(Node, VNode, System, Bucket, User, Op, Val),
             ok;
         {ReqID, ok, Result} ->
-            snarl_sync:sync_op(Node, VNode, System, User, Op, Val),
+            snarl_sync:sync_op(Node, VNode, System, Bucket, User, Op, Val),
             {ok, Result}
             %%;
             %%Other ->
@@ -111,10 +118,11 @@ write({Node, VNode, System}, User, Op, Val) ->
 
 %% @doc Initialize the state data.
 
-init([{Node, VNode, System}, ReqID, From, Entity, Op, Val]) ->
+init([{Node, VNode, System, Bucket}, ReqID, From, Entity, Op, Val]) ->
     {N, _R, W} = ?NRW(System),
     SD = #state{req_id=ReqID,
                 from=From,
+                bucket=Bucket,
                 entity=Entity,
                 op=Op,
                 vnode=VNode,
@@ -128,12 +136,12 @@ init([{Node, VNode, System}, ReqID, From, Entity, Op, Val]) ->
 
 %% @doc Prepare the write by calculating the _preference list_.
 prepare(timeout, SD0=#state{
+                        bucket=Bucket,
                         entity = Entity,
                         n = N,
                         system = System
                        }) ->
-    Bucket = list_to_binary(atom_to_list(System)),
-    DocIdx = riak_core_util:chash_key({Bucket, term_to_binary(Entity)}),
+    DocIdx = riak_core_util:chash_key({Bucket, Entity}),
     Preflist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Preflist},
     {next_state, execute, SD, 0}.
@@ -162,9 +170,6 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     lager:info("Write(~p) ok", [NumW]),
     if
         NumW =:= W ->
-            statman_histogram:record_value(
-              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
-              SD0#state.start),
             case From of
                 undefined ->
                     ok;
@@ -182,9 +187,6 @@ waiting({ok, ReqID, Reply},
     lager:info("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= W ->
-            statman_histogram:record_value(
-              {list_to_binary(stat_name(SD0#state.vnode) ++ "/write"), total},
-              SD0#state.start),
             if
                 is_pid(From) ->
                     From ! {ReqID, ok, Reply};
@@ -214,11 +216,11 @@ terminate(_Reason, _SN, _SD) ->
 %%% Internal Functions
 %%%===================================================================
 
-stat_name(snarl_user_vnode) ->
-    "user";
-stat_name(snarl_group_vnode) ->
-    "group";
-stat_name(snarl_org_vnode) ->
-    "org";
-stat_name(snarl_token_vnode) ->
-    "token".
+%%stat_name(snarl_user_vnode) ->
+%%    "user";
+%%stat_name(snarl_role_vnode) ->
+%%    "role";
+%%stat_name(snarl_org_vnode) ->
+%%    "org";
+%%stat_name(snarl_token_vnode) ->
+%%    "token".

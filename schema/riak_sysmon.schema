@@ -36,6 +36,7 @@
   {datatype, {enum, [true, false]}},
   {level, advanced}
 ]}.
+
 {mapping, "riak_sysmon.busy_dist_port", "riak_sysmon.busy_dist_port", [
   {default, true},
   {datatype, {enum, [true, false]}},

@@ -40,7 +40,7 @@ start(_StartType, _StartArgs) ->
     case snarl_sup:start_link() of
         {ok, Pid} ->
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
-            ?SRV_WITH_AAE(snarl_group_vnode, snarl_group),
+            ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
             ?SRV_WITH_AAE(snarl_org_vnode, snarl_org),
 
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),
@@ -49,14 +49,7 @@ start(_StartType, _StartArgs) ->
             ok = riak_core_ring_events:add_guarded_handler(snarl_ring_event_handler, []),
             ok = riak_core_node_watcher_events:add_guarded_handler(snarl_node_event_handler, []),
 
-            statman_server:add_subscriber(statman_aggregator),
             snarl_snmp_handler:start(),
-            case application:get_env(newrelic,license_key) of
-                undefined ->
-                    ok;
-                _ ->
-                    newrelic_poller:start_link(fun newrelic_statman:poll/0)
-            end,
             case application:get_env(snarl, sync) of
                 {ok, on} ->
                     {ok, {IP, Port}} = application:get_env(snarl, sync_ip),

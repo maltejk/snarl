@@ -62,8 +62,8 @@ ring_status(get) ->
             {value, 4}
     end.
 
-keys(get, <<"group">>) ->
-    {ok, L} = snarl_group:list(),
+keys(get, <<"role">>) ->
+    {ok, L} = snarl_role:list(),
     {value, length(L)};
 keys(get, <<"user">>) ->
     {ok, L} = snarl_user:list(),
@@ -99,8 +99,8 @@ mean(get, Prefix) ->
 max(get, Prefix) ->
     percentile_get(max, Prefix, total).
 
-percentile_get(mean, Prefix, Grouping) ->
-    Data = generate_percentile(Prefix, Grouping),
+percentile_get(mean, Prefix, Roleing) ->
+    Data = generate_percentile(Prefix, Roleing),
     case lists:keyfind(mean, 1, Data) of
         {mean, R} ->
             {value, trunc(R)};
@@ -108,8 +108,8 @@ percentile_get(mean, Prefix, Grouping) ->
             {value, 0}
     end;
 
-percentile_get(What, Prefix, Grouping) ->
-    Data = generate_percentile(Prefix, Grouping),
+percentile_get(What, Prefix, Roleing) ->
+    Data = generate_percentile(Prefix, Roleing),
     case lists:keyfind(What, 1, Data) of
         {What, R} ->
             {value, R};
@@ -117,26 +117,41 @@ percentile_get(What, Prefix, Grouping) ->
             {value, 0}
     end.
 
-generate_percentile(Prefix, Grouping) ->
-    L = byte_size(Prefix),
-    {ok, Data} = statman_aggregator:get_window(60),
-    Data1 = [ D || [{key,{
-                       <<ThisPrefix:L/binary, _/binary>>,
-                       ThisGrouping}},
-                    _,
-                    {type,histogram},
-                    {value, D},
-                    _] <- Data,
-                   ThisPrefix =:= Prefix,
-                   ThisGrouping =:= Grouping
-            ],
-    Data2 = lists:sort(lists:flatten(Data1)),
-    Data3 = lists:foldl(fun ({T, C}, [{T, C1} | Acc]) ->
-                                [{T, C1 + C} | Acc];
-                            (E, Acc) ->
-                                [E | Acc]
-                        end, [], Data2),
-    statman_histogram:summary(Data3).
+%% TODO: this is a dummy now
+generate_percentile(_Prefix, _Roleing) ->
+ [{observations,12},
+  {min,15986},
+  {median,17581},
+  {mean,17796.416666666668},
+  {max,19912},
+  {sd,1135.098911055232},
+  {sum,213557},
+  {sum2,3814722299},
+  {p25,16831},
+  {p75,17995},
+  {p95,19912},
+  {p99,19912},
+  {p999,19912}]. 
+
+%%    L = byte_size(Prefix),
+%%    {ok, Data} = statman_aggregator:get_window(60),
+%%    Data1 = [ D || [{key,{
+%%                       <<ThisPrefix:L/binary, _/binary>>,
+%%                       ThisRoleing}},
+%%                    _,
+%%                    {type,histogram},
+%%                    {value, D},
+%%                    _] <- Data,
+%%                   ThisPrefix =:= Prefix,
+%%                   ThisRoleing =:= Roleing
+%%            ],
+%%    Data2 = lists:sort(lists:flatten(Data1)),
+%%    Data3 = lists:foldl(fun ({T, C}, [{T, C1} | Acc]) ->
+%%                                [{T, C1 + C} | Acc];
+%%                            (E, Acc) ->
+%%                                [E | Acc]
+%%                        end, [], Data2),
+%%    statman_histogram:summary(Data3).
 
 %% [{observations,12},
 %% {min,15986},

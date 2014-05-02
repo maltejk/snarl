@@ -10,6 +10,7 @@
          sync_repair/2,
          ping/0,
          list/0,
+         list_/0,
          list/2,
          auth/3,
          find_key/1,
@@ -29,18 +30,24 @@
          add_key/3, revoke_key/2, keys/1,
          add_yubikey/2, remove_yubikey/2, yubikeys/1,
          active/1,
-         orgs/1
+         orgs/1,
+         wipe/1
         ]).
 
 -ignore_xref([
+              wipe/1,
+              list_/0,
               join_org/2, leave_org/2, select_org/2,
-              lookup_/1,
+              lookup_/1, list_/0,
               ping/0, raw/1, sync_repair/2
              ]).
 
 -define(TIMEOUT, 5000).
 
 %% Public API
+wipe(UUID) ->
+    snarl_coverage:start(snarl_user_vnode_master, snarl_user,
+                         {wipe, UUID}).
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
@@ -229,17 +236,17 @@ cache(User) ->
     case get_(User) of
         {ok, UserObj} ->
             {ok, lists:foldl(
-                   fun(Group, Permissions) ->
-                           case snarl_group:get_(Group) of
-                               {ok, GroupObj} ->
-                                   GrPerms = snarl_group_state:permissions(GroupObj),
+                   fun(Role, Permissions) ->
+                           case snarl_role:get_(Role) of
+                               {ok, RoleObj} ->
+                                   GrPerms = snarl_role_state:permissions(RoleObj),
                                    ordsets:union(Permissions, GrPerms);
                                _ ->
                                    Permissions
                            end
                    end,
                    snarl_user_state:permissions(UserObj),
-                   snarl_user_state:groups(UserObj))};
+                   snarl_user_state:roles(UserObj))};
         E ->
             E
     end.
@@ -284,6 +291,13 @@ list() ->
       snarl_user_vnode_master, snarl_user,
       list).
 
+list_() ->
+    {ok, Res} = snarl_full_coverage:start(
+                  snarl_user_vnode_master, snarl_user,
+                  {list, [], true, true}),
+    Res1 = [R || {_, R} <- Res],
+    {ok,  Res1}.
+
 -spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
 
 list(Requirements, true) ->
@@ -313,14 +327,14 @@ add(undefined, User) ->
         {ok, UUID} ->
             lager:info("[~p:create] Created.", [UUID]),
             case snarl_opt:get(defaults, users,
-                               inital_group,
-                               user_inital_group, undefined) of
+                               inital_role,
+                               user_inital_role, undefined) of
                 undefined ->
-                    lager:info("[~p:create] No default group.",
+                    lager:info("[~p:create] No default role.",
                                [UUID]),
                     ok;
                 Grp ->
-                    lager:info("[~p:create] Assigning default group: ~s.",
+                    lager:info("[~p:create] Assigning default role: ~s.",
                                [UUID, Grp]),
                     join(UUID, Grp)
             end,
@@ -389,26 +403,37 @@ set(User, Attributes) ->
                     {error, timeout} |
                     ok.
 passwd(User, Passwd) ->
-    {ok, Salt} = bcrypt:gen_salt(),
-    {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
-    do_write(User, passwd, {bcrypt, list_to_binary(Hash)}).
+    H = case application:get_env(snarl, hash_fun) of
+            {ok, sha512} ->
+                Salt = crypto:rand_bytes(64),
+                Hash = hash(sha512, Salt, Passwd),
+
+                {Salt, Hash};
+            %% {ok, bcrypt} ->
+            %% undefined ->
+            _ ->
+                {ok, Salt} = bcrypt:gen_salt(),
+                {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
+                {bcrypt, list_to_binary(Hash)}
+        end,
+    do_write(User, passwd, H).
 
 import(User, Data) ->
     do_write(User, import, Data).
 
--spec join(User::fifo:user_id(), Group::fifo:group_id()) ->
+-spec join(User::fifo:user_id(), Role::fifo:role_id()) ->
                   not_found |
                   {error, timeout} |
                   ok.
-join(User, Group) ->
-    do_write(User, join, Group).
+join(User, Role) ->
+    do_write(User, join, Role).
 
--spec leave(User::fifo:user_id(), Group::fifo:group_id()) ->
+-spec leave(User::fifo:user_id(), Role::fifo:role_id()) ->
                    not_found |
                    {error, timeout} |
                    ok.
-leave(User, Group) ->
-    do_write(User, leave, Group).
+leave(User, Role) ->
+    do_write(User, leave, Role).
 
 
 -spec join_org(User::fifo:user_id(), Org::fifo:org_id()) ->
@@ -459,7 +484,18 @@ leave_org(User, Org) ->
                     {error, timeout} |
                     ok.
 delete(User) ->
-    do_write(User, delete).
+    Res = do_write(User, delete),
+    spawn(
+      fun () ->
+              Prefix = [<<"users">>, User],
+              {ok, Users} = snarl_user:list(),
+              [snarl_user:revoke_prefix(U, Prefix) || U <- Users],
+              {ok, Roles} = list(),
+              [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(),
+              [snarl_org:remove_target(O, User) || O <- Orgs]
+      end),
+    Res.
 
 -spec grant(User::fifo:user_id(),
             Permission::fifo:permission()) ->
@@ -497,22 +533,22 @@ do_write(User, Op, Val) ->
             R
     end.
 
-test_groups(_Permission, []) ->
+test_roles(_Permission, []) ->
     false;
 
-test_groups(Permission, [Group|Groups]) ->
-    case snarl_group:get_(Group) of
-        {ok, GroupObj} ->
+test_roles(Permission, [Role|Roles]) ->
+    case snarl_role:get_(Role) of
+        {ok, RoleObj} ->
             case libsnarlmatch:test_perms(
                    Permission,
-                   snarl_group_state:permissions(GroupObj)) of
+                   snarl_role_state:permissions(RoleObj)) of
                 true ->
                     true;
                 false ->
-                    test_groups(Permission, Groups)
+                    test_roles(Permission, Roles)
             end;
         _ ->
-            test_groups(Permission, Groups)
+            test_roles(Permission, Roles)
     end.
 
 test_user(UserObj, Permission) ->
@@ -522,7 +558,7 @@ test_user(UserObj, Permission) ->
         true ->
             true;
         false ->
-            test_groups(Permission, snarl_user_state:groups(UserObj))
+            test_roles(Permission, snarl_user_state:roles(UserObj))
     end.
 
 check_pw(UserR, Passwd) ->

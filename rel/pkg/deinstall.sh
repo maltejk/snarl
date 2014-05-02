@@ -9,6 +9,5 @@ case $2 in
 	echo "If you don't need them any more remove the directories:"
 	echo " /var/log/snarl"
 	echo " /var/db/snarl"
-    rm /opt/local/sbin/snaadm
 	;;
 esac

@@ -17,7 +17,7 @@
 -endif.
 
 %% API
--export([start/2, start_link/2, sync_op/6, hash/2]).
+-export([start/2, start_link/2, sync_op/7, hash/2]).
 
 -ignore_xref([start_link/2]).
 
@@ -48,8 +48,8 @@ start(IP, Port) ->
 start_link(IP, Port) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [IP, Port], []).
 
-sync_op(Node, VNode, System, User, Op, Val) ->
-    gen_server:abcast(?SERVER, {write, Node, VNode, System, User, Op, Val}).
+sync_op(Node, VNode, System, Bucket, User, Op, Val) ->
+    gen_server:abcast(?SERVER, {write, Node, VNode, System, Bucket, User, Op, Val}).
 
 reconnect() ->
     reconnect(self()).
@@ -73,9 +73,6 @@ reconnect(Pid) ->
 %% @end
 %%--------------------------------------------------------------------
 init([IP, Port]) ->
-    %% SegmetPath = "/var/db/snarl/sync/" ++ IP,
-    %% Opts = [{segment_path, SegmetPath}],
-    %% {ok, Tree} =  hashtree:new({0,0}, Opts),
     Timeout = case application:get_env(sync_recv_timeout) of
                   {ok, T} ->
                       T;
@@ -132,16 +129,16 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({write, Node, VNode, System, User, Op, Val},
+handle_cast({write, Node, VNode, System, Bucket, User, Op, Val},
             State = #state{socket=undefined}) ->
-    lager:debug("[sync] ~p", [{write, Node, VNode, System, User, Op, Val}]),
+    lager:debug("[sync] ~p", [{write, Node, VNode, System, Bucket, User, Op, Val}]),
     {noreply, State};
-handle_cast({write, Node, VNode, System, ID, Op, Val},
+handle_cast({write, Node, VNode, System, Bucket, ID, Op, Val},
             State = #state{socket=Socket}) ->
     SystemS = atom_to_list(System),
     OpS = atom_to_list(Op),
     dyntrace:p(?DT_SYNC_SEND, ?DT_ENTRY, SystemS, ID, OpS),
-    Command = {write, Node, VNode, System, ID, Op, Val},
+    Command = {write, Node, VNode, System, Bucket, ID, Op, Val},
     State0 = case gen_tcp:send(Socket, term_to_binary(Command)) of
                  ok ->
                      State;

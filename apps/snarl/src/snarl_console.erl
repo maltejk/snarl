@@ -3,6 +3,14 @@
 
 -include("snarl.hrl").
 
+-export([
+         db_keys/1,
+         db_get/1,
+         db_delete/1,
+         get_ring/1,
+         db_update/1
+        ]).
+
 -export([join/1,
          leave/1,
          remove/1,
@@ -16,17 +24,17 @@
 
 -export([export_user/1,
          import_user/1,
-         export_group/1,
-         import_group/1
+         export_role/1,
+         import_role/1
         ]).
 
--export([add_group/1,
-         delete_group/1,
-         join_group/1,
-         leave_group/1,
-         grant_group/1,
-         list_group/1,
-         revoke_group/1]).
+-export([add_role/1,
+         delete_role/1,
+         join_role/1,
+         leave_role/1,
+         grant_role/1,
+         list_role/1,
+         revoke_role/1]).
 
 -export([add_user/1,
          delete_user/1,
@@ -36,34 +44,149 @@
          passwd/1]).
 
 -ignore_xref([
+              db_keys/1,
+              db_get/1,
+              db_delete/1,
+              get_ring/1,
+              db_update/1,
               join/1,
               leave/1,
               delete_user/1,
-              delete_group/1,
+              delete_role/1,
               remove/1,
               export_user/1,
               import_user/1,
-              export_group/1,
-              import_group/1,
+              export_role/1,
+              import_role/1,
               down/1,
               reip/1,
               aae_status/1,
               staged_join/1,
               ringready/1,
               list_user/1,
-              list_group/1,
+              list_role/1,
               add_user/1,
-              add_group/1,
-              join_group/1,
-              leave_group/1,
-              grant_group/1,
+              add_role/1,
+              join_role/1,
+              leave_role/1,
+              grant_role/1,
               grant_user/1,
               revoke_user/1,
-              revoke_group/1,
+              revoke_role/1,
               passwd/1,
               config/1,
               status/1
              ]).
+
+db_update([]) ->
+    [db_update([E]) || E <- ["users", "roles", "orgs"]],
+    ok;
+
+db_update(["users"]) ->
+    io:format("Updating users...~n"),
+    do_update(snarl_user, snarl_user_state);
+
+db_update(["roles"]) ->
+    io:format("Updating roles...~n"),
+    do_update(snarl_role, snarl_role_state);
+
+db_update(["orgs"]) ->
+    io:format("Updating orgs...~n"),
+    do_update(snarl_org, snarl_org_state).
+
+get_ring([]) ->
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHash} = riak_core_ring:chash(RingData),
+    io:format("Hash                "
+              "                    "
+              "          "
+              " Node~n"),
+    io:format("--------------------"
+              "--------------------"
+              "----------"
+              " ---------------~n", []),
+    lists:map(fun({K, H}) ->
+                      io:format("~50b ~-15s~n", [K, H])
+              end, CHash),
+    ok.
+
+is_prefix(Prefix, K) ->
+    binary:longest_common_prefix([Prefix, K]) =:= byte_size(Prefix).
+
+db_delete([CHashS, CatS, KeyS]) ->
+    Cat = list_to_binary(CatS),
+    Key = list_to_binary(KeyS),
+    CHash = list_to_integer(CHashS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    case lists:keyfind(CHash, 1, CHashs) of
+        false ->
+            io:format("C-Hash ~b does not exist.~n", [CHash]),
+            error;
+        _ ->
+            CHashA = list_to_atom(CHashS),
+            fifo_db:delete(CHashA, Cat, Key)
+    end.
+db_get([CHashS, CatS, KeyS]) ->
+    Cat = list_to_binary(CatS),
+    Key = list_to_binary(KeyS),
+    CHash = list_to_integer(CHashS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    case lists:keyfind(CHash, 1, CHashs) of
+        false ->
+            io:format("C-Hash ~b does not exist.~n", [CHash]),
+            error;
+        _ ->
+            CHashA = list_to_atom(CHashS),
+            case fifo_db:get(CHashA, Cat, Key) of
+                {ok, E} ->
+                    io:format("~p~n", [E]);
+                _ ->
+                    io:format("Not found.~n", []),
+                    error
+            end
+    end.
+
+db_keys([]) ->
+    db_keys(["-p", ""]);
+
+db_keys(["-p", PrefixS]) ->
+    Prefix = list_to_binary(PrefixS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    lists:map(fun({Hash, H}) ->
+                      io:format("~n~50b ~-15s~n", [Hash, H]),
+                      io:format("--------------------"
+                                "--------------------"
+                                "--------------------"
+                                "------~n", []),
+                      CHashA = list_to_atom(integer_to_list(Hash)),
+                      Keys = fifo_db:list_keys(CHashA, <<>>),
+                      [io:format("~s~n", [K])
+                       || K <- Keys,
+                          is_prefix(Prefix, K) =:= true]
+              end, CHashs),
+    ok;
+
+db_keys([CHashS]) ->
+    db_keys([CHashS, ""]);
+
+db_keys([CHashS, PrefixS]) ->
+    Prefix = list_to_binary(PrefixS),
+    CHash = list_to_integer(CHashS),
+    {ok, RingData} = riak_core_ring_manager:get_my_ring(),
+    {_S, CHashs} = riak_core_ring:chash(RingData),
+    case lists:keyfind(CHash, 1, CHashs) of
+        false ->
+            io:format("C-Hash ~b does not exist.", [CHash]),
+            error;
+        _ ->
+            CHashA = list_to_atom(CHashS),
+            Keys = fifo_db:list_keys(CHashA, Prefix),
+            [io:format("~s~n", [K]) || K <- Keys],
+            ok
+    end.
 
 list_user([]) ->
     {ok, Users} = snarl_user:list(),
@@ -75,12 +198,12 @@ list_user([]) ->
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
-list_group([]) ->
-    {ok, Users} = snarl_group:list(),
+list_role([]) ->
+    {ok, Users} = snarl_role:list(),
     io:format("UUID                                 Name~n"),
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
-                      {ok, User} = snarl_group:get(UUID),
+                      {ok, User} = snarl_role:get(UUID),
                       io:format("~36s ~-15s~n",
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
@@ -90,7 +213,7 @@ delete_user([User]) ->
     snarl_user:delete(list_to_binary(User)),
     ok.
 
-delete_group([User]) ->
+delete_role([User]) ->
     snarl_user:delete(list_to_binary(User)),
     ok.
 
@@ -134,16 +257,16 @@ import_user([File]) ->
     end.
 
 
-export_group([UUID]) ->
-    case snarl_group:get(list_to_binary(UUID)) of
-        {ok, GroupObj} ->
-            io:format("~s~n", [jsx:encode(GroupObj)]),
+export_role([UUID]) ->
+    case snarl_role:get(list_to_binary(UUID)) of
+        {ok, RoleObj} ->
+            io:format("~s~n", [jsx:encode(RoleObj)]),
             ok;
         _ ->
             error
     end.
 
-import_group([File]) ->
+import_role([File]) ->
     case file:read_file(File) of
         {error,enoent} ->
             io:format("That file does not exist or is not an absolute path.~n"),
@@ -158,30 +281,30 @@ import_group([File]) ->
                            list_to_binary(uuid:to_string(uuid:uuid4()))
                    end,
             As = jsxd:thread([{set, [<<"uuid">>], UUID}], JSX),
-            snarl_group:import(UUID, statebox:new(fun() -> As end))
+            snarl_role:import(UUID, statebox:new(fun() -> As end))
     end.
 
-add_group([Group]) ->
-    case snarl_group:add(list_to_binary(Group)) of
+add_role([Role]) ->
+    case snarl_role:add(list_to_binary(Role)) of
         {ok, UUID} ->
-            io:format("Group '~s' added with id '~s'.~n", [Group, UUID]),
+            io:format("Role '~s' added with id '~s'.~n", [Role, UUID]),
             ok;
         duplicate ->
-            io:format("Group '~s' already exists.~n", [Group]),
+            io:format("Role '~s' already exists.~n", [Role]),
             error
     end.
 
-join_group([User, Group]) ->
+join_role([User, Role]) ->
     case snarl_user:lookup(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_group:lookup(list_to_binary(Group)) of
-                {ok, GroupObj} ->
+            case snarl_role:lookup(list_to_binary(Role)) of
+                {ok, RoleObj} ->
                     ok = snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj),
-                                         jsxd:get(<<"uuid">>, <<>>, GroupObj)),
-                    io:format("User '~s' added to group '~s'.~n", [User, Group]),
+                                         jsxd:get(<<"uuid">>, <<>>, RoleObj)),
+                    io:format("User '~s' added to role '~s'.~n", [User, Role]),
                     ok;
                 _ ->
-                    io:format("Group does not exist.~n"),
+                    io:format("Role does not exist.~n"),
                     error
             end;
         _ ->
@@ -189,17 +312,17 @@ join_group([User, Group]) ->
             error
     end.
 
-leave_group([User, Group]) ->
+leave_role([User, Role]) ->
     case snarl_user:lookup(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_group:lookup(list_to_binary(Group)) of
-                {ok, GroupObj} ->
+            case snarl_role:lookup(list_to_binary(Role)) of
+                {ok, RoleObj} ->
                     ok = snarl_user:leave(jsxd:get(<<"uuid">>, <<>>, UserObj),
-                                          jsxd:get(<<"uuid">>, <<>>, GroupObj)),
-                    io:format("User '~s' removed from group '~s'.~n", [User, Group]),
+                                          jsxd:get(<<"uuid">>, <<>>, RoleObj)),
+                    io:format("User '~s' removed from role '~s'.~n", [User, Role]),
                     ok;
                 _ ->
-                    io:format("Group does not exist.~n"),
+                    io:format("Role does not exist.~n"),
                     error
             end;
         _ ->
@@ -224,11 +347,11 @@ passwd([User, Pass]) ->
             error
     end.
 
-grant_group([Group | P]) ->
-    case snarl_group:lookup_(list_to_binary(Group)) of
-        {ok, GroupObj} ->
-            case snarl_group:grant(snarl_group_state:uuid(GroupObj),
-                                   build_permission(P)) of
+grant_role([Role | P]) ->
+    case snarl_role:lookup_(list_to_binary(Role)) of
+        {ok, RoleObj} ->
+            case snarl_role:grant(snarl_role_state:uuid(RoleObj),
+                                  build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
                     ok;
@@ -237,7 +360,7 @@ grant_group([Group | P]) ->
                     error
             end;
         not_found ->
-            io:format("Group '~s' not found.~n", [Group]),
+            io:format("Role '~s' not found.~n", [Role]),
             error
     end.
 
@@ -275,11 +398,11 @@ revoke_user([User | P ]) ->
             error
     end.
 
-revoke_group([Group | P]) ->
-    case snarl_group:lookup_(list_to_binary(Group)) of
-        {ok, GroupObj} ->
-            case snarl_group:revoke(snarl_group_state:uuid(GroupObj),
-                                    build_permission(P)) of
+revoke_role([Role | P]) ->
+    case snarl_role:lookup_(list_to_binary(Role)) of
+        {ok, RoleObj} ->
+            case snarl_role:revoke(snarl_role_state:uuid(RoleObj),
+                                   build_permission(P)) of
                 ok ->
                     io:format("Revoked.~n", []),
                     ok;
@@ -288,7 +411,7 @@ revoke_group([Group | P]) ->
                     error
             end;
         not_found ->
-            io:format("Group '~s' not found.~n", [Group]),
+            io:format("Role '~s' not found.~n", [Role]),
             error
     end.
 
@@ -408,7 +531,7 @@ down([Node]) ->
     end.
 
 aae_status([]) ->
-    Services = [{snarl_user, "User"}, {snarl_group, "Group"},
+    Services = [{snarl_user, "User"}, {snarl_role, "Role"},
                 {snarl_org, "Org"}],
     [aae_status(E) || E <- Services];
 
@@ -470,7 +593,8 @@ ringready([]) ->
 config(["show"]) ->
     io:format("Defaults~n  User Section~n"),
     print_config(defaults, users),
-    io:format("Yubikey~n~n"),
+    io:format("~n"
+              "Yubikey~n"),
     print_config(yubico, api),
     ok;
 
@@ -615,7 +739,7 @@ fields(F, Vs) ->
 %%     fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
 
 fields([{_, S}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
-                                     orelse is_binary(V) ->
+                                               orelse is_binary(V) ->
     %% there is a space that matters here ------------v
     fields(R, Vs, {[$~ | integer_to_list(S) ++ [$s, $\  | Fmt]], [V | Vars]});
 
@@ -626,3 +750,31 @@ fields([{_, S}|R], [V | Vs], {Fmt, Vars}) ->
 
 fields([], [], {Fmt, Vars}) ->
     io:format(Fmt, Vars).
+
+
+do_update(MainMod, StateMod) ->
+    {ok, US} = MainMod:list_(),
+    io:format("  Entries found: ~p~n", [length(US)]),
+
+    io:format("  Grabbing UUIDs"),
+    US1 = [begin
+               io:format("."),
+               {StateMod:uuid(V), U}
+           end|| U = #snarl_obj{val = V} <- US],
+    io:format(" done.~n"),
+
+    io:format("  Wipeing old entries"),
+    [begin
+         io:format("."),
+         MainMod:wipe(UUID)
+     end || {UUID, _} <- US1],
+    io:format(" done.~n"),
+
+    io:format("  Restoring entries"),
+    [begin
+         io:format("."),
+         MainMod:sync_repair(UUID, O)
+     end || {UUID, O} <- US1],
+    io:format(" done.~n"),
+    io:format("Update complete.~n"),
+    ok.
