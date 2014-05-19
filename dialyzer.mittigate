@@ -39,4 +39,6 @@
 ^yubico_
 ^snarl_worker.erl:2: Callback info about the riak_core_vnode_worker behaviour is not available
 ^snarl_user_vnode.erl:355: Function key_to_id/1 will never be called
-^snarl_org_state.erl:241: The call uuid:uuid5(UUID::any(),binary()) breaks the contract (NamespaceOrUuid::atom() | uuid_string() | uuid(),Name::string()) -> uuid()
+^snarl_org_state.erl:258: The call uuid:uuid5(UUID::any(),binary()) breaks the contract (NamespaceOrUuid::atom() | uuid_string() | uuid(),Name::string()) -> uuid()
+^snarl_vnode.erl:101:
+^snarl_vnode.erl:308:
