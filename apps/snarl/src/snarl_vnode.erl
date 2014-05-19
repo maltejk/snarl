@@ -17,7 +17,7 @@
          hash_object/2,
          mk_reqid/0]).
 
--ignore_xref([mkid/0]).
+-ignore_xref([change/5, mkid/0]).
 
 hash_object(Key, Obj) ->
     Obj1 = lists:sort(Obj),
@@ -74,7 +74,7 @@ list_keys(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
     fold(FoldFn, [], Sender, State).
 
 list(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
-    ID = snarl_vnode:mkid(list),
+    ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
                      E1 = E#snarl_obj{val=StateMod:load(ID, E#snarl_obj.val)},
                      case rankmatcher:match(E1, Getter, Requirements) of
@@ -150,7 +150,7 @@ handle_coverage({wipe, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
     {reply, {ok, ReqID}, State};
 
 handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
-    ID = snarl_vnode:mkid(lookup),
+    ID = mkid(lookup),
     FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
                      case Mod:name(Mod:load(ID, V)) of
                          AName when AName =:= Name ->
