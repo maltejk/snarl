@@ -40,7 +40,12 @@ init(Partition, Bucket, Service, VNode, StateMod) ->
     fifo_db:start(DB),
     HT = riak_core_aae_vnode:maybe_create_hashtrees(Service, Partition, VNode,
                                                     undefined),
-    WorkerPoolSize = application:get_env(snarl, async_workers, 5),
+    WorkerPoolSize = case application:get_env(snarl, async_workers) of
+                         {ok, Val} ->
+                             Val;
+                         undefined ->
+                             5
+                     end,
     FoldWorkerPool = {pool, snarl_worker, WorkerPoolSize, []},
     {ok,
      #vstate{db=DB, hashtrees=HT, partition=Partition, node=node(),
