@@ -9,7 +9,12 @@
 get(Prefix, SubPrefix, Key, EnvKey, Dflt) ->
     case riak_core_metadata:get({Prefix, SubPrefix}, Key) of
         undefined ->
-            V = application:get_env(snarl, EnvKey, Dflt),
+            V = case application:get_env(snarl, EnvKey) of
+                    {ok, Val} ->
+                        Val;
+                    undefined ->
+                        Dflt
+                end,
             set(Prefix, SubPrefix, Key, V),
             V;
         V ->
