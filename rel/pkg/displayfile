@@ -9,7 +9,7 @@
 |                                                                              |
 | Note: To enable Snarl you first need to enable the epmd service.             |
 |                                                                              |
-| If this is not the first node in your Smarl cluster join an existing ring    |
+| If this is not the first node in your Snarl cluster join an existing ring    |
 | you can use the snarl-admin tool to join the existing ring.                  |
 |                                                                              |
 | The snarl-admin tool also offers a commandline interface to the most         |
