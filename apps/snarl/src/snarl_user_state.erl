@@ -32,7 +32,6 @@
 -export_type([user/0, any_user/0]).
 
 -ignore_xref([
-              new/0,
               load/1,
               uuid/1, uuid/3,
               name/1, name/3,

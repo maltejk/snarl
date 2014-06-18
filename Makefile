@@ -28,10 +28,10 @@ distclean: clean devclean relclean
 
 eunit: 
 	$(REBAR) skip_deps=true compile
-	$(REBAR) skip_deps=true eunit
+	$(REBAR) skip_deps=true eunit --verbose
 
 test:  eunit
-	$(REBAR) skip_deps=true xref
+	$(REBAR) skip_deps=true xref 
 
 quick-xref:
 	$(REBAR) xref skip_deps=true
