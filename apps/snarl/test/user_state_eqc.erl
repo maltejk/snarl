@@ -33,18 +33,6 @@ perm_entry() ->
 bin_str() ->
     ?LET(S, ?SUCHTHAT(L, list(choose($a, $z)), L =/= []), list_to_binary(S)).
 
-existing_permission(U) ->
-    oneof(permissions(model(U))).
-
-existing_org(U) ->
-    oneof(orgs(model(U))).
-
-existing_role(U) ->
-    oneof(roles(model(U))).
-
-existing_yubikey(U) ->
-    oneof(yubikeys(model(U))).
-
 user() ->
     ?SIZED(Size, user(Size)).
 
@@ -55,27 +43,20 @@ user(Size) ->
                         oneof([
                                {call, ?U, load, [id(Size), U]},
                                {call, ?U, uuid, [id(Size), bin_str(), U]},
+                               {call, ?U, name, [id(Size), bin_str(), U]},
                                {call, ?U, add_key, [id(Size), bin_str(), bin_str(), U]},
                                {call, ?U, add_yubikey, [id(Size), bin_str(), U]},
                                {call, ?U, join, [id(Size), bin_str(), U]},
                                {call, ?U, join_org, [id(Size), bin_str(), U]},
                                {call, ?U, grant, [id(Size), permission(), U]},
                                {call, ?U, password, [id(Size), bin_str(), U]},
-                               {call, ?U, name, [id(Size), bin_str(), U]},
-                               {call, ?U, set_metadata, [id(Size), bin_str(), bin_str(), U]}
-                              ] ++
-                                  [{call, ?U, revoke_key, [id(Size), maybe_oneof(calc_keys(U)), U]}
-                                   || calc_keys(U) =/= []] ++
-                                  [{call, ?U, set_metadata, [id(Size), maybe_oneof(calc_metadata(U)), delete, U]}
-                                   || calc_metadata(U) =/= []] ++
-                                  [{call, ?U, remove_yubikey, [id(Size), maybe_oneof(calc_yubikeys(U)), U]}
-                                   || calc_yubikeys(U) =/= []] ++
-                                  [{call, ?U, leave, [id(Size), maybe_oneof(calc_roles(U)), U]}
-                                   || calc_roles(U) =/= []] ++
-                                  [{call, ?U, leave_org, [id(Size), maybe_oneof(calc_orgs(U)), U]}
-                                   || calc_orgs(U) =/= []] ++
-                                  [{call, ?U, revoke, [id(Size), maybe_oneof(calc_perms(U)), U]}
-                                   || calc_perms(U) =/= []]))
+                               {call, ?U, set_metadata, [id(Size), bin_str(), bin_str(), U]},
+                               {call, ?U, revoke_key, [id(Size), maybe_oneof(calc_keys(U)), U]},
+                               {call, ?U, set_metadata, [id(Size), maybe_oneof(calc_metadata(U)), delete, U]},
+                               {call, ?U, remove_yubikey, [id(Size), maybe_oneof(calc_yubikeys(U)), U]},
+                               {call, ?U, leave, [id(Size), maybe_oneof(calc_roles(U)), U]},
+                               {call, ?U, leave_org, [id(Size), maybe_oneof(calc_orgs(U)), U]},
+                               {call, ?U, revoke, [id(Size), maybe_oneof(calc_perms(U)), U]}]))
                      || Size > 0])).
 
 calc_yubikeys({call, _, add_yubikey, [_, K, U]}) ->
@@ -267,6 +248,15 @@ prop_grant() ->
                               model_grant(P, model(User)))
             end).
 
+prop_revoke() ->
+    ?FORALL({U, P}, ?LET(U, ?SUCHTHAT(T, user(), calc_perms(T) =/= []), {U, oneof(calc_perms(U))}),
+            begin
+                User = eval(U),
+                ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
+                          model(?U:revoke(id(?BIG_TIME), P, User)) ==
+                              model_revoke(P, model(User)))
+            end).
+
 prop_add_role() ->
     ?FORALL({R,U},
             {bin_str(),user()},
@@ -279,7 +269,7 @@ prop_add_role() ->
 
 prop_add_org() ->
     ?FORALL({O,U},
-            {bin_str(),user()},
+            {bin_str(), user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -308,15 +298,6 @@ prop_add_key() ->
                               model_add_key(I, K, model(User)))
             end).
 
-prop_revoke() ->
-    ?FORALL({U, P}, ?LET(U, ?SUCHTHAT(T, user(), calc_perms(T) =/= []), {U, oneof(calc_perms(U))}),
-            begin
-                User = eval(U),
-                ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
-                          model(?U:revoke(id(?BIG_TIME), P, User)) ==
-                              model_revoke(P, model(User)))
-            end).
-
 prop_set_metadata() ->
     ?FORALL({K, V, U}, {bin_str(), bin_str(), user()},
             begin
@@ -329,7 +310,7 @@ prop_set_metadata() ->
             end).
 
 prop_leave_org() ->
-    ?FORALL({U, O}, ?LET(U, ?SUCHTHAT(T, user(), calc_orgs(T) =/= []), {U, oneof(calc_orgs(U))}),
+    ?FORALL({U, O}, ?LET(U, user(), {U, maybe_oneof(calc_orgs(U))}),
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -338,7 +319,7 @@ prop_leave_org() ->
             end).
 
 prop_leave_role() ->
-    ?FORALL({U, P}, ?LET(U, ?SUCHTHAT(T, user(), calc_roles(T) =/= []), {U, oneof(calc_roles(U))}),
+    ?FORALL({U, P}, ?LET(U, user(), {U, maybe_oneof(calc_roles(U))}),
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -347,7 +328,7 @@ prop_leave_role() ->
             end).
 
 prop_remove_yubikey() ->
-    ?FORALL({U, K}, ?LET(U, ?SUCHTHAT(T, user(), calc_yubikeys(T) =/= []), {U, oneof(calc_yubikeys(U))}),
+    ?FORALL({U, K}, ?LET(U, user(), {U, maybe_oneof(calc_yubikeys(U))}),
             begin
                 User = eval(U),
                 U1 = ?U:remove_yubikey(id(?BIG_TIME), K, User),
@@ -357,7 +338,7 @@ prop_remove_yubikey() ->
             end).
 
 prop_remove_key() ->
-    ?FORALL({U, K}, ?LET(U, ?SUCHTHAT(T, user(), calc_keys(T) =/= []), {U, maybe_oneof(calc_keys(U))}),
+    ?FORALL({U, K}, ?LET(U, user(), {U, maybe_oneof(calc_keys(U))}),
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -366,7 +347,7 @@ prop_remove_key() ->
             end).
 
 prop_remove_metadata() ->
-    ?FORALL({U, K}, ?LET(U, ?SUCHTHAT(T, user(), calc_metadata(T) =/= []), {U, oneof(calc_metadata(U))}),
+    ?FORALL({U, K}, ?LET(U, user(), {U, maybe_oneof(calc_metadata(U))}),
             begin
                 User = eval(U),
                 U1 = ?U:set_metadata(id(?BIG_TIME), K, delete, User),
@@ -376,9 +357,6 @@ prop_remove_metadata() ->
                           model(U1) == M1)
             end).
 
--ifndef(EQC_NUM_TESTS).
--define(EQC_NUM_TESTS, 100).
--endif.
 -include("eqc_helper.hrl").
 -endif.
 -endif.

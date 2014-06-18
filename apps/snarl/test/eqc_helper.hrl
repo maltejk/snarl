@@ -37,12 +37,17 @@
                   end, P)).
 -endif.
 
+
 -ifndef(EQC_NUM_TESTS).
--define(EQC_NUM_TESTS, 500).
+-ifdef(EQC_LONG_TESTS).
+-define(EQC_NUM_TESTS, 5000).
+-else.
+-define(EQC_NUM_TESTS, 100).
+-endif.
 -endif.
 
 -ifndef(EQC_EUNIT_TIMEUT).
--define(EQC_EUNIT_TIMEUT, 60).
+-define(EQC_EUNIT_TIMEUT, (?EQC_NUM_TESTS/10)).
 -endif.
 
 run_test_() ->
