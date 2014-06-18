@@ -51,8 +51,8 @@ user(Size) ->
                                {call, ?U, grant, [id(Size), permission(), U]},
                                {call, ?U, password, [id(Size), bin_str(), U]},
                                {call, ?U, set_metadata, [id(Size), bin_str(), bin_str(), U]},
-                               {call, ?U, revoke_key, [id(Size), maybe_oneof(calc_keys(U)), U]},
                                {call, ?U, set_metadata, [id(Size), maybe_oneof(calc_metadata(U)), delete, U]},
+                               {call, ?U, revoke_key, [id(Size), maybe_oneof(calc_keys(U)), U]},
                                {call, ?U, remove_yubikey, [id(Size), maybe_oneof(calc_yubikeys(U)), U]},
                                {call, ?U, leave, [id(Size), maybe_oneof(calc_roles(U)), U]},
                                {call, ?U, leave_org, [id(Size), maybe_oneof(calc_orgs(U)), U]},
@@ -203,9 +203,6 @@ has_yubikeys(U) ->
 has_keys(U) ->
     ?U:keys(U) =/= [].
 
-has_metadata(U) ->
-    ?U:metadata(U) =/= [].
-
 prop_name() ->
     ?FORALL({N,U},
             {bin_str(),user()},
@@ -277,7 +274,6 @@ prop_add_org() ->
                               model_join_org(O, model(User)))
             end).
 
-
 prop_add_yubikey() ->
     ?FORALL({K, U},
             {bin_str(), user()},
@@ -296,17 +292,6 @@ prop_add_key() ->
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
                           model(?U:add_key(id(?BIG_TIME), I, K, User)) ==
                               model_add_key(I, K, model(User)))
-            end).
-
-prop_set_metadata() ->
-    ?FORALL({K, V, U}, {bin_str(), bin_str(), user()},
-            begin
-                User = eval(U),
-                U1 = ?U:set_metadata(id(?BIG_TIME), K, V, User),
-                M1 = model_set_metadata(K, V, model(User)),
-                ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n"
-                                    "User': ~p~nModel': ~p~n", [U, User, model(User), U1, M1]),
-                          model(U1) == M1)
             end).
 
 prop_leave_org() ->
@@ -344,6 +329,17 @@ prop_remove_key() ->
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
                           model(?U:revoke_key(id(?BIG_TIME), K, User)) ==
                               model_revoke_key(K, model(User)))
+            end).
+
+prop_set_metadata() ->
+    ?FORALL({K, V, U}, {bin_str(), bin_str(), user()},
+            begin
+                User = eval(U),
+                U1 = ?U:set_metadata(id(?BIG_TIME), K, V, User),
+                M1 = model_set_metadata(K, V, model(User)),
+                ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n"
+                                    "User': ~p~nModel': ~p~n", [U, User, model(User), U1, M1]),
+                          model(U1) == M1)
             end).
 
 prop_remove_metadata() ->

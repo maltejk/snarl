@@ -50,6 +50,15 @@ role(Size) ->
                               ]))
                      || Size > 0])).
 
+calc_metadata({call, _, set_metadata, [_, delete, K, U]}) ->
+    lists:delete(K, lists:usort(calc_metadata(U)));
+calc_metadata({call, _, set_metadata, [_, I, _K, U]}) ->
+    [I | calc_metadata(U)];
+calc_metadata({call, _, _, P}) ->
+    calc_metadata(lists:last(P));
+calc_metadata(_) ->
+    [].
+
 calc_perms({call, _, grant, [_, P, R]}) ->
     [P | calc_perms(R)];
 calc_perms({call, _, revoke, [_, P, R]}) ->
@@ -74,6 +83,12 @@ model_revoke(P, R) ->
 model_grant(P, R) ->
     r(<<"permissions">>, lists:usort([P | permissions(R)]), R).
 
+model_set_metadata(K, V, U) ->
+    r(<<"metadata">>, lists:usort(r(K, V, metadata(U))), U).
+
+model_delete_metadata(K, U) ->
+    r(<<"metadata">>, lists:keydelete(K, 1, metadata(U)), U).
+
 model(R) ->
     ?R:to_json(R).
 
@@ -81,6 +96,9 @@ permissions(U) ->
     {<<"permissions">>, Ps} = lists:keyfind(<<"permissions">>, 1, U),
     Ps.
 
+metadata(U) ->
+    {<<"metadata">>, M} = lists:keyfind(<<"metadata">>, 1, U),
+    M.
 
 prop_name() ->
     ?FORALL({N, R},
@@ -123,6 +141,27 @@ prop_revoke() ->
                               model_revoke(P, model(Role)))
             end).
 
+prop_set_metadata() ->
+    ?FORALL({K, V, R}, {bin_str(), bin_str(), role()},
+            begin
+                Role = eval(R),
+                R1 = ?R:set_metadata(id(?BIG_TIME), K, V, Role),
+                M1 = model_set_metadata(K, V, model(Role)),
+                ?WHENFAIL(io:format(role, "History: ~p~nRole: ~p~nModel: ~p~n"
+                                    "Role': ~p~nModel': ~p~n", [R, Role, model(Role), R1, M1]),
+                          model(R1) == M1)
+            end).
+
+prop_remove_metadata() ->
+    ?FORALL({R, K}, ?LET(R, role(), {R, maybe_oneof(calc_metadata(R))}),
+            begin
+                Role = eval(R),
+                R1 = ?R:set_metadata(id(?BIG_TIME), K, delete, Role),
+                M1 = model_delete_metadata(K, model(Role)),
+                ?WHENFAIL(io:format(role, "History: ~p~nRole: ~p~nModel: ~p~n"
+                                    "Role': ~p~nModel': ~p~n", [R, Role, model(Role), R1, M1]),
+                          model(R1) == M1)
+            end).
 
 -include("eqc_helper.hrl").
 -endif.
