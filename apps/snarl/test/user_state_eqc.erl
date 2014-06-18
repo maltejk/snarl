@@ -23,6 +23,10 @@ permission(Size) ->
     ?LAZY(oneof([[oneof([<<"...">>, perm_entry()])] || Size == 0] ++
                     [[perm_entry() | permission(Size -1)] || Size > 0])).
 
+maybe_oneof(L) ->
+    ?LET(E, ?SUCHTHAT(E, bin_str(), not lists:member(E, L)),
+         oneof([E | L])).
+
 perm_entry() ->
     oneof([<<"_">>, bin_str()]).
 
@@ -60,17 +64,17 @@ user(Size) ->
                                {call, ?U, name, [id(Size), bin_str(), U]},
                                {call, ?U, set_metadata, [id(Size), bin_str(), bin_str(), U]}
                               ] ++
-                                  [{call, ?U, revoke_key, [id(Size), oneof(calc_keys(U)), U]}
+                                  [{call, ?U, revoke_key, [id(Size), maybe_oneof(calc_keys(U)), U]}
                                    || calc_keys(U) =/= []] ++
-                                  [{call, ?U, set_metadata, [id(Size), oneof(calc_metadata(U)), delete, U]}
+                                  [{call, ?U, set_metadata, [id(Size), maybe_oneof(calc_metadata(U)), delete, U]}
                                    || calc_metadata(U) =/= []] ++
-                                  [{call, ?U, remove_yubikey, [id(Size), oneof(calc_yubikeys(U)), U]}
+                                  [{call, ?U, remove_yubikey, [id(Size), maybe_oneof(calc_yubikeys(U)), U]}
                                    || calc_yubikeys(U) =/= []] ++
-                                  [{call, ?U, leave, [id(Size), oneof(calc_roles(U)), U]}
+                                  [{call, ?U, leave, [id(Size), maybe_oneof(calc_roles(U)), U]}
                                    || calc_roles(U) =/= []] ++
-                                  [{call, ?U, leave_org, [id(Size), oneof(calc_orgs(U)), U]}
+                                  [{call, ?U, leave_org, [id(Size), maybe_oneof(calc_orgs(U)), U]}
                                    || calc_orgs(U) =/= []] ++
-                                  [{call, ?U, revoke, [id(Size), oneof(calc_perms(U)), U]}
+                                  [{call, ?U, revoke, [id(Size), maybe_oneof(calc_perms(U)), U]}
                                    || calc_perms(U) =/= []]))
                      || Size > 0])).
 
@@ -353,7 +357,7 @@ prop_remove_yubikey() ->
             end).
 
 prop_remove_key() ->
-    ?FORALL({U, K}, ?LET(U, ?SUCHTHAT(T, user(), calc_keys(T) =/= []), {U, oneof(calc_keys(U))}),
+    ?FORALL({U, K}, ?LET(U, ?SUCHTHAT(T, user(), calc_keys(T) =/= []), {U, maybe_oneof(calc_keys(U))}),
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
