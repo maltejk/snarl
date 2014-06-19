@@ -34,6 +34,17 @@ maybe_oneof(L) ->
     ?LET(E, ?SUCHTHAT(E, bin_str(), not lists:member(E, L)),
          oneof([E | L])).
 
+name() ->
+    oneof([a, b, c, d, e, f, g]).
+
+trigger() ->
+    {name(), action()}.
+
+action() ->
+    oneof([{grant, role, a, permission()},
+           {grant, user, a, permission()},
+           {join, role, bin_str()},
+           {join, org, bin_str()}]).
 org() ->
     ?SIZED(Size, org(Size)).
 
@@ -46,7 +57,9 @@ org(Size) ->
                                {call, ?O, uuid, [id(Size), bin_str(), O]},
                                {call, ?O, name, [id(Size), bin_str(), O]},
                                {call, ?O, set_metadata, [id(Size), bin_str(), bin_str(), O]},
-                               {call, ?O, set_metadata, [id(Size), maybe_oneof(calc_metadata(O)), delete, O]}
+                               {call, ?O, set_metadata, [id(Size), maybe_oneof(calc_metadata(O)), delete, O]},
+                               {call, ?O, add_trigger, [id(Size), bin_str(), trigger(), O]},
+                               {call, ?O, remove_trigger, [id(Size), maybe_oneof(calc_triggers(O)), O]}
 
                               ]))
                      || Size > 0])).
@@ -58,6 +71,15 @@ calc_metadata({call, _, set_metadata, [_, I, _K, U]}) ->
 calc_metadata({call, _, _, P}) ->
     calc_metadata(lists:last(P));
 calc_metadata(_) ->
+    [].
+
+calc_triggers({call, _, remove_triggers, [_, I, _, U]}) ->
+    lists:delete(I, lists:usort(calc_triggers(U)));
+calc_triggers({call, _, add_trigger, [_, I, _K, U]}) ->
+    [I | calc_triggers(U)];
+calc_triggers({call, _, _, P}) ->
+    calc_triggers(lists:last(P));
+calc_triggers(_) ->
     [].
 
 r(K, V, U) ->
@@ -75,11 +97,22 @@ model_set_metadata(K, V, U) ->
 model_delete_metadata(K, U) ->
     r(<<"metadata">>, lists:keydelete(K, 1, metadata(U)), U).
 
+model_add_trigger(UUID, T, U) ->
+    r(<<"triggers">>, lists:usort(r(UUID, ?O:jsonify_trigger(T), triggers(U))), U).
+
+model_remove_trigger(I, U) ->
+    r(<<"triggers">>, lists:keydelete(I, 1, triggers(U)), U).
+
+
 model(R) ->
     ?O:to_json(R).
 
 metadata(U) ->
     {<<"metadata">>, M} = lists:keyfind(<<"metadata">>, 1, U),
+    M.
+
+triggers(U) ->
+    {<<"triggers">>, M} = lists:keyfind(<<"triggers">>, 1, U),
     M.
 
 prop_name() ->
@@ -108,7 +141,7 @@ prop_set_metadata() ->
                 Org = eval(O),
                 O1 = ?O:set_metadata(id(?BIG_TIME), K, V, Org),
                 M1 = model_set_metadata(K, V, model(Org)),
-                ?WHENFAIL(io:format(org, "History: ~p~nOrg: ~p~nModel: ~p~n"
+                ?WHENFAIL(io:format(user, "History: ~p~nOrg: ~p~nModel: ~p~n"
                                     "Org': ~p~nModel': ~p~n", [O, Org, model(Org), O1, M1]),
                           model(O1) == M1)
             end).
@@ -119,7 +152,28 @@ prop_remove_metadata() ->
                 Org = eval(O),
                 O1 = ?O:set_metadata(id(?BIG_TIME), K, delete, Org),
                 M1 = model_delete_metadata(K, model(Org)),
-                ?WHENFAIL(io:format(org, "History: ~p~nOrg: ~p~nModel: ~p~n"
+                ?WHENFAIL(io:format(user, "History: ~p~nOrg: ~p~nModel: ~p~n"
+                                    "Org': ~p~nModel': ~p~n", [O, Org, model(Org), O1, M1]),
+                          model(O1) == M1)
+            end).
+
+prop_add_trigger() ->
+    ?FORALL({UUID, T, O}, {bin_str(), trigger(), org()},
+            begin
+                Org = eval(O),
+                O1 = ?O:add_trigger(id(?BIG_TIME), UUID, T, Org),
+                M1 = model_add_trigger(UUID, T, model(Org)),
+                ?WHENFAIL(io:format(user, "History: ~p~nOrg: ~p~nModel: ~p~n"
+                                    "Org': ~p~nModel': ~p~n", [O, Org, model(Org), O1, M1]),
+                          model(O1) == M1)
+            end).
+prop_remove_trigger() ->
+    ?FORALL({O, T}, ?LET(O, org(), {O, maybe_oneof(calc_triggers(O))}),
+            begin
+                Org = eval(O),
+                O1 = ?O:remove_trigger(id(?BIG_TIME), T, Org),
+                M1 = model_remove_trigger(T, model(Org)),
+                ?WHENFAIL(io:format(user, "History: ~p~nOrg: ~p~nModel: ~p~n"
                                     "Org': ~p~nModel': ~p~n", [O, Org, model(Org), O1, M1]),
                           model(O1) == M1)
             end).

@@ -11,6 +11,7 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-export([jsonify_trigger/1]).
 -endif.
 
 -export([
