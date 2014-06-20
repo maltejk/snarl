@@ -28,12 +28,12 @@ distclean: clean devclean relclean
 
 long-test:
 	-rm -r apps/snarl/.eunit
-	$(REBAR) skip_deps=true -DEQC_LONG_TESTS eunit --verbose
+	$(REBAR) skip_deps=true -DEQC_LONG_TESTS eunit -v
 
 eunit: 
 	$(REBAR) compile
 	-rm -r apps/snarl/.eunit
-	$(REBAR) eunit skip_deps=true -r --verbose
+	$(REBAR) eunit skip_deps=true -r -v
 
 test:  eunit
 	$(REBAR) xref skip_deps=true -r

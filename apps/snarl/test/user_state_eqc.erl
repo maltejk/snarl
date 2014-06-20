@@ -9,29 +9,13 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 -compile(export_all).
 
+-import(snarl_test_helper, [id/1, permission/0, non_blank_string/0, maybe_oneof/1]).
+
 -define(U, snarl_user_state).
+
 %% This is larger then and time we ever get in the size, used for ensure setting data
 %% in LWW registers.
 -define(BIG_TIME, 1000000000).
-id(T) ->
-    {T, eqc}.
-
-permission() ->
-    ?SIZED(Size, permission(Size)).
-
-permission(Size) ->
-    ?LAZY(oneof([[oneof([<<"...">>, perm_entry()])] || Size == 0] ++
-                    [[perm_entry() | permission(Size -1)] || Size > 0])).
-
-perm_entry() ->
-    oneof([<<"_">>, bin_str()]).
-
-maybe_oneof(L) ->
-    ?LET(E, ?SUCHTHAT(E, bin_str(), not lists:member(E, L)),
-         oneof([E | L])).
-
-bin_str() ->
-    ?LET(S, ?SUCHTHAT(L, list(choose($a, $z)), L =/= []), list_to_binary(S)).
 
 user() ->
     ?SIZED(Size, user(Size)).
@@ -42,15 +26,15 @@ user(Size) ->
                         [U], [user(Size - 1)],
                         oneof([
                                {call, ?U, load, [id(Size), U]},
-                               {call, ?U, uuid, [id(Size), bin_str(), U]},
-                               {call, ?U, name, [id(Size), bin_str(), U]},
-                               {call, ?U, add_key, [id(Size), bin_str(), bin_str(), U]},
-                               {call, ?U, add_yubikey, [id(Size), bin_str(), U]},
-                               {call, ?U, join, [id(Size), bin_str(), U]},
-                               {call, ?U, join_org, [id(Size), bin_str(), U]},
+                               {call, ?U, uuid, [id(Size), non_blank_string(), U]},
+                               {call, ?U, name, [id(Size), non_blank_string(), U]},
+                               {call, ?U, add_key, [id(Size), non_blank_string(), non_blank_string(), U]},
+                               {call, ?U, add_yubikey, [id(Size), non_blank_string(), U]},
+                               {call, ?U, join, [id(Size), non_blank_string(), U]},
+                               {call, ?U, join_org, [id(Size), non_blank_string(), U]},
                                {call, ?U, grant, [id(Size), permission(), U]},
-                               {call, ?U, password, [id(Size), bin_str(), U]},
-                               {call, ?U, set_metadata, [id(Size), bin_str(), bin_str(), U]},
+                               {call, ?U, password, [id(Size), non_blank_string(), U]},
+                               {call, ?U, set_metadata, [id(Size), non_blank_string(), non_blank_string(), U]},
                                {call, ?U, set_metadata, [id(Size), maybe_oneof(calc_metadata(U)), delete, U]},
                                {call, ?U, revoke_key, [id(Size), maybe_oneof(calc_keys(U)), U]},
                                {call, ?U, remove_yubikey, [id(Size), maybe_oneof(calc_yubikeys(U)), U]},
@@ -205,7 +189,7 @@ has_keys(U) ->
 
 prop_name() ->
     ?FORALL({N,U},
-            {bin_str(),user()},
+            {non_blank_string(),user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~n", [U, User]),
@@ -215,7 +199,7 @@ prop_name() ->
 
 prop_uuid() ->
     ?FORALL({N,U},
-            {bin_str(),user()},
+            {non_blank_string(),user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~n", [U, User]),
@@ -225,7 +209,7 @@ prop_uuid() ->
 
 prop_password() ->
     ?FORALL({N,U},
-            {bin_str(),user()},
+            {non_blank_string(),user()},
             begin
                 User = eval(U),
                 U1 = ?U:password(id(?BIG_TIME),N,User),
@@ -256,7 +240,7 @@ prop_revoke() ->
 
 prop_add_role() ->
     ?FORALL({R,U},
-            {bin_str(),user()},
+            {non_blank_string(),user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -266,7 +250,7 @@ prop_add_role() ->
 
 prop_add_org() ->
     ?FORALL({O,U},
-            {bin_str(), user()},
+            {non_blank_string(), user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -276,7 +260,7 @@ prop_add_org() ->
 
 prop_add_yubikey() ->
     ?FORALL({K, U},
-            {bin_str(), user()},
+            {non_blank_string(), user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -286,7 +270,7 @@ prop_add_yubikey() ->
 
 prop_add_key() ->
     ?FORALL({I, K, U},
-            {bin_str(), bin_str(), user()},
+            {non_blank_string(), non_blank_string(), user()},
             begin
                 User = eval(U),
                 ?WHENFAIL(io:format(user, "History: ~p~nUser: ~p~nModel: ~p~n", [U, User, model(User)]),
@@ -332,7 +316,7 @@ prop_remove_key() ->
             end).
 
 prop_set_metadata() ->
-    ?FORALL({K, V, U}, {bin_str(), bin_str(), user()},
+    ?FORALL({K, V, U}, {non_blank_string(), non_blank_string(), user()},
             begin
                 User = eval(U),
                 U1 = ?U:set_metadata(id(?BIG_TIME), K, V, User),

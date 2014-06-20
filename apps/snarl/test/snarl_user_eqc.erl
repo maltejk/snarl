@@ -12,46 +12,17 @@
 -include_lib("snarl/include/snarl.hrl").
 
 -compile(export_all).
-
+-import(snarl_test_helper,
+        [id/0, permission/0, non_blank_string/0, maybe_oneof/1, lower_char/0,
+         cleanup_mock_servers/0, mock_vnode/2, start_mock_servers/0]).
 
 -record(state, {added = [], next_uuid=uuid:uuid4s(),
-                passwords = []}).
+                passwords = [], roles = [], orgs = [],
+                yubikeys = []}).
 
-reqid(I) ->
-    {I, eqc}.
-
-reqid() ->
-    reqid(0).
-
-atom() ->
-    elements([a,b,c,undefined]).
-
-not_empty(G) ->
-    ?SUCHTHAT(X, G, X /= [] andalso X /= <<>>).
-
-non_blank_string() ->
-    ?LET(X,not_empty(list(lower_char())), list_to_binary(X)).
 
 maybe_a_uuid(#state{added = Added}) ->
-    oneof([non_blank_string() | Added]).
-
-
-%% Generate a lower 7-bit ACSII character that should not cause any problems
-%% with utf8 conversion.
-lower_char() ->
-    choose(16#20, 16#7f).
-
-
-permission() ->
-    ?SIZED(Size, permission(Size)).
-
-permission(Size) ->
-    ?LAZY(oneof([[oneof([<<"...">>, perm_entry()])] || Size == 0] ++
-                    [[perm_entry() | permission(Size -1)] || Size > 0])).
-
-perm_entry() ->
-    oneof([<<"_">>, non_blank_string()]).
-
+    maybe_oneof(Added).
 
 initial_state() ->
     random:seed(now()),
@@ -66,6 +37,16 @@ prop_test() ->
                    io:format(user, "History: ~p\nState: ~p\nRes: ~p\n", [H,S,Res]),
                    Res == ok)
             end).
+
+yubikey() ->
+    ?LET(L, resize(44, list(lower_char())), list_to_binary(L)).
+
+maybe_role(#state{roles = Rs}) ->
+    maybe_oneof([R || {_, R} <- Rs]).
+
+maybe_org(#state{orgs = Os}) ->
+    maybe_oneof([O || {_, O} <- Os]).
+
 
 cleanup() ->
     eqc_vnode ! delete,
@@ -82,10 +63,10 @@ command(S) ->
            {call, ?U, passwd, [maybe_a_uuid(S), non_blank_string()]},
            %% Role related commands
            {call, ?MODULE, join, [maybe_a_uuid(S), non_blank_string()]},
-           {call, ?U, leave, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?U, leave, [maybe_a_uuid(S), maybe_role(S)]},
            %% Org related commands
            {call, ?MODULE, join_org, [maybe_a_uuid(S), non_blank_string()]},
-           {call, ?U, leave_org, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?U, leave_org, [maybe_a_uuid(S), maybe_org(S)]},
            {call, ?U, active, [maybe_a_uuid(S)]},
 
            %% SSH key related commands
@@ -94,7 +75,7 @@ command(S) ->
            {call, ?U, keys, [maybe_a_uuid(S)]},
 
            %% Yubi key related commands
-           {call, ?U, add_yubikey, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?U, add_yubikey, [maybe_a_uuid(S), yubikey()]},
            {call, ?U, remove_yubikey, [maybe_a_uuid(S), non_blank_string()]},
            {call, ?U, yubikeys, [maybe_a_uuid(S)]},
 
@@ -102,11 +83,8 @@ command(S) ->
            {call, ?U, delete, [maybe_a_uuid(S)]}
           ]).
 
-initialize_vnode() ->
-    ok.
-
 add(UUID, User) ->
-    case snarl_user_vnode:add(0, reqid(), UUID, User) of
+    case snarl_user_vnode:add(0, id(), UUID, User) of
         {ok, 0} ->
             UUID;
         E ->
@@ -125,6 +103,52 @@ join_org(UUID, Org) ->
     R = ?U:join_org(UUID, Org),
     meck:unload(snarl_org),
     R.
+
+next_state(S = #state{added=Us, roles=Rs}, _V,
+           {call, _, join, [UUID, Role]}) ->
+    case lists:member(UUID, Us) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Rs) of
+                {UUID, Roles} ->
+                    Rs1 = proplists:delete(UUID, Rs),
+                    S#state{roles = [{UUID, [Role | Roles]} | Rs1]};
+                _  ->
+                    S#state{roles = [{UUID, [Role]} | Rs]}
+            end
+    end;
+
+next_state(S = #state{added=Us, orgs=Os}, _V,
+           {call, _, join_org, [UUID, Org]}) ->
+    case lists:member(UUID, Us) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Os) of
+                {UUID, Orgs} ->
+                    Os1 = proplists:delete(UUID, Os),
+                    S#state{orgs = [{UUID, [Org | Orgs]} | Os1]};
+                _  ->
+                    S#state{orgs = [{UUID, [Org]} | Os]}
+            end
+    end;
+
+next_state(S = #state{added=Us, yubikeys=Ks}, _V,
+           {call, _, add_yubikey, [UUID, Key]}) ->
+    ID = snarl_yubico:id(Key),
+    case lists:member(UUID, Us) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Ks) of
+                {UUID, Keys} ->
+                    Ks1 = proplists:delete(UUID, Ks),
+                    S#state{yubikeys = [{UUID, [ID | Keys]} | Ks1]};
+                _  ->
+                    S#state{yubikeys = [{UUID, [ID]} | Ks]}
+            end
+    end;
 
 next_state(S = #state{added = Added}, V, {call, _, add, [_, _User]}) ->
     S#state{added = [V | Added], next_uuid=uuid:uuid4s()};
@@ -248,14 +272,15 @@ postcondition(#state{added=Us}, {call, _, passwd, [UUID, _]}, ok) ->
 postcondition(#state{added=Us}, {call, _, get, [UUID]}, not_found) ->
     not lists:member(UUID, Us);
 
-postcondition(#state{added=Us}, {call, _, get, [UUID]}, {ok, _}) ->
+postcondition(#state{added=Us}, {call, _, get, [UUID]}, {ok, _U}) ->
     lists:member(UUID, Us);
 
 postcondition(#state{added=Us}, {call, _, get_, [UUID]}, not_found) ->
     not lists:member(UUID, Us);
 
-postcondition(#state{added=Us}, {call, _, get_, [UUID]}, {ok, _}) ->
-    lists:member(UUID, Us);
+postcondition(S=#state{added=Us}, {call, _, get_, [UUID]}, {ok, U}) ->
+    lists:member(UUID, Us) andalso roles_match(S, UUID, U)
+        andalso orgs_match(S, UUID, U) andalso yubikeys_match(S, UUID, U);
 
 postcondition(#state{added=Us}, {call, _, raw, [UUID]}, not_found) ->
     not lists:member(UUID, Us);
@@ -276,19 +301,37 @@ postcondition(_S, C, R) ->
     io:format(user, "postcondition(_, ~p, ~p).~n", [C, R]),
     false.
 
+roles_match(#state{roles=Rs}, UUID, U) ->
+    Known = case lists:keyfind(UUID, 1, Rs) of
+                {UUID, Roles} ->
+                    lists:usort(Roles);
+                _ ->
+                    []
+            end,
+    snarl_user_state:roles(U) == Known.
+
+orgs_match(#state{orgs=Os}, UUID, U) ->
+    Known = case lists:keyfind(UUID, 1, Os) of
+                {UUID, Orgs} ->
+                    lists:usort(Orgs);
+                _ ->
+                    []
+            end,
+    snarl_user_state:orgs(U) == Known.
+
+yubikeys_match(S, UUID, U) ->
+    snarl_user_state:yubikeys(U) == known_yubikeys(S, UUID).
+
+known_yubikeys(#state{yubikeys=Ks}, UUID) ->
+    case lists:keyfind(UUID, 1, Ks) of
+        {UUID, Keys} ->
+            lists:usort(Keys);
+        _ ->
+            []
+    end.
+
 %% We kind of have to start a lot of services for this tests :(
 setup() ->
-    application:load(sasl),
-    %%application:set_env(sasl, sasl_error_logger, {file, "snarl_user_eqc.log"}),
-    application:set_env(snarl, hash_fun, sha512),
-    %%error_logger:tty(false),
-    error_logger:logfile({open, "put_fsm_eqc.log"}),
-
-    application:stop(lager),
-    application:load(lager),
-    application:set_env(lager, handlers,
-                        [{lager_file_backend, [{"snarl_user_eqc_lager.log", info, 10485760,"$D0",5}]}]),
-    ok = lager:start(),
     start_mock_servers(),
     mock_vnode(snarl_user_vnode, [0]),
     ok.
@@ -297,179 +340,11 @@ cleanup(_) ->
     cleanup_mock_servers(),
     ok.
 
-start_mock_servers() ->
-    os:cmd("mkdir eqc_user_vnode_data"),
-    application:set_env(fifo_db, db_path, "eqc_user_vnode_data"),
-    application:set_env(fifo_db, backend, fifo_db_leveldb),
-    ok = application:start(hanoidb),
-    ok = application:start(bitcask),
-    ok = application:start(eleveldb),
-    application:start(syntax_tools),
-    application:start(compiler),
-    application:start(goldrush),
-    application:start(lager),
-    ok = application:start(fifo_db),
-    start_fake_read_fsm(),
-    start_fake_write_fsm().
 
-cleanup_mock_servers() ->
-    eqc_vnode ! stop,
-    stop_fake_read_fsm(),
-    stop_fake_write_fsm(),
-    application:stop(fifo_db),
-    os:cmd("rm -r eqc_user_vnode_data"),
-    application:stop(bitcask),
-    application:stop(compiler),
-    application:stop(eleveldb),
-    application:stop(goldrush),
-    application:stop(hanoidb),
-    application:stop(lager),
-    application:stop(syntax_tools).
-
-start_fake_vnode_master(Pid) ->
-    meck:new(riak_core_vnode_master, [passthrough]),
-    meck:expect(riak_core_vnode_master, command,
-                fun(_, C, _, _) ->
-                        Ref = make_ref(),
-                        Pid ! {command, self(), Ref, C},
-                        receive
-                            {Ref, Res} ->
-                                Res
-                        after
-                            5000 ->
-                                {error, timeout}
-                        end
-                end).
-start_fake_read_fsm() ->
-    meck:new(snarl_entity_read_fsm, [passthrough]),
-    meck:expect(snarl_entity_read_fsm, start,
-                fun({M, _}, C, E) ->
-                        ReqID = reqid(),
-                        R = M:C(dummy, ReqID, E),
-                        Res = case R of
-                                  {ok, ReqID, _, #snarl_obj{val=V}} ->
-                                      {ok, V};
-                                  {ok, ReqID, _, O} ->
-                                      O;
-                                  E ->
-                                      E
-                              end,
-                        Res
-                end),
-    meck:expect(snarl_entity_read_fsm, start,
-                fun({M, _}, C, E, _, true) ->
-                        ReqID = reqid(),
-                        R = M:C(dummy, ReqID, E),
-                        Res = case R of
-                                  {ok, ReqID, _, not_found} ->
-                                      not_found;
-                                  {ok, ReqID, _, O} ->
-                                      {ok, O};
-                                  {ok, ReqID, _, O} ->
-                                      O;
-                                  E ->
-                                      E
-                              end,
-                        Res
-                end).
-
-start_fake_write_fsm() ->
-    meck:new(snarl_entity_write_fsm, [passthrough]),
-    meck:expect(snarl_entity_write_fsm, write,
-                fun({M, _}, E, C) ->
-                        ReqID = reqid(),
-                        R = M:C(dummy, ReqID, E),
-                        Res = case R of
-                                  {ok, ReqID, _, #snarl_obj{val=V}} ->
-                                      {ok, V};
-                                  {ok, ReqID, _, O} ->
-                                      O;
-                                  {ok, _} ->
-                                      ok;
-                                  E ->
-                                      E
-                              end,
-                        Res
-                end),
-    meck:expect(snarl_entity_write_fsm, write,
-                fun({M, _}, E, C, Val) ->
-                        ReqID = reqid(),
-                        R = M:C(dummy, ReqID, E, Val),
-                        Res = case R of
-                                  {ok, ReqID, _, #snarl_obj{val=V}} ->
-                                      {ok, V};
-                                  {ok, ReqID, _, O} ->
-                                      O;
-                                  {ok, _} ->
-                                      ok;
-                                  {ok, _, O} ->
-                                      O;
-                                  E ->
-                                      E
-                              end,
-                        Res
-                end).
-
-stop_fake_vnode_master() ->
-    catch meck:unload(riak_core_vnode_master).
-
-stop_fake_read_fsm() ->
-    catch meck:unload(snarl_entity_read_fsm).
-
-stop_fake_write_fsm() ->
-    meck:unload(snarl_entity_write_fsm).
-
-mock_vnode(Mod, Args) ->
-    {ok, S, _} = Mod:init(Args),
-    Pid = spawn(?MODULE, mock_vnode_loop, [Mod, S]),
-    register(eqc_vnode, Pid),
-    start_fake_vnode_master(Pid),
-    Pid.
-
-mock_vnode_loop(M, S) ->
-    receive
-        {command, F, Ref, C} ->
-            try M:handle_command(C, F, S) of
-                {reply, R, S1} ->
-                    F ! {Ref, R},
-                    mock_vnode_loop(M, S1);
-                {_, _, S1} = E->
-                    io:format(user, "VNode command Error: ~p~n", [E]),
-                    mock_vnode_loop(M, S1);
-                E ->
-                    io:format(user, "VNode command Error: ~p~n", [E]),
-                    mock_vnode_loop(M, S)
-            catch
-                E:E1 ->
-                    io:format(user, "VNode command(~p) crash: ~p:~p~n", [C, E, E1])
-
-            end;
-        {coverage, F, Ref, C} ->
-            case M:handle_coverage(C, undefinded, F, S) of
-                {reply, R, S1} ->
-                    F ! {Ref, R},
-                    mock_vnode_loop(M, S1);
-                {_, _, S1} ->
-                    mock_vnode_loop(M, S1)
-            end;
-        {info, F, Ref, C} ->
-            case M:handle_info(C, undefinded, F, S) of
-                {reply, R, S1} ->
-                    F ! {Ref, R},
-                    mock_vnode_loop(M, S1);
-                {_, _, S1} ->
-                    mock_vnode_loop(M, S1)
-            end;
-        stop ->
-            stop_fake_vnode_master();
-        delete ->
-            {ok, S1} = M:delete(S),
-            mock_vnode_loop(M, S1)
-    end.
 
 -define(EQC_SETUP, true).
 
-                                                %-define(EQC_NUM_TESTS, 5000).
+%-define(EQC_NUM_TESTS, 5000).
 -define(EQC_EUNIT_TIMEUT, 120).
 -include("eqc_helper.hrl").
 -endif.
