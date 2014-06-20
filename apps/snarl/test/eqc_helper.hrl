@@ -50,6 +50,7 @@
 -define(EQC_EUNIT_TIMEUT, (?EQC_NUM_TESTS/10)).
 -endif.
 
+-ifndef(EQC_SETUP).
 run_test_() ->
     [{exports, E} | _] = module_info(),
     E1 = [{atom_to_list(N), N} || {N, 0} <- E],
@@ -57,3 +58,15 @@ run_test_() ->
     [{"Running " ++ N ++ " propperty test",
       {timeout, ?EQC_EUNIT_TIMEUT, ?_assert(quickcheck(numtests(?EQC_NUM_TESTS,  ?OUT(?MODULE:A()))))}}
      || {N, A} <- E2].
+-else.
+run_test_() ->
+    [{exports, E} | _] = module_info(),
+    E1 = [{atom_to_list(N), N} || {N, 0} <- E],
+    E2 = [{N, A} || {"prop_" ++ N, A} <- E1],
+    [{setup,
+      fun setup/0,
+      fun cleanup/1,
+      [{"Running " ++ N ++ " propperty test",
+        {timeout, ?EQC_EUNIT_TIMEUT, ?_assert(quickcheck(numtests(?EQC_NUM_TESTS,  ?OUT(?MODULE:A()))))}}
+     || {N, A} <- E2]}].
+-endif.

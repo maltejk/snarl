@@ -7,5 +7,7 @@ ensure_str(V) when is_binary(V) ->
     binary_to_list(V);
 ensure_str(V) when is_integer(V) ->
     integer_to_list(V);
+ensure_str(V) when is_float(V) ->
+    float_to_list(V);
 ensure_str(V) when is_list(V) ->
     V.

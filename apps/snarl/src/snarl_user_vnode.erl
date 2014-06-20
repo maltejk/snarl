@@ -233,7 +233,6 @@ revoke_prefix(Preflist, ReqID, User, Val) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-
 %%%===================================================================
 %%% VNode
 %%%===================================================================
@@ -254,14 +253,6 @@ handle_command({add, {ReqID, Coordinator}=ID, UUID, User}, _Sender, State) ->
     UserObj = #snarl_obj{val=User3, vclock=VC},
     snarl_vnode:put(UUID, UserObj, State),
     {reply, {ok, ReqID}, State};
-
-handle_command({join = Action, {ReqID, _}=ID, User, Role}, _Sender, State) ->
-    case snarl_role:get(Role) of
-        not_found ->
-            {reply, {ok, ReqID, not_found}, State};
-        {ok, _RoleObj} ->
-            snarl_vnode:change(User, Action, [Role], ID, State)
-    end;
 
 handle_command(Message, Sender, State) ->
     snarl_vnode:handle_command(Message, Sender, State).
@@ -350,6 +341,7 @@ handle_exit(_Pid, _Reason, State) ->
 
 terminate(_Reason, _State) ->
     ok.
+
 handle_info(Msg, State) ->
     snarl_vnode:handle_info(Msg, State).
 

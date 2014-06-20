@@ -271,8 +271,7 @@ get(User) ->
 get_(User) ->
     case snarl_entity_read_fsm:start(
            {snarl_user_vnode, snarl_user},
-           get, User
-          ) of
+           get, User) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -321,7 +320,7 @@ list(Requirements, false) ->
                  {ok, UUID::fifo:user_id()}.
 
 add(undefined, User) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    UUID = uuid:uuid4s(),
     lager:info("[~p:create] Creation Started.", [UUID]),
     case create(UUID, User) of
         {ok, UUID} ->
@@ -426,7 +425,12 @@ import(User, Data) ->
                   {error, timeout} |
                   ok.
 join(User, Role) ->
-    do_write(User, join, Role).
+    case snarl_role:get_(Role) of
+        {ok, _} ->
+            do_write(User, join, Role);
+        E ->
+            E
+    end.
 
 -spec leave(User::fifo:user_id(), Role::fifo:role_id()) ->
                    not_found |
@@ -441,7 +445,12 @@ leave(User, Role) ->
                       {error, timeout} |
                       ok.
 join_org(User, Org) ->
-    do_write(User, join_org, Org).
+    case snarl_org:get_(Org) of
+        {ok, _} ->
+            do_write(User, join_org, Org);
+        E ->
+            E
+    end.
 
 -spec select_org(User::fifo:user_id(), Org::fifo:org_id()) ->
                         not_found |

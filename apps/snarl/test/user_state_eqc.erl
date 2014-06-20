@@ -23,12 +23,12 @@ permission(Size) ->
     ?LAZY(oneof([[oneof([<<"...">>, perm_entry()])] || Size == 0] ++
                     [[perm_entry() | permission(Size -1)] || Size > 0])).
 
+perm_entry() ->
+    oneof([<<"_">>, bin_str()]).
+
 maybe_oneof(L) ->
     ?LET(E, ?SUCHTHAT(E, bin_str(), not lists:member(E, L)),
          oneof([E | L])).
-
-perm_entry() ->
-    oneof([<<"_">>, bin_str()]).
 
 bin_str() ->
     ?LET(S, ?SUCHTHAT(L, list(choose($a, $z)), L =/= []), list_to_binary(S)).

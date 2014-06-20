@@ -31,19 +31,19 @@ long-test:
 	$(REBAR) skip_deps=true -DEQC_LONG_TESTS eunit --verbose
 
 eunit: 
-	$(REBAR) skip_deps=true compile
+	$(REBAR) compile
 	-rm -r apps/snarl/.eunit
-	$(REBAR) skip_deps=true eunit --verbose
+	$(REBAR) eunit skip_deps=true -r --verbose
 
 test:  eunit
-	$(REBAR) skip_deps=true xref 
+	$(REBAR) xref skip_deps=true -r
 
 quick-xref:
-	$(REBAR) xref skip_deps=true
+	$(REBAR) xref skip_deps=true -r
 
 quick-test:
 	-rm -r apps/snarl/.eunit
-	$(REBAR) skip_deps=true eunit
+	$(REBAR) skip_deps=true eunit -r
 
 rel: all zabbix
 	-rm -r rel/snarl/share
