@@ -33,7 +33,7 @@ long-test:
 eunit: 
 	$(REBAR) compile
 	-rm -r apps/snarl/.eunit
-	$(REBAR) eunit skip_deps=true -r -v
+	$(REBAR) skip_deps=true -r -v
 
 test:  eunit
 	$(REBAR) xref skip_deps=true -r
@@ -43,7 +43,7 @@ quick-xref:
 
 quick-test:
 	-rm -r apps/snarl/.eunit
-	$(REBAR) skip_deps=true eunit -r
+	$(REBAR) -DEQC_SHORT_TEST skip_deps=true eunit -r
 
 rel: all zabbix
 	-rm -r rel/snarl/share

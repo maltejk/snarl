@@ -39,12 +39,18 @@
 
 
 -ifndef(EQC_NUM_TESTS).
+
 -ifdef(EQC_LONG_TESTS).
 -define(EQC_NUM_TESTS, 5000).
--else.
+-else.  % EQC_LONG_TESTS
+-ifdef(EQC_SHORT_TEST).
+-define(EQC_NUM_TESTS, 100).
+-else.  % EQC_SHORT_TEST
 -define(EQC_NUM_TESTS, 500).
--endif.
--endif.
+-endif. % EQC_SHORT_TEST
+-endif. % EQC_LONG_TESTS
+
+-endif. % EQC_NUM_TESTS
 
 -ifndef(EQC_EUNIT_TIMEUT).
 -define(EQC_EUNIT_TIMEUT, (?EQC_NUM_TESTS/10)).
