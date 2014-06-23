@@ -42,7 +42,7 @@
 -ifdef(EQC_LONG_TESTS).
 -define(EQC_NUM_TESTS, 5000).
 -else.
--define(EQC_NUM_TESTS, 100).
+-define(EQC_NUM_TESTS, 500).
 -endif.
 -endif.
 

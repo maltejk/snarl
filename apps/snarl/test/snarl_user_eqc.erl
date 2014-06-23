@@ -18,7 +18,7 @@
 
 -record(state, {added = [], next_uuid=uuid:uuid4s(),
                 passwords = [], roles = [], orgs = [],
-                yubikeys = []}).
+                yubikeys = [], keys = []}).
 
 
 maybe_a_uuid(#state{added = Added}) ->
@@ -47,6 +47,11 @@ maybe_role(#state{roles = Rs}) ->
 maybe_org(#state{orgs = Os}) ->
     maybe_oneof([O || {_, O} <- Os]).
 
+maybe_yubikey(#state{yubikeys = Ks}) ->
+    maybe_oneof([K || {_, K} <- Ks]).
+
+maybe_key(#state{keys = Ks}) ->
+    maybe_oneof([K || {_, K} <- Ks]).
 
 cleanup() ->
     eqc_vnode ! delete,
@@ -68,15 +73,17 @@ command(S) ->
            {call, ?MODULE, join_org, [maybe_a_uuid(S), non_blank_string()]},
            {call, ?U, leave_org, [maybe_a_uuid(S), maybe_org(S)]},
            {call, ?U, active, [maybe_a_uuid(S)]},
+           {call, ?U, orgs, [maybe_a_uuid(S)]},
+           {call, ?U, select_org, [maybe_a_uuid(S), maybe_org(S)]},
 
            %% SSH key related commands
            {call, ?U, add_key, [maybe_a_uuid(S), non_blank_string(), non_blank_string()]},
-           {call, ?U, revoke_key, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?U, revoke_key, [maybe_a_uuid(S), maybe_key(S)]},
            {call, ?U, keys, [maybe_a_uuid(S)]},
 
            %% Yubi key related commands
            {call, ?U, add_yubikey, [maybe_a_uuid(S), yubikey()]},
-           {call, ?U, remove_yubikey, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?U, remove_yubikey, [maybe_a_uuid(S), maybe_yubikey(S)]},
            {call, ?U, yubikeys, [maybe_a_uuid(S)]},
 
            {call, ?MODULE, add, [S#state.next_uuid, maybe_a_uuid(S)]},
@@ -134,6 +141,7 @@ next_state(S = #state{added=Us, orgs=Os}, _V,
             end
     end;
 
+
 next_state(S = #state{added=Us, yubikeys=Ks}, _V,
            {call, _, add_yubikey, [UUID, Key]}) ->
     ID = snarl_yubico:id(Key),
@@ -147,6 +155,21 @@ next_state(S = #state{added=Us, yubikeys=Ks}, _V,
                     S#state{yubikeys = [{UUID, [ID | Keys]} | Ks1]};
                 _  ->
                     S#state{yubikeys = [{UUID, [ID]} | Ks]}
+            end
+    end;
+
+next_state(S = #state{added=Us, keys=Ks}, _V,
+           {call, _, add_key, [UUID, ID, _]}) ->
+    case lists:member(UUID, Us) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Ks) of
+                {UUID, Keys} ->
+                    Ks1 = proplists:delete(UUID, Ks),
+                    S#state{keys = [{UUID, lists:usort([ID | Keys])} | Ks1]};
+                _  ->
+                    S#state{keys = [{UUID, [ID]} | Ks]}
             end
     end;
 
@@ -203,6 +226,20 @@ postcondition(#state{added=Us}, {call, _, active, [UUID]}, not_found) ->
 
 postcondition(#state{added=Us}, {call, _, active, [UUID]}, {ok, _}) ->
     lists:member(UUID, Us);
+
+postcondition(#state{added=Us}, {call, _, orgs, [UUID]}, not_found) ->
+    not lists:member(UUID, Us);
+
+postcondition(#state{added=Us}, {call, _, orgs, [UUID]}, {ok, _}) ->
+    lists:member(UUID, Us);
+
+postcondition(S = #state{added=Us}, {call, _, select_org, [UUID, Org]}, not_found) ->
+    not (lists:member(UUID, Us) andalso
+         lists:member(Org, known_orgs(S, UUID)));
+
+postcondition(S = #state{added=Us}, {call, _, select_org, [UUID, Org]}, ok) ->
+    lists:member(UUID, Us) andalso
+     lists:member(Org, known_orgs(S, UUID));
 
 %% Keys
 postcondition(#state{added=Us}, {call, _, add_key, [UUID, _, _]}, not_found) ->
@@ -280,7 +317,8 @@ postcondition(#state{added=Us}, {call, _, get_, [UUID]}, not_found) ->
 
 postcondition(S=#state{added=Us}, {call, _, get_, [UUID]}, {ok, U}) ->
     lists:member(UUID, Us) andalso roles_match(S, UUID, U)
-        andalso orgs_match(S, UUID, U) andalso yubikeys_match(S, UUID, U);
+        andalso orgs_match(S, UUID, U) andalso yubikeys_match(S, UUID, U)
+        andalso keys_match(S, UUID, U);
 
 postcondition(#state{added=Us}, {call, _, raw, [UUID]}, not_found) ->
     not lists:member(UUID, Us);
@@ -310,22 +348,38 @@ roles_match(#state{roles=Rs}, UUID, U) ->
             end,
     snarl_user_state:roles(U) == Known.
 
-orgs_match(#state{orgs=Os}, UUID, U) ->
-    Known = case lists:keyfind(UUID, 1, Os) of
-                {UUID, Orgs} ->
-                    lists:usort(Orgs);
-                _ ->
-                    []
-            end,
-    snarl_user_state:orgs(U) == Known.
+orgs_match(S, UUID, U) ->
+    snarl_user_state:orgs(U) == known_orgs(S, UUID).
 
 yubikeys_match(S, UUID, U) ->
     snarl_user_state:yubikeys(U) == known_yubikeys(S, UUID).
+
+keys_match(S, UUID, U) ->
+    Ks = snarl_user_state:keys(U),
+    Ks1 = [I || {I, _K} <- Ks],
+    Ks1 == known_keys(S, UUID).
 
 known_yubikeys(#state{yubikeys=Ks}, UUID) ->
     case lists:keyfind(UUID, 1, Ks) of
         {UUID, Keys} ->
             lists:usort(Keys);
+        _ ->
+            []
+    end.
+
+known_keys(#state{keys=Ks}, UUID) ->
+    case lists:keyfind(UUID, 1, Ks) of
+        {UUID, Keys} ->
+            lists:usort(Keys);
+        _ ->
+            []
+    end.
+
+
+known_orgs(#state{orgs=Os}, UUID) ->
+    case lists:keyfind(UUID, 1, Os) of
+        {UUID, Orgs} ->
+            lists:usort(Orgs);
         _ ->
             []
     end.
@@ -340,12 +394,10 @@ cleanup(_) ->
     cleanup_mock_servers(),
     ok.
 
-
-
 -define(EQC_SETUP, true).
 
 %-define(EQC_NUM_TESTS, 5000).
--define(EQC_EUNIT_TIMEUT, 120).
+-define(EQC_EUNIT_TIMEUT, 1200).
 -include("eqc_helper.hrl").
 -endif.
 -endif.
