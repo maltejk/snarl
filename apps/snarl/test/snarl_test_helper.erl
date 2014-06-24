@@ -11,7 +11,7 @@ id(I) ->
     {I, eqc}.
 
 id() ->
-    id(0).
+    id(1).
 
 atom() ->
     elements([a,b,c,undefined]).
@@ -71,7 +71,7 @@ start_mock_servers() ->
     start_fake_write_fsm().
 
 cleanup_mock_servers() ->
-    eqc_vnode ! stop,
+    catch eqc_vnode ! stop,
     stop_fake_read_fsm(),
     stop_fake_write_fsm(),
     application:stop(fifo_db),
@@ -110,8 +110,8 @@ start_fake_read_fsm() ->
                                       {ok, V};
                                   {ok, ReqID, _, O} ->
                                       O;
-                                  E ->
-                                      E
+                                  Err ->
+                                      Err
                               end,
                         Res
                 end),
@@ -145,8 +145,8 @@ start_fake_write_fsm() ->
                                       O;
                                   {ok, _} ->
                                       ok;
-                                  E ->
-                                      E
+                                  Err ->
+                                      Err
                               end,
                         Res
                 end),
@@ -163,10 +163,28 @@ start_fake_write_fsm() ->
                                       ok;
                                   {ok, _, O} ->
                                       O;
-                                  E ->
-                                      E
+                                  Err ->
+                                      Err
                               end,
                         Res
+                end).
+
+start_fake_coverage(Pid) ->
+    meck:new(snarl_coverage, [passthrough]),
+    meck:expect(snarl_coverage, start,
+                fun(_, O, C) ->
+                        M = list_to_atom(atom_to_list(O) ++ "_vnode"),
+                        Ref = make_ref(),
+                        Pid ! {coverage, M, self(), Ref, C},
+                        receive
+                            {Ref,  {ok, _, _, Res}} ->
+                                {ok, Res};
+                            {Ref, Res} ->
+                                Res
+                        after
+                            5000 ->
+                                {error, timeout}
+                        end
                 end).
 
 stop_fake_vnode_master() ->
@@ -176,54 +194,84 @@ stop_fake_read_fsm() ->
     catch meck:unload(snarl_entity_read_fsm).
 
 stop_fake_write_fsm() ->
-    meck:unload(snarl_entity_write_fsm).
+    catch meck:unload(snarl_entity_write_fsm).
+
+stop_fake_coverage() ->
+    catch meck:unload(snarl_coverage).
 
 mock_vnode(Mod, Args) ->
     {ok, S, _} = Mod:init(Args),
     Pid = spawn(?MODULE, mock_vnode_loop, [Mod, S]),
     register(eqc_vnode, Pid),
     start_fake_vnode_master(Pid),
+    start_fake_coverage(Pid),
     Pid.
 
 mock_vnode_loop(M, S) ->
-    receive
-        {command, F, Ref, C} ->
-            try M:handle_command(C, F, S) of
-                {reply, R, S1} ->
-                    F ! {Ref, R},
-                    mock_vnode_loop(M, S1);
-                {_, _, S1} = E->
-                    io:format(user, "VNode command Error: ~p~n", [E]),
-                    mock_vnode_loop(M, S1);
-                E ->
-                    io:format(user, "VNode command Error: ~p~n", [E]),
-                    mock_vnode_loop(M, S)
-            catch
-                E:E1 ->
-                    io:format(user, "VNode command(~p) crash: ~p:~p~n", [C, E, E1])
-
-            end;
-        {coverage, F, Ref, C} ->
-            case M:handle_coverage(C, undefinded, F, S) of
-                {reply, R, S1} ->
-                    F ! {Ref, R},
-                    mock_vnode_loop(M, S1);
-                {_, _, S1} ->
-                    mock_vnode_loop(M, S1)
-            end;
-        {info, F, Ref, C} ->
-            case M:handle_info(C, undefinded, F, S) of
-                {reply, R, S1} ->
-                    F ! {Ref, R},
-                    mock_vnode_loop(M, S1);
-                {_, _, S1} ->
-                    mock_vnode_loop(M, S1)
-            end;
-        stop ->
-            stop_fake_vnode_master();
-        delete ->
-            {ok, S1} = M:delete(S),
-            mock_vnode_loop(M, S1)
+    try
+        receive
+            {command, F, Ref, C} ->
+                try M:handle_command(C, F, S) of
+                    {reply, R, S1} ->
+                        F ! {Ref, R},
+                        mock_vnode_loop(M, S1);
+                    {_, _, S1} = E->
+                        mock_vnode_loop(M, S1);
+                    E ->
+                        io:format(user, "VNode command Error: ~p~n", [E]),
+                        mock_vnode_loop(M, S)
+                catch
+                    E:E1 ->
+                        io:format(user, "VNode command(~p) crash: ~p:~p~n",
+                                  [C, E, E1]),
+                        mock_vnode_loop(M, S)
+                end;
+            {coverage, M, F, Ref, C} ->
+                From = {raw, Ref, F},
+                try M:handle_coverage(C, undefinded, From, S) of
+                    {async, {fold, Fun1, Fun2}, _, S1} ->
+                        R1 = Fun1(),
+                        Fun2(R1),
+                        mock_vnode_loop(M, S1);
+                    {reply, R, S1} ->
+                        F ! {Ref, R},
+                        mock_vnode_loop(M, S1);
+                    {_, _, S1} ->
+                        mock_vnode_loop(M, S1);
+                    O ->
+                        io:format(user, "vnode return: ~p~n", [O]),
+                        mock_vnode_loop(M, S)
+                catch
+                    E:E1 ->
+                        io:format(user, "VNode coverage(~p) crash: ~p:~p~n",
+                                  [C, E, E1]),
+                        mock_vnode_loop(M, S)
+                end;
+            {coverage, M1, F, Ref, C} ->
+                F ! {Ref, {error, wrong_vnode}},
+                mock_vnode_loop(M, S);
+            {info, F, Ref, C} ->
+                case M:handle_info(C, undefinded, F, S) of
+                    {reply, R, S1} ->
+                        F ! {Ref, R},
+                        mock_vnode_loop(M, S1);
+                    {_, _, S1} ->
+                        mock_vnode_loop(M, S1)
+                end;
+            stop ->
+                stop_fake_vnode_master(),
+                stop_fake_coverage();
+            delete ->
+                {ok, S1} = M:delete(S),
+                mock_vnode_loop(M, S1);
+            O1 ->
+                io:format(user, "vnode bad message: ~p~n", [O1]),
+                mock_vnode_loop(M, S)
+        end
+    catch
+        Te:Te1 ->
+            io:format(user, "mock vnode error: ~p:~p~n", [Te, Te1]),
+            mock_vnode_loop(M, S)
     end.
 
 -endif.

@@ -65,7 +65,6 @@
               leave/4,
               list/2,
               list/3,
-              lookup/3,
               passwd/4,
               repair/4,
               revoke/4,

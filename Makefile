@@ -33,7 +33,7 @@ long-test:
 eunit: 
 	$(REBAR) compile
 	-rm -r apps/snarl/.eunit
-	$(REBAR) skip_deps=true -r -v
+	$(REBAR) eunit skip_deps=true -r -v
 
 test:  eunit
 	$(REBAR) xref skip_deps=true -r

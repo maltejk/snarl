@@ -53,7 +53,7 @@
 -endif. % EQC_NUM_TESTS
 
 -ifndef(EQC_EUNIT_TIMEUT).
--define(EQC_EUNIT_TIMEUT, (?EQC_NUM_TESTS/10)).
+-define(EQC_EUNIT_TIMEUT, (?EQC_NUM_TESTS/5)).
 -endif.
 
 -ifndef(EQC_SETUP).

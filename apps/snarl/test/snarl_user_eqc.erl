@@ -4,6 +4,20 @@
 -ifdef(EQC).
 
 -define(U, snarl_user).
+-define(M, ?MODULE).
+
+
+-define(FWD(C),
+        C({_, UUID}) ->
+               ?U:C(UUID)).
+
+-define(FWD2(C),
+        C({_, UUID}, A1) ->
+               ?U:C(UUID, A1)).
+
+-define(FWD3(C),
+        C({_, UUID}, A1, A2) ->
+               ?U:C(UUID, A1, A2)).
 
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("eqc/include/eqc_statem.hrl").
@@ -13,16 +27,26 @@
 
 -compile(export_all).
 -import(snarl_test_helper,
-        [id/0, permission/0, non_blank_string/0, maybe_oneof/1, lower_char/0,
-         cleanup_mock_servers/0, mock_vnode/2, start_mock_servers/0]).
+        [id/0, permission/0, non_blank_string/0, maybe_oneof/1, maybe_oneof/2,
+         lower_char/0, cleanup_mock_servers/0, mock_vnode/2,
+         start_mock_servers/0]).
 
 -record(state, {added = [], next_uuid=uuid:uuid4s(),
                 passwords = [], roles = [], orgs = [],
-                yubikeys = [], keys = []}).
+                yubikeys = [], keys = [], metadata = []}).
 
 
 maybe_a_uuid(#state{added = Added}) ->
-    maybe_oneof(Added).
+    ?SUCHTHAT(
+       U,
+       ?LET(E, ?SUCHTHAT(N,
+                         non_blank_string(),
+                         lists:keyfind(N, 1, Added) == false),
+            oneof([{E, non_blank_string()} | Added])),
+       U /= duplicate).
+
+maybe_a_password(#state{passwords = Pws}) ->
+    maybe_oneof(Pws).
 
 initial_state() ->
     random:seed(now()),
@@ -50,70 +74,137 @@ maybe_org(#state{orgs = Os}) ->
 maybe_yubikey(#state{yubikeys = Ks}) ->
     maybe_oneof([K || {_, K} <- Ks]).
 
-maybe_key(#state{keys = Ks}) ->
-    maybe_oneof([K || {_, K} <- Ks]).
+maybe_key(#state{keys = K0}) ->
+    ?LET(Ks, K0, maybe_oneof([Ka || {_, Ka} <- lists:flatten([K || {_, K} <- Ks])])).
+
+maybe_keyid(#state{keys = K0}) ->
+    ?LET(Ks, K0, maybe_oneof([Ki || {Ki, _} <- lists:flatten([K || {_, K} <- Ks])])).
 
 cleanup() ->
-    eqc_vnode ! delete,
+    catch eqc_vnode ! delete,
     ok.
+
+metadata_value() ->
+    oneof([delete, non_blank_string()]).
+
+metadata_kvs() ->
+    ?SUCHTHAT(L, list({non_blank_string(), metadata_value()}), L /= []
+              andalso lists:sort(L) == lists:usort(L)).
 
 command(S) ->
     oneof([
-           {call, ?U, get, [maybe_a_uuid(S)]},
-           {call, ?U, get_, [maybe_a_uuid(S)]},
-           {call, ?U, raw, [maybe_a_uuid(S)]},
+           {call, ?M, add, [S#state.next_uuid, non_blank_string()]},
+           {call, ?M, delete, [maybe_a_uuid(S)]},
+           {call, ?M, get, [maybe_a_uuid(S)]},
+           {call, ?M, get_, [maybe_a_uuid(S)]},
+           {call, ?M, lookup, [maybe_a_uuid(S)]},
+           {call, ?M, lookup_, [maybe_a_uuid(S)]},
+           {call, ?M, raw, [maybe_a_uuid(S)]},
+           {call, ?M, passwd, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?M, auth, [maybe_a_uuid(S), maybe_a_password(S)]},
 
-           {call, ?U, grant, [maybe_a_uuid(S), permission()]},
-           {call, ?U, revoke, [maybe_a_uuid(S), permission()]},
-           {call, ?U, passwd, [maybe_a_uuid(S), non_blank_string()]},
+           %% List
+           {call, ?U, list, []},
+
+           %% Permissions
+           {call, ?M, grant, [maybe_a_uuid(S), permission()]},
+           {call, ?M, revoke, [maybe_a_uuid(S), permission()]},
+
            %% Role related commands
-           {call, ?MODULE, join, [maybe_a_uuid(S), non_blank_string()]},
-           {call, ?U, leave, [maybe_a_uuid(S), maybe_role(S)]},
-           %% Org related commands
-           {call, ?MODULE, join_org, [maybe_a_uuid(S), non_blank_string()]},
-           {call, ?U, leave_org, [maybe_a_uuid(S), maybe_org(S)]},
-           {call, ?U, active, [maybe_a_uuid(S)]},
-           {call, ?U, orgs, [maybe_a_uuid(S)]},
-           {call, ?U, select_org, [maybe_a_uuid(S), maybe_org(S)]},
+           {call, ?M, join, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?M, leave, [maybe_a_uuid(S), maybe_role(S)]},
+
+           %% %% Org related commands
+           {call, ?M, join_org, [maybe_a_uuid(S), non_blank_string()]},
+           {call, ?M, leave_org, [maybe_a_uuid(S), maybe_org(S)]},
+           {call, ?M, active, [maybe_a_uuid(S)]},
+           {call, ?M, orgs, [maybe_a_uuid(S)]},
+           {call, ?M, select_org, [maybe_a_uuid(S), maybe_org(S)]},
 
            %% SSH key related commands
-           {call, ?U, add_key, [maybe_a_uuid(S), non_blank_string(), non_blank_string()]},
-           {call, ?U, revoke_key, [maybe_a_uuid(S), maybe_key(S)]},
-           {call, ?U, keys, [maybe_a_uuid(S)]},
+           {call, ?M, add_key, [maybe_a_uuid(S), non_blank_string(), non_blank_string()]},
+           {call, ?M, revoke_key, [maybe_a_uuid(S), maybe_key(S)]},
+           {call, ?M, keys, [maybe_a_uuid(S)]},
+           {call, ?U, find_key, [maybe_keyid(S)]},
 
            %% Yubi key related commands
-           {call, ?U, add_yubikey, [maybe_a_uuid(S), yubikey()]},
-           {call, ?U, remove_yubikey, [maybe_a_uuid(S), maybe_yubikey(S)]},
-           {call, ?U, yubikeys, [maybe_a_uuid(S)]},
+           {call, ?M, add_yubikey, [maybe_a_uuid(S), yubikey()]},
+           {call, ?M, remove_yubikey, [maybe_a_uuid(S), maybe_yubikey(S)]},
+           {call, ?M, yubikeys, [maybe_a_uuid(S)]},
 
-           {call, ?MODULE, add, [S#state.next_uuid, maybe_a_uuid(S)]},
-           {call, ?U, delete, [maybe_a_uuid(S)]}
+           %% Metadata
+           {call, ?M, set, [maybe_a_uuid(S), metadata_kvs()]},
+           {call, ?M, set, [maybe_a_uuid(S), non_blank_string(), metadata_value()]}
+
           ]).
 
+auth({_, N}, P) ->
+    ?U:auth(N, P, <<>>).
+
 add(UUID, User) ->
-    case snarl_user_vnode:add(0, id(), UUID, User) of
-        {ok, 0} ->
-            UUID;
-        E ->
-            {error, E}
-    end.
-join(UUID, Role) ->
+    meck:new(snarl_opt, [passthrough]),
+    meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),
+    meck:new(uuid, [passthrough]),
+    meck:expect(uuid, uuid4s, fun() -> UUID end),
+    R = case ?U:add(User) of
+            duplicate ->
+                duplicate;
+            {ok, UUID} ->
+                {User, UUID}
+        end,
+    meck:unload(snarl_opt),
+    meck:unload(uuid),
+    R.
+
+?FWD(get).
+?FWD(get_).
+?FWD(raw).
+
+lookup({N, _}) ->
+    ?U:lookup(N).
+
+lookup_({N, _}) ->
+    ?U:lookup_(N).
+
+?FWD2(grant).
+?FWD2(revoke).
+?FWD2(passwd).
+?FWD(delete).
+
+join({_, UUID}, Role) ->
     meck:new(snarl_role, [passthrough]),
     meck:expect(snarl_role, get_, fun(_) -> {ok, dummy} end),
     R = ?U:join(UUID, Role),
     meck:unload(snarl_role),
     R.
+?FWD2(leave).
 
-join_org(UUID, Org) ->
+join_org({_, UUID}, Org) ->
     meck:new(snarl_org, [passthrough]),
     meck:expect(snarl_org, get_, fun(_) -> {ok, dummy} end),
     R = ?U:join_org(UUID, Org),
     meck:unload(snarl_org),
     R.
+?FWD2(leave_org).
+?FWD2(select_org).
+?FWD(orgs).
+?FWD(active).
 
-next_state(S = #state{added=Us, roles=Rs}, _V,
-           {call, _, join, [UUID, Role]}) ->
-    case lists:member(UUID, Us) of
+?FWD3(add_key).
+?FWD2(revoke_key).
+?FWD(keys).
+?FWD(find_key).
+
+?FWD2(add_yubikey).
+?FWD2(remove_yubikey).
+?FWD(yubikeys).
+
+?FWD2(set).
+?FWD3(set).
+
+next_state(S = #state{roles=Rs}, _V,
+           {call, _, join, [{_, UUID}, Role]}) ->
+    case has_uuid(S, UUID) of
         false ->
             S;
         true ->
@@ -126,9 +217,9 @@ next_state(S = #state{added=Us, roles=Rs}, _V,
             end
     end;
 
-next_state(S = #state{added=Us, orgs=Os}, _V,
-           {call, _, join_org, [UUID, Org]}) ->
-    case lists:member(UUID, Us) of
+next_state(S = #state{orgs=Os}, _V,
+           {call, _, join_org, [{_, UUID}, Org]}) ->
+    case has_uuid(S, UUID) of
         false ->
             S;
         true ->
@@ -142,10 +233,10 @@ next_state(S = #state{added=Us, orgs=Os}, _V,
     end;
 
 
-next_state(S = #state{added=Us, yubikeys=Ks}, _V,
-           {call, _, add_yubikey, [UUID, Key]}) ->
+next_state(S = #state{yubikeys=Ks}, _V,
+           {call, _, add_yubikey, [{_, UUID}, Key]}) ->
     ID = snarl_yubico:id(Key),
-    case lists:member(UUID, Us) of
+    case has_uuid(S, UUID) of
         false ->
             S;
         true ->
@@ -158,9 +249,9 @@ next_state(S = #state{added=Us, yubikeys=Ks}, _V,
             end
     end;
 
-next_state(S = #state{added=Us, keys=Ks}, _V,
-           {call, _, add_key, [UUID, ID, _]}) ->
-    case lists:member(UUID, Us) of
+next_state(S = #state{keys=Ks}, _V,
+           {call, _, add_key, [{_, UUID}, ID, _]}) ->
+    case has_uuid(S, UUID) of
         false ->
             S;
         true ->
@@ -173,6 +264,9 @@ next_state(S = #state{added=Us, keys=Ks}, _V,
             end
     end;
 
+ next_state(S, duplicate, {call, _, add, [_, _User]}) ->
+    S#state{next_uuid=uuid:uuid4s()};
+
 next_state(S = #state{added = Added}, V, {call, _, add, [_, _User]}) ->
     S#state{added = [V | Added], next_uuid=uuid:uuid4s()};
 
@@ -180,8 +274,8 @@ next_state(S, _V, {call, _, delete, [UUID]}) ->
     S#state{added = lists:delete(UUID,  S#state.added),
             passwords = proplists:delete(UUID, S#state.passwords)};
 
-next_state(S, _V, {call, _, passwd, [UUID, Passwd]}) ->
-    case lists:member(UUID, S#state.added) of
+next_state(S, ok, {call, _, passwd, [{_, UUID}, Passwd]}) ->
+    case has_uuid(S, UUID) of
         true ->
             Pwds1 = proplists:delete(UUID, S#state.passwords),
             S#state{passwords = [{UUID, Passwd} | Pwds1]};
@@ -189,142 +283,239 @@ next_state(S, _V, {call, _, passwd, [UUID, Passwd]}) ->
             S
     end;
 
+next_state(S = #state{metadata=Ms}, _V,
+           {call, _, set, [{_, UUID}, K, delete]}) ->
+    case has_uuid(S, UUID) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Ms) of
+                {UUID, M} ->
+                    Ms1 = proplists:delete(UUID, Ms),
+                    S#state{metadata = [{UUID, orddict:erase(K, M)} | Ms1]};
+                _  ->
+                    S
+            end
+    end;
+
+next_state(S = #state{metadata=Ms}, _V,
+           {call, _, set, [{_, UUID}, K, V]}) ->
+    case has_uuid(S, UUID) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Ms) of
+                {UUID, M} ->
+                    Ms1 = proplists:delete(UUID, Ms),
+                    S#state{metadata = [{UUID, orddict:store(K, V, M)} | Ms1]};
+                _  ->
+                    S#state{metadata = [{UUID, [{K, V}]} | Ms]}
+            end
+    end;
+
+next_state(S, R,
+           {call, Mod, set, [UU, KVs]}) ->
+    lists:foldl(fun({K, V}, SAcc) ->
+                       next_state(SAcc, R, {call, Mod, set, [UU, K, V]})
+               end, S, KVs);
+
 next_state(S, _V, _C) ->
     S.
+
+dynamic_precondition(S, {call,snarl_user_eqc, lookup_, [{Name, UUID}]}) ->
+    dynamic_precondition(S, {call,snarl_user_eqc, lookup, [{Name, UUID}]});
+
+dynamic_precondition(S, {call,snarl_user_eqc, auth, [{Name, UUID}, _]}) ->
+    dynamic_precondition(S, {call,snarl_user_eqc, lookup, [{Name, UUID}]});
+
+dynamic_precondition(S, {call,snarl_user_eqc, lookup, [{Name, UUID}]}) ->
+    case lists:keyfind(Name, 1, S#state.added) of
+        false ->
+            true;
+        {Name, UUID} ->
+            true;
+        {Name, _} ->
+            false
+    end;
+
+dynamic_precondition(_S, {call, _, _, Args}) ->
+    not lists:member(duplicate, Args);
+
+dynamic_precondition(_, _) ->
+    true.
 
 precondition(_S, _) ->
     true.
 
 %% Roles
-postcondition(#state{added=Us}, {call, _, join, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, join, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, join, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, join, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, leave, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, leave, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, leave, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, leave, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
 %% Orgs
-postcondition(#state{added=Us}, {call, _, join_org, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, join_org, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, join_org, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, join_org, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, leave_org, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, leave_org, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, leave_org, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, leave_org, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, active, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, active, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, active, [UUID]}, {ok, _}) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, active, [{_, UUID}]}, {ok, _}) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, orgs, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, orgs, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, orgs, [UUID]}, {ok, _}) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, orgs, [{_, UUID}]}, {ok, _}) ->
+    has_uuid(S, UUID);
 
-postcondition(S = #state{added=Us}, {call, _, select_org, [UUID, Org]}, not_found) ->
-    not (lists:member(UUID, Us) andalso
+postcondition(S, {call, _, select_org, [{_, UUID}, Org]}, not_found) ->
+    not (has_uuid(S, UUID) andalso
          lists:member(Org, known_orgs(S, UUID)));
 
-postcondition(S = #state{added=Us}, {call, _, select_org, [UUID, Org]}, ok) ->
-    lists:member(UUID, Us) andalso
+postcondition(S, {call, _, select_org, [{_, UUID}, Org]}, ok) ->
+    has_uuid(S, UUID) andalso
      lists:member(Org, known_orgs(S, UUID));
 
 %% Keys
-postcondition(#state{added=Us}, {call, _, add_key, [UUID, _, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, add_key, [{_, UUID}, _, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, add_key, [UUID, _, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, add_key, [{_, UUID}, _, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, revoke_key, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, revoke_key, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, revoke_key, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, revoke_key, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, keys, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, keys, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added = Us}, {call, _, keys, [UUID]}, {ok, L}) when is_list(L) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, keys, [{_, UUID}]}, {ok, L}) when is_list(L) ->
+    has_uuid(S, UUID);
 
 postcondition(#state{added = _Us}, {call, _, keys, [_UUID]}, _) ->
     false;
 
 %% YubiKeys
-postcondition(#state{added=Us}, {call, _, add_yubikey, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, add_yubikey, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, add_yubikey, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, add_yubikey, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, remove_yubikey, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, remove_yubikey, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, remove_yubikey, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, remove_yubikey, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, yubikeys, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, yubikeys, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added = Us}, {call, _, yubikeys, [UUID]}, {ok, L}) when is_list(L) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, yubikeys, [{_, UUID}]}, {ok, L}) when is_list(L) ->
+    has_uuid(S, UUID);
 
 postcondition(#state{added = _Us}, {call, _, yubikeys, [_UUID]}, _) ->
     false;
 
-
 %% Permissions
-postcondition(#state{added=Us}, {call, _, grant, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, grant, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, grant, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, grant, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, revoke, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, revoke, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, revoke, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, revoke, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
+
+%% Metadata
+postcondition(S, {call, _, set, [{_, UUID}, _, _]}, not_found) ->
+    not has_uuid(S, UUID);
+
+postcondition(S, {call, _, set, [{_, UUID}, _, _]}, ok) ->
+    has_uuid(S, UUID);
+
+postcondition(S, {call, _, set, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
+
+postcondition(S, {call, _, set, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
+
+%% List
+
+postcondition(#state{added = A}, {call, _, list, []}, {ok, R}) ->
+    lists:usort([U || {_, U} <- A]) == lists:usort(R);
+
+postcondition(#state{keys=Ks}, {call, _, find_key, [K]}, not_found) ->
+    [true || {Ak, _} <- Ks, Ak == K] == [];
 
 %% General
-postcondition(#state{added=Us}, {call, _, passwd, [UUID, _]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, passwd, [{_, UUID}, _]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, passwd, [UUID, _]}, ok) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, passwd, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, get, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, auth, [{User, UUID}, Passwd]}, not_found) ->
+    not has_user(S, User)
+        orelse (lists:keyfind(UUID, 1, S#state.passwords) =/= {UUID, Passwd});
 
-postcondition(#state{added=Us}, {call, _, get, [UUID]}, {ok, _U}) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, get, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, get_, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, get, [{_, UUID}]}, {ok, _U}) ->
+    has_uuid(S, UUID);
 
-postcondition(S=#state{added=Us}, {call, _, get_, [UUID]}, {ok, U}) ->
-    lists:member(UUID, Us) andalso roles_match(S, UUID, U)
+postcondition(S, {call, _, lookup, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
+
+postcondition(S, {call, _, lookup, [{_, UUID}]}, {ok, Result}) ->
+    {ok, UUID} == jsxd:get(<<"uuid">>, Result) andalso has_uuid(S, UUID);
+
+postcondition(S, {call, _, lookup_, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
+
+postcondition(S, {call, _, lookup_, [{_, UUID}]}, {ok, Result}) ->
+    UUID == snarl_user_state:uuid(Result) andalso has_uuid(S, UUID);
+
+postcondition(S, {call, _, get_, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
+
+postcondition(S, {call, _, get_, [{_, UUID}]}, {ok, U}) ->
+    has_uuid(S, UUID) andalso roles_match(S, UUID, U)
         andalso orgs_match(S, UUID, U) andalso yubikeys_match(S, UUID, U)
-        andalso keys_match(S, UUID, U);
+        andalso keys_match(S, UUID, U) andalso metadata_match(S, UUID, U);
 
-postcondition(#state{added=Us}, {call, _, raw, [UUID]}, not_found) ->
-    not lists:member(UUID, Us);
+postcondition(S, {call, _, raw, [{_, UUID}]}, not_found) ->
+    not has_uuid(S, UUID);
 
-postcondition(#state{added=Us}, {call, _, raw, [UUID]}, {ok, _}) ->
-    lists:member(UUID, Us);
+postcondition(S, {call, _, raw, [{_, UUID}]}, {ok, _}) ->
+    has_uuid(S, UUID);
+
+postcondition(S, {call, _, add, [_UUID, User]}, duplicate) ->
+    has_user(S, User);
 
 postcondition(#state{added=_Us}, {call, _, add, [_User, _]}, {error, _}) ->
     false;
@@ -332,7 +523,7 @@ postcondition(#state{added=_Us}, {call, _, add, [_User, _]}, {error, _}) ->
 postcondition(#state{added=_Us}, {call, _, add, [_User, _]}, _) ->
     true;
 
-postcondition(#state{added=_Us}, {call, _, delete, [_UUID]}, ok) ->
+postcondition(#state{added=_Us}, {call, _, delete, [{_, _UUID}]}, ok) ->
     true;
 
 postcondition(_S, C, R) ->
@@ -359,6 +550,18 @@ keys_match(S, UUID, U) ->
     Ks1 = [I || {I, _K} <- Ks],
     Ks1 == known_keys(S, UUID).
 
+metadata_match(S, UUID, U) ->
+    Ks = snarl_user_state:metadata(U),
+    Ks == known_metadata(S, UUID).
+
+known_metadata(#state{metadata=Ms}, UUID) ->
+    case lists:keyfind(UUID, 1, Ms) of
+        {UUID, M} ->
+            M;
+        _ ->
+            []
+    end.
+
 known_yubikeys(#state{yubikeys=Ks}, UUID) ->
     case lists:keyfind(UUID, 1, Ks) of
         {UUID, Keys} ->
@@ -383,6 +586,23 @@ known_orgs(#state{orgs=Os}, UUID) ->
         _ ->
             []
     end.
+
+has_uuid(#state{added = A}, UUID) ->
+    case lists:keyfind(UUID, 2, A) of
+        {_, UUID} ->
+            true;
+        _ ->
+            false
+    end.
+
+has_user(#state{added = A}, User) ->
+    case lists:keyfind(User, 1, A) of
+        {User, _} ->
+            true;
+        _ ->
+            false
+    end.
+
 
 %% We kind of have to start a lot of services for this tests :(
 setup() ->

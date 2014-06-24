@@ -440,7 +440,7 @@ leave({_T, ID}, Role, User) ->
     end.
 
 metadata(User) ->
-    User#?USER.metadata.
+    snarl_map:value(User#?USER.metadata).
 
 set_metadata({T, ID}, P, Value, User) when is_binary(P) ->
     set_metadata({T, ID}, snarl_map:split_path(P), Value, User);
