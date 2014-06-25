@@ -11,7 +11,9 @@ id(I) ->
     {I, eqc}.
 
 id() ->
-    id(1).
+    {Mega, Sec, Micro} = now(),
+    Now = (Mega * 1000000  + Sec) * 1000000 + Micro,
+    id(Now).
 
 atom() ->
     elements([a,b,c,undefined]).

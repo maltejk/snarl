@@ -28,3 +28,4 @@ standalone.config
 current_counterexample.eqc
 .rebar
 *.log
+*.log.?

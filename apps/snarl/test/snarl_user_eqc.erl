@@ -142,8 +142,6 @@ auth({_, N}, P) ->
     ?U:auth(N, P, <<>>).
 
 add(UUID, User) ->
-    meck:new(snarl_opt, [passthrough]),
-    meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),
     meck:new(uuid, [passthrough]),
     meck:expect(uuid, uuid4s, fun() -> UUID end),
     R = case ?U:add(User) of
@@ -152,7 +150,6 @@ add(UUID, User) ->
             {ok, UUID} ->
                 {User, UUID}
         end,
-    meck:unload(snarl_opt),
     meck:unload(uuid),
     R.
 
@@ -171,20 +168,10 @@ lookup_({N, _}) ->
 ?FWD2(passwd).
 ?FWD(delete).
 
-join({_, UUID}, Role) ->
-    meck:new(snarl_role, [passthrough]),
-    meck:expect(snarl_role, get_, fun(_) -> {ok, dummy} end),
-    R = ?U:join(UUID, Role),
-    meck:unload(snarl_role),
-    R.
+?FWD2(join).
 ?FWD2(leave).
 
-join_org({_, UUID}, Org) ->
-    meck:new(snarl_org, [passthrough]),
-    meck:expect(snarl_org, get_, fun(_) -> {ok, dummy} end),
-    R = ?U:join_org(UUID, Org),
-    meck:unload(snarl_org),
-    R.
+?FWD2(join_org).
 ?FWD2(leave_org).
 ?FWD2(select_org).
 ?FWD(orgs).
@@ -608,10 +595,24 @@ has_user(#state{added = A}, User) ->
 setup() ->
     start_mock_servers(),
     mock_vnode(snarl_user_vnode, [0]),
+    meck:new(snarl_role, [passthrough]),
+    meck:expect(snarl_role, revoke_prefix, fun(_, _) -> ok end),
+    meck:expect(snarl_role, list, fun() -> {ok, []} end),
+    meck:expect(snarl_role, get_, fun(_) -> {ok, dummy} end),
+    meck:new(snarl_org, [passthrough]),
+    meck:expect(snarl_org, remove_target, fun(_, _) -> ok end),
+    meck:expect(snarl_org, list, fun() -> {ok, []} end),
+    meck:expect(snarl_org, get_, fun(_) -> {ok, dummy} end),
+    meck:new(snarl_opt, [passthrough]),
+    meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),
+
     ok.
 
 cleanup(_) ->
     cleanup_mock_servers(),
+    meck:unload(snarl_role),
+    meck:unload(snarl_org),
+    meck:unload(snarl_opt),
     ok.
 
 -define(EQC_SETUP, true).

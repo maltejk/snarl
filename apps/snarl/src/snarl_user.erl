@@ -499,7 +499,7 @@ delete(User) ->
               Prefix = [<<"users">>, User],
               {ok, Users} = snarl_user:list(),
               [snarl_user:revoke_prefix(U, Prefix) || U <- Users],
-              {ok, Roles} = list(),
+              {ok, Roles} = snarl_role:list(),
               [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
               {ok, Orgs} = snarl_org:list(),
               [snarl_org:remove_target(O, User) || O <- Orgs]
