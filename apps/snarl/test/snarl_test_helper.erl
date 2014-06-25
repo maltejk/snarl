@@ -187,6 +187,27 @@ start_fake_coverage(Pid) ->
                             5000 ->
                                 {error, timeout}
                         end
+                end),
+    meck:new(snarl_full_coverage, [passthrough]),
+    meck:expect(snarl_full_coverage, start,
+                fun (A, B, {C, Req, Full, true}) ->
+                        snarl_full_coverage:start(A, B, {C, Req, Full});
+                    (A, B, {C, Req, Full, false}) ->
+                        {ok, R} = snarl_full_coverage:start(A, B, {C, Req, Full}),
+                        {ok, [U || #snarl_obj{val = U} <- R]};
+                    (_, O, {C, Req, Full}) ->
+                        M = list_to_atom(atom_to_list(O) ++ "_vnode"),
+                        Ref = make_ref(),
+                        Pid ! {coverage, M, self(), Ref, {C, Req, Full}},
+                        receive
+                            {Ref,  {ok, _, _, Res}} ->
+                                {ok, Res};
+                            {Ref, Res} ->
+                                Res
+                        after
+                            5000 ->
+                                {error, timeout}
+                        end
                 end).
 
 stop_fake_vnode_master() ->
@@ -199,7 +220,8 @@ stop_fake_write_fsm() ->
     catch meck:unload(snarl_entity_write_fsm).
 
 stop_fake_coverage() ->
-    catch meck:unload(snarl_coverage).
+    catch meck:unload(snarl_coverage),
+    catch meck:unload(snarl_full_coverage).
 
 mock_vnode(Mod, Args) ->
     {ok, S, _} = Mod:init(Args),

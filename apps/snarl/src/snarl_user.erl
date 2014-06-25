@@ -309,7 +309,7 @@ list(Requirements, true) ->
 list(Requirements, false) ->
     {ok, Res} = snarl_coverage:start(
                   snarl_user_vnode_master, snarl_user,
-                  {list, Requirements}),
+                  {list, Requirements, false}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
@@ -586,7 +586,10 @@ check_pw(UserR, Passwd) ->
                     true;
                 _ ->
                     false
-            end
+            end;
+        %% Unset passwords are always false
+        <<>> ->
+            false
     end.
 
 -ifndef(old_hash).

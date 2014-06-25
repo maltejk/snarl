@@ -52,7 +52,7 @@ initial_state() ->
     random:seed(now()),
     #state{}.
 
-prop_test() ->
+prop_compare_to_model() ->
     ?FORALL(Cmds,commands(?MODULE),
             begin
                 {H,S,Res} = run_commands(?MODULE,Cmds),
@@ -95,6 +95,7 @@ command(S) ->
     oneof([
            {call, ?M, add, [S#state.next_uuid, non_blank_string()]},
            {call, ?M, delete, [maybe_a_uuid(S)]},
+           {call, ?M, wipe, [maybe_a_uuid(S)]},
            {call, ?M, get, [maybe_a_uuid(S)]},
            {call, ?M, get_, [maybe_a_uuid(S)]},
            {call, ?M, lookup, [maybe_a_uuid(S)]},
@@ -102,9 +103,12 @@ command(S) ->
            {call, ?M, raw, [maybe_a_uuid(S)]},
            {call, ?M, passwd, [maybe_a_uuid(S), non_blank_string()]},
            {call, ?M, auth, [maybe_a_uuid(S), maybe_a_password(S)]},
+           {call, ?M, auth, [maybe_a_uuid(S), maybe_a_password(S), basic]},
 
            %% List
            {call, ?U, list, []},
+           {call, ?U, list, [[], bool()]},
+           {call, ?U, list_, []},
 
            %% Permissions
            {call, ?M, grant, [maybe_a_uuid(S), permission()]},
@@ -138,8 +142,12 @@ command(S) ->
 
           ]).
 
+%% Normal auth takes a name.
 auth({_, N}, P) ->
     ?U:auth(N, P, <<>>).
+
+%% BASIC auth takes the uuid.
+?FWD3(auth).
 
 add(UUID, User) ->
     meck:new(uuid, [passthrough]),
@@ -167,6 +175,7 @@ lookup_({N, _}) ->
 ?FWD2(revoke).
 ?FWD2(passwd).
 ?FWD(delete).
+?FWD(wipe).
 
 ?FWD2(join).
 ?FWD2(leave).
@@ -257,8 +266,12 @@ next_state(S = #state{keys=Ks}, _V,
 next_state(S = #state{added = Added}, V, {call, _, add, [_, _User]}) ->
     S#state{added = [V | Added], next_uuid=uuid:uuid4s()};
 
-next_state(S, _V, {call, _, delete, [UUID]}) ->
-    S#state{added = lists:delete(UUID,  S#state.added),
+next_state(S, _V, {call, _, delete, [UUIDAndName = {_, UUID}]}) ->
+    S#state{added = lists:delete(UUIDAndName,  S#state.added),
+            passwords = proplists:delete(UUID, S#state.passwords)};
+
+next_state(S, _V, {call, _, wipe, [UUIDAndName = {_, UUID}]}) ->
+    S#state{added = lists:delete(UUIDAndName,  S#state.added),
             passwords = proplists:delete(UUID, S#state.passwords)};
 
 next_state(S, ok, {call, _, passwd, [{_, UUID}, Passwd]}) ->
@@ -455,8 +468,19 @@ postcondition(S, {call, _, set, [{_, UUID}, _]}, ok) ->
 postcondition(#state{added = A}, {call, _, list, []}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) == lists:usort(R);
 
+postcondition(#state{added = A}, {call, _, list, [_, true]}, {ok, R}) ->
+    lists:usort([U || {_, U} <- A]) == lists:usort([UUID || {_, {UUID, _}} <- R]);
+
+postcondition(#state{added = A}, {call, _, list, [_, false]}, {ok, R}) ->
+    lists:usort([U || {_, U} <- A]) == lists:usort([UUID || {_, UUID} <- R]);
+
 postcondition(#state{keys=Ks}, {call, _, find_key, [K]}, not_found) ->
     [true || {Ak, _} <- Ks, Ak == K] == [];
+
+postcondition(#state{added = A}, {call, _, list_, []}, {ok, R}) ->
+    lists:usort([U || {_, U} <- A]) ==
+        lists:usort([UUID || {UUID, _} <- R]);
+
 
 %% General
 postcondition(S, {call, _, passwd, [{_, UUID}, _]}, not_found) ->
@@ -467,6 +491,10 @@ postcondition(S, {call, _, passwd, [{_, UUID}, _]}, ok) ->
 
 postcondition(S, {call, _, auth, [{User, UUID}, Passwd]}, not_found) ->
     not has_user(S, User)
+        orelse (lists:keyfind(UUID, 1, S#state.passwords) =/= {UUID, Passwd});
+
+postcondition(S, {call, _, auth, [{_, UUID}, Passwd, basic]}, not_found) ->
+    not has_uuid(S, UUID)
         orelse (lists:keyfind(UUID, 1, S#state.passwords) =/= {UUID, Passwd});
 
 postcondition(S, {call, _, get, [{_, UUID}]}, not_found) ->
@@ -511,6 +539,9 @@ postcondition(#state{added=_Us}, {call, _, add, [_User, _]}, _) ->
     true;
 
 postcondition(#state{added=_Us}, {call, _, delete, [{_, _UUID}]}, ok) ->
+    true;
+
+postcondition(#state{added=_Us}, {call, _, wipe, [{_, _UUID}]}, {ok, _}) ->
     true;
 
 postcondition(_S, C, R) ->
