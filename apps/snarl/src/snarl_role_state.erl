@@ -213,7 +213,7 @@ revoke_prefix({_T, ID}, Prefix, Role) ->
            }.
 
 metadata(Role) ->
-    Role#?ROLE.metadata.
+    snarl_map:value(Role#?ROLE.metadata).
 
 set_metadata({T, ID}, P, Value, Role) when is_binary(P) ->
     set_metadata({T, ID}, snarl_map:split_path(P), Value, Role);

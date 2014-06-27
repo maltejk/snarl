@@ -187,10 +187,6 @@ handle_coverage(Req, _KeySpaces, _Sender, State) ->
     lager:warning("Unknown coverage request: ~p", [Req]),
     {stop, not_implemented, State}.
 
-
-handle_command(ping, _Sender, State) ->
-    {reply, {pong, State#vstate.partition}, State};
-
 handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender,
                State=#vstate{state=Mod}) ->
     case get(UUID, State) of

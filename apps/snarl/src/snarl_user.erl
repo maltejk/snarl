@@ -8,7 +8,6 @@
 
 -export([
          sync_repair/2,
-         ping/0,
          list/0,
          list_/0,
          list/2,
@@ -39,7 +38,7 @@
               list_/0,
               join_org/2, leave_org/2, select_org/2,
               lookup_/1, list_/0,
-              ping/0, raw/1, sync_repair/2
+              raw/1, sync_repair/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -51,13 +50,6 @@ wipe(UUID) ->
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
-
-%% @doc Pings a random vnode to make sure communication is functional
-ping() ->
-    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_user),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
 -spec find_key(KeyID::binary()) ->
                       not_found |

@@ -108,9 +108,6 @@ init([Partition]) ->
        timeout_cycle = TimeoutCycle
       }}.
 
-handle_command(ping, _Sender, State) ->
-    {reply, {pong, State#state.partition}, State};
-
 handle_command({repair, Token, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
     Tokens1 = dict:store(Token, {now(), Obj}, Tokens0),

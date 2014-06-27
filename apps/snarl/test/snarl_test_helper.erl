@@ -46,6 +46,13 @@ maybe_oneof(L) ->
 maybe_oneof(L, T) ->
     ?LET(E, ?SUCHTHAT(E, T, not lists:member(E, L)), oneof([E | L])).
 
+metadata_value() ->
+    oneof([delete, non_blank_string()]).
+
+metadata_kvs() ->
+    ?SUCHTHAT(L, list({non_blank_string(), metadata_value()}), L /= []
+              andalso lists:sort([K || {K, _} <- L]) == lists:usort([K || {K, _} <- L])).
+
 start_mock_servers() ->
     application:load(sasl),
     %%application:set_env(sasl, sasl_error_logger, {file, "snarl_user_eqc.log"}),

@@ -4,7 +4,6 @@
 
 -export([
          sync_repair/2,
-         ping/0,
          list/0, list/2, list_/0,
          get/1, get_/1, raw/1,
          lookup/1, lookup_/1,
@@ -19,7 +18,7 @@
 -ignore_xref([
               wipe/1,
               list_/0,
-              ping/0, create/2, raw/1, sync_repair/2]).
+              create/2, raw/1, sync_repair/2]).
 
 -define(TIMEOUT, 5000).
 
@@ -31,13 +30,6 @@ wipe(UUID) ->
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
-
-%% @doc Pings a random vnode to make sure communication is functional
-ping() ->
-    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_role),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_role_vnode_master).
 
 import(Role, Data) ->
     do_write(Role, import, Data).
@@ -148,7 +140,7 @@ list(Requirements, false) ->
                  {error, timeout}.
 
 add(Role) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    UUID = uuid:uuid4s(),
     create(UUID, Role).
 
 create(UUID, Role) ->
@@ -176,7 +168,7 @@ delete(Role) ->
                    snarl_user:revoke_prefix(U, Prefix)
                end
                || U <- Users],
-              {ok, Roles} = list(),
+              {ok, Roles} = snarl_role:list(),
               [revoke_prefix(R, Prefix) || R <- Roles],
               {ok, Orgs} = snarl_org:list(),
               [snarl_org:remove_target(O, Role) || O <- Orgs]
@@ -221,15 +213,14 @@ set(Role, Attribute, Value) ->
 set(Role, Attributes) ->
     do_write(Role, set, Attributes).
 
-
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
 
 do_write(Role, Op) ->
     snarl_entity_write_fsm:write(
-      {node(), snarl_role_vnode, snarl_role}, Role, Op).
+      {snarl_role_vnode, snarl_role}, Role, Op).
 
 do_write(Role, Op, Val) ->
     snarl_entity_write_fsm:write(
-      {node(), snarl_role_vnode, snarl_role}, Role, Op, Val).
+      {snarl_role_vnode, snarl_role}, Role, Op, Val).

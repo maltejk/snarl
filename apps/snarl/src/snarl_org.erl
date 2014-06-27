@@ -4,7 +4,6 @@
 
 -export([
          sync_repair/2,
-         ping/0,
          list/0,
          list_/0,
          list/2,
@@ -27,7 +26,6 @@
 -ignore_xref([
               wipe/1,
               list_/0,
-              ping/0,
               list/0,
               get/1,
               get_/1,
@@ -42,7 +40,7 @@
               add_trigger/2, remove_trigger/2, raw/1, sync_repair/2
              ]).
 
--ignore_xref([ping/0, create/2]).
+-ignore_xref([create/2]).
 
 -define(TIMEOUT, 5000).
 
@@ -55,14 +53,6 @@ wipe(UUID) ->
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
-
-%% @doc Pings a random vnode to make sure communication is functional
-ping() ->
-    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_org),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_org_vnode_master).
-
 
 add_trigger(Org, Trigger) ->
     do_write(Org, add_trigger, {uuid:uuid4s(), Trigger}).
@@ -218,7 +208,7 @@ list(Requirements, false) ->
                  {error, timeout}.
 
 add(Org) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    UUID = uuid:uuid4s(),
     create(UUID, Org).
 
 create(UUID, Org) ->
@@ -245,7 +235,7 @@ delete(Org) ->
                    snarl_user:leave_org(U, Org),
                    snarl_user:revoke_prefix(U, Prefix)
                end || U <- Users],
-              {ok, Roles} = list(),
+              {ok, Roles} = snarl_role:list(),
               [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
               {ok, Orgs} = snarl_org:list(),
               [snarl_org:remove_target(O, Org) || O <- Orgs]

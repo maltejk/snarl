@@ -29,7 +29,7 @@
 -import(snarl_test_helper,
         [id/0, permission/0, non_blank_string/0, maybe_oneof/1, maybe_oneof/2,
          lower_char/0, cleanup_mock_servers/0, mock_vnode/2,
-         start_mock_servers/0]).
+         start_mock_servers/0, metadata_value/0, metadata_kvs/0]).
 
 -record(state, {added = [], next_uuid=uuid:uuid4s(),
                 passwords = [], roles = [], orgs = [],
@@ -83,13 +83,6 @@ maybe_keyid(#state{keys = K0}) ->
 cleanup() ->
     catch eqc_vnode ! delete,
     ok.
-
-metadata_value() ->
-    oneof([delete, non_blank_string()]).
-
-metadata_kvs() ->
-    ?SUCHTHAT(L, list({non_blank_string(), metadata_value()}), L /= []
-              andalso lists:sort(L) == lists:usort(L)).
 
 command(S) ->
     oneof([
