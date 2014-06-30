@@ -14,6 +14,7 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-compile(export_all).
 -endif.
 
 %% API
@@ -26,7 +27,7 @@
          terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(CON_OPTS, [binary, {active,false}, {packet,4}, {send_timeout, 1000}]).
+-define(CON_OPTS, [binary, {active,false}, {packet,4}]).
 
 -define(SYNC_IVAL, 1000*60*15).
 
@@ -89,7 +90,9 @@ init([IP, Port]) ->
     State = #state{ip=IP, port=Port, timeout=Timeout},
     %% Every oen hour we want to regenerate.
     timer:send_interval(IVal, sync),
-    case gen_tcp:connect(IP, Port, ?CON_OPTS, Timeout) of
+    timer:send_interval(1000, ping),
+    case gen_tcp:connect(IP, Port, [{send_timeout, State#state.timeout} |
+                                    ?CON_OPTS], Timeout) of
         {ok, Socket} ->
             lager:info("[sync] Connected to: ~s:~p.", [IP, Port]),
             {ok, State#state{socket=Socket}, 0};
@@ -151,7 +154,8 @@ handle_cast({write, Node, VNode, System, Bucket, ID, Op, Val},
 handle_cast(reconnect, State = #state{socket = Old, ip=IP, port=Port,
                                       timeout=Timeout}) ->
     gen_tcp:close(Old),
-    case gen_tcp:connect(IP, Port, ?CON_OPTS, Timeout) of
+    case gen_tcp:connect(IP, Port, [{send_timeout, State#state.timeout} |
+                                    ?CON_OPTS], Timeout) of
         {ok, Socket} ->
             {noreply, State#state{socket=Socket}};
         E ->
@@ -175,6 +179,28 @@ handle_cast(_Msg, State) ->
 %%                                   {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
+handle_info(ping, State = #state{socket = undefined}) ->
+    lager:warning("[sync] Can't syncing not connected"),
+    {noreply, State};
+
+handle_info(ping, State = #state{socket = Socket, timeout = Timeout}) ->
+    State0 = case gen_tcp:send(Socket, term_to_binary(ping)) of
+                 ok ->
+                     case gen_tcp:recv(Socket, 0, Timeout) of
+                         {error, E} ->
+                             lager:error("[sync] Error: ~p", [E]),
+                             reconnect(),
+                             State#state{socket=undefined};
+                         {ok, _Pong} ->
+                             State
+                     end;
+                 E ->
+                     lager:error("[sync] Error: ~p", [E]),
+                     reconnect(),
+                     State#state{socket=undefined}
+             end,
+    {noreply, State0};
+
 handle_info(sync, State = #state{socket = undefined}) ->
     lager:warning("[sync] Can't syncing not connected"),
     {noreply, State};
@@ -235,7 +261,7 @@ hash(BKey, Obj) ->
     list_to_binary(integer_to_list(erlang:phash2({BKey, snarl_obj:vclock(Obj)}))).
 
 sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
-    {Diff, Get, Push} =split_trees(LTree, RTree),
+    {Diff, Get, Push} = split_trees(LTree, RTree),
     lager:debug("[sync] We need to diff: ~p", [Diff]),
     lager:debug("[sync] We need to get: ~p", [Get]),
     lager:debug("[sync] We need to push: ~p", [Push]),
@@ -243,7 +269,7 @@ sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     State.
 
 split_trees(L, R) ->
-    split_trees(L, R, [], [], []).
+    split_trees(lists:sort(L), lists:sort(R), [], [], []).
 
 split_trees([K | LR], [K | RR], Diff, Get, Push) ->
     split_trees(LR, RR, Diff, Get, Push);
@@ -251,7 +277,7 @@ split_trees([K | LR], [K | RR], Diff, Get, Push) ->
 split_trees([{K, _} | LR], [{K, _} | RR] , Diff, Get, Push) ->
     split_trees(LR, RR, [K | Diff], Get, Push);
 
-split_trees([{K, _} = L | LR], [_Kr | _] = R , Diff, Get, Push) when L < R ->
+split_trees([{K, _} = L | LR], [_Kr | _] = R , Diff, Get, Push) when L < _Kr ->
     split_trees(LR, R, Diff, Get, [K | Push]);
 
 split_trees(L, [{K, _} | RR] , Diff, Get, Push) ->
