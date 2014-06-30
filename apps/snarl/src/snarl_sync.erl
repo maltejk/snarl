@@ -26,6 +26,7 @@
          terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
+-define(CON_OPTS, [binary, {active,false}, {packet,4}, {send_timeout, 1000}]).
 
 -define(SYNC_IVAL, 1000*60*15).
 
@@ -79,7 +80,6 @@ init([IP, Port]) ->
                   _ ->
                       1500
               end,
-
     IVal = case application:get_env(sync_interval) of
                {ok, IValX} ->
                    IValX;
@@ -89,9 +89,7 @@ init([IP, Port]) ->
     State = #state{ip=IP, port=Port, timeout=Timeout},
     %% Every oen hour we want to regenerate.
     timer:send_interval(IVal, sync),
-    case gen_tcp:connect(IP, Port,
-                         [binary, {active,false}, {packet,4}],
-                         Timeout) of
+    case gen_tcp:connect(IP, Port, ?CON_OPTS, Timeout) of
         {ok, Socket} ->
             lager:info("[sync] Connected to: ~s:~p.", [IP, Port]),
             {ok, State#state{socket=Socket}, 0};
@@ -116,8 +114,7 @@ init([IP, Port]) ->
 %% @end
 %%--------------------------------------------------------------------
 handle_call(_Request, _From, State) ->
-    Reply = ok,
-    {reply, Reply, State}.
+    {reply, ok, State}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -129,10 +126,11 @@ handle_call(_Request, _From, State) ->
 %%                                  {stop, Reason, State}
 %% @end
 %%--------------------------------------------------------------------
-handle_cast({write, Node, VNode, System, Bucket, User, Op, Val},
+handle_cast({write, _Node, _VNode, _System, _Bucket, _User, _Op, _Val} = Act,
             State = #state{socket=undefined}) ->
-    lager:debug("[sync] ~p", [{write, Node, VNode, System, Bucket, User, Op, Val}]),
+    lager:debug("[sync] ~p", [Act]),
     {noreply, State};
+
 handle_cast({write, Node, VNode, System, Bucket, ID, Op, Val},
             State = #state{socket=Socket}) ->
     SystemS = atom_to_list(System),
@@ -153,9 +151,7 @@ handle_cast({write, Node, VNode, System, Bucket, ID, Op, Val},
 handle_cast(reconnect, State = #state{socket = Old, ip=IP, port=Port,
                                       timeout=Timeout}) ->
     gen_tcp:close(Old),
-    case gen_tcp:connect(IP, Port,
-                         [binary, {active,false}, {packet,4}],
-                         Timeout) of
+    case gen_tcp:connect(IP, Port, ?CON_OPTS, Timeout) of
         {ok, Socket} ->
             {noreply, State#state{socket=Socket}};
         E ->
@@ -182,6 +178,7 @@ handle_cast(_Msg, State) ->
 handle_info(sync, State = #state{socket = undefined}) ->
     lager:warning("[sync] Can't syncing not connected"),
     {noreply, State};
+
 handle_info(sync, State = #state{socket = Socket, timeout = Timeout}) ->
     State0 = case gen_tcp:send(Socket, term_to_binary(get_tree)) of
                  ok ->
@@ -201,6 +198,7 @@ handle_info(sync, State = #state{socket = Socket, timeout = Timeout}) ->
                      State#state{socket=undefined}
              end,
     {noreply, State0};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -244,7 +242,6 @@ sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     snarl_sync_exchange_fsm:start(IP, Port, Diff, Get, Push),
     State.
 
-
 split_trees(L, R) ->
     split_trees(L, R, [], [], []).
 
@@ -265,8 +262,6 @@ split_trees(L, [] , Diff, Get, Push) ->
 
 split_trees([], R , Diff, Get, Push) ->
     {Diff, Get ++ [K || {K, _} <- R], Push}.
-
-
 
 -ifdef(TEST).
 split_tree_empty_test() ->
@@ -298,5 +293,4 @@ split_tree_test() ->
     L = [{a, 1}, {b, 2}, {c, 1}, {d, 1}],
     R = [{a, 1}, {b, 1}, {d, 1}, {e, 1}],
     ?assertEqual({[b], [e], [c]}, split_trees(L, R)).
-
 -endif.

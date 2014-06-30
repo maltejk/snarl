@@ -29,11 +29,13 @@
 -import(snarl_test_helper,
         [id/0, permission/0, non_blank_string/0, maybe_oneof/1, maybe_oneof/2,
          lower_char/0, cleanup_mock_servers/0, mock_vnode/2,
-         start_mock_servers/0, metadata_value/0, metadata_kvs/0]).
+         start_mock_servers/0, metadata_value/0, metadata_kvs/0,
+         handoff/0, handon/1, delete/0]).
 
 -record(state, {added = [], next_uuid=uuid:uuid4s(),
                 passwords = [], roles = [], orgs = [],
-                yubikeys = [], keys = [], metadata = []}).
+                yubikeys = [], keys = [], metadata = [],
+                pid}).
 
 
 maybe_a_uuid(#state{added = Added}) ->
@@ -81,8 +83,7 @@ maybe_keyid(#state{keys = K0}) ->
     ?LET(Ks, K0, maybe_oneof([Ki || {Ki, _} <- lists:flatten([K || {_, K} <- Ks])])).
 
 cleanup() ->
-    catch eqc_vnode ! delete,
-    ok.
+    delete().
 
 command(S) ->
     oneof([
@@ -131,9 +132,16 @@ command(S) ->
 
            %% Metadata
            {call, ?M, set, [maybe_a_uuid(S), metadata_kvs()]},
-           {call, ?M, set, [maybe_a_uuid(S), non_blank_string(), metadata_value()]}
+           {call, ?M, set, [maybe_a_uuid(S), non_blank_string(), metadata_value()]},
 
+           %% Meta command
+           {call, ?M, handoff_handon, []}
           ]).
+
+handoff_handon() ->
+    {ok, Data} = handoff(),
+    delete(),
+    handon(Data).
 
 %% Normal auth takes a name.
 auth({_, N}, P) ->
@@ -537,6 +545,9 @@ postcondition(#state{added=_Us}, {call, _, delete, [{_, _UUID}]}, ok) ->
 postcondition(#state{added=_Us}, {call, _, wipe, [{_, _UUID}]}, {ok, _}) ->
     true;
 
+postcondition(_S, {call, _,handoff_handon, []}, _) ->
+    true;
+
 postcondition(_S, C, R) ->
     io:format(user, "postcondition(_, ~p, ~p).~n", [C, R]),
     false.
@@ -641,7 +652,7 @@ cleanup(_) ->
 
 -define(EQC_SETUP, true).
 
-%-define(EQC_NUM_TESTS, 5000).
+-define(EQC_NUM_TESTS, 100).
 -define(EQC_EUNIT_TIMEUT, 1200).
 -include("eqc_helper.hrl").
 -endif.

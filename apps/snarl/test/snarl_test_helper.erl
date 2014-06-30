@@ -1,9 +1,9 @@
 -module(snarl_test_helper).
 
-
 -ifdef(EQC).
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("snarl/include/snarl.hrl").
+-include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -compile(export_all).
 
@@ -81,6 +81,7 @@ start_mock_servers() ->
 
 cleanup_mock_servers() ->
     catch eqc_vnode ! stop,
+
     stop_fake_read_fsm(),
     stop_fake_write_fsm(),
     application:stop(fifo_db),
@@ -238,6 +239,42 @@ mock_vnode(Mod, Args) ->
     start_fake_coverage(Pid),
     Pid.
 
+handoff() ->
+    Ref = make_ref(),
+    eqc_vnode ! {handoff, self(), Ref},
+    receive
+        {Ref, ok, L} ->
+            {ok, L};
+        {Ref, E} ->
+            E
+    after
+        1000 ->
+            {error, timeout}
+    end.
+
+handon(L) ->
+    Ref = make_ref(),
+    eqc_vnode ! {handon, self(), Ref, L},
+    receive
+        {Ref, ok} ->
+            ok
+    after
+        1000 ->
+            {error, timeout}
+    end.
+
+delete() ->
+    Ref = make_ref(),
+    eqc_vnode ! {delete, self(), Ref},
+    receive
+        {Ref, ok} ->
+            ok
+    after
+        1000 ->
+            {error, timeout}
+    end.
+
+
 mock_vnode_loop(M, S) ->
     try
         receive
@@ -292,8 +329,29 @@ mock_vnode_loop(M, S) ->
             stop ->
                 stop_fake_vnode_master(),
                 stop_fake_coverage();
-            delete ->
+            {handoff, F, Ref} ->
+                Fun = fun(K, V, A) ->
+                              [M:encode_handoff_item(K, V) | A]
+                      end,
+                FR = ?FOLD_REQ{foldfun=Fun, acc0=[]},
+                case M:handle_handoff_command(FR, self(), S) of
+                    {reply, L, S1} ->
+                        F ! {Ref, ok, L},
+                        mock_vnode_loop(M, S1);
+                    E ->
+                        F ! {Ref, {error, E}},
+                        mock_vnode_loop(M, S)
+                end;
+            {handon, F, Ref, Data} ->
+                S1 = lists:foldl(fun(D, SAcc) ->
+                                         {reply, ok, SAcc1} = M:handle_handoff_data(D, SAcc),
+                                         SAcc1
+                                 end, S, Data),
+                F ! {Ref, ok},
+                mock_vnode_loop(M, S1);
+            {delete, F, Ref} ->
                 {ok, S1} = M:delete(S),
+                F ! {Ref, ok},
                 mock_vnode_loop(M, S1);
             O1 ->
                 io:format(user, "vnode bad message: ~p~n", [O1]),
