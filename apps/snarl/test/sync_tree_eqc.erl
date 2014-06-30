@@ -34,7 +34,6 @@ tree(Size) ->
                                {call, ?M, add_both, [U, kv()]}
                               ])) || Size > 0])).
 
-
 add_left({L, R}, KV) ->
     {[KV | L], R}.
 
