@@ -1,14 +1,13 @@
 -module(snarl_map).
 
-
 -export([new/0, merge/2, get/2, set/5, remove/3, value/1, split_path/1,
          from_orddict/3]).
 
--ignore_xref([get/2]).
-
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-export([flatten_orddict/1]).
 -endif.
+
+-ignore_xref([get/2]).
 
 
 -define(SET, riak_dt_orswot).
@@ -234,106 +233,3 @@ flatten_orddict(Prefix, [{K, V} | R], Acc) ->
     flatten_orddict(Prefix, R, [{[K | Prefix], V} | Acc]);
 flatten_orddict(_, [], Acc) ->
     Acc.
-
-%%%===================================================================
-%%% Tests
-%%%===================================================================
-
--ifdef(TEST).
-
-flatten_orddict_test() ->
-    O1 = [{k, v}],
-    F1 = [{[k], v}],
-    O2 = [{k1, [{k11, v11}]}, {k2, v2}],
-    F2 = [{[k2], v2}, {[k1, k11], v11}],
-    O3 = [{k1, [{k11, [{k111, v111}]}]}, {k2, v2}],
-    F3 = [{[k2], v2}, {[k1, k11, k111], v111}],
-    ?assertEqual(F1, flatten_orddict(O1)),
-    ?assertEqual(F2, flatten_orddict(O2)),
-    ?assertEqual(F3, flatten_orddict(O3)),
-    ok.
-
-from_orddict_test() ->
-    O1 = [{k, v}],
-    M1 = from_orddict(O1, none, 0),
-    O2 = [{k1, [{k11, v11}]}, {k2, v2}],
-    M2 = from_orddict(O2, none, 0),
-    O3 = [{k1, [{k11, [{k111, v111}]}]}, {k2, v2}],
-    M3 = from_orddict(O3, none, 0),
-    ?assertEqual(O1, value(M1)),
-    ?assertEqual(O2, value(M2)),
-    ?assertEqual(O3, value(M3)),
-    ok.
-
-adding_mapo_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set(k, [{k1, v1}], a, 0, M),
-    ?assertEqual([{k, [{k1, v1}]}], snarl_map:value(M1)),
-    ?assertEqual(v1, snarl_map:get([k, k1], M1)),
-    ok.
-
-reg_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set(k, v, 0, a, M),
-    {ok, M2} = snarl_map:set(k, v1, 1, a, M1),
-    ?assertEqual(v, snarl_map:get(k, M1)),
-    ?assertEqual(v1, snarl_map:get(k, M2)),
-    ok.
-
-counter_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set(k, {counter, 3}, a, 0, M),
-    {ok, M2} = snarl_map:set(k, {counter, -2}, a, 1, M1),
-    ?assertEqual(3, snarl_map:get(k, M1)),
-    ?assertEqual(1, snarl_map:get(k, M2)),
-    ok.
-
-set_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set(k, {set, 3}, a, 0, M),
-    {ok, M2} = snarl_map:set(k, {set, 2}, a, 1, M1),
-    {ok, M3} = snarl_map:set(k, {set, [1,4]}, a, 2, M2),
-    {ok, M4} = snarl_map:set(k, {set, {remove, 3}}, a, 3, M3),
-
-    ?assertEqual([3], snarl_map:get(k, M1)),
-    ?assertEqual([2,3], snarl_map:get(k, M2)),
-    ?assertEqual([1,2,3,4], snarl_map:get(k, M3)),
-    ?assertEqual([1,2,4], snarl_map:get(k, M4)),
-    ok.
-
-nested_reg_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set([o, k], v, a, 0, M),
-    {ok, M2} = snarl_map:set([o, k], v1, a, 1, M1),
-    ?assertEqual(v, snarl_map:get([o, k], M1)),
-    ?assertEqual(v1, snarl_map:get([o, k], M2)),
-    ok.
-
-nested_counter_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set([o, k], {counter, 3}, a, 0, M),
-    {ok, M2} = snarl_map:set([o, k], {counter, -2}, a, 1, M1),
-    ?assertEqual(3, snarl_map:get([o, k], M1)),
-    ?assertEqual(1, snarl_map:get([o, k], M2)),
-    ok.
-
-delete_test() ->
-    M = snarl_map:new(),
-    {ok, M1} = snarl_map:set(k, v, a, 0, M),
-    {ok, M2} = snarl_map:set([o, k], v1, a, 1, M1),
-    {ok, M3} = snarl_map:remove(k, a, M2),
-    {ok, M4} = snarl_map:remove(o, a, M2),
-    {ok, M5} = snarl_map:remove([o, k], a, M2),
-    ?assertEqual(v, snarl_map:get(k, M1)),
-    ?assertEqual(v1, snarl_map:get([o, k], M2)),
-    ?assertEqual([{k, v}, {o, [{k, v1}]}],
-                 snarl_map:value(M2)),
-    ?assertEqual([{o, [{k, v1}]}],
-                 snarl_map:value(M3)),
-    ?assertEqual([{k, v}],
-                 snarl_map:value(M4)),
-    ?assertEqual([{k, v}, {o, []}],
-                 snarl_map:value(M5)),
-    ok.
-
--endif.

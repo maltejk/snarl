@@ -10,7 +10,7 @@
 -include("snarl.hrl").
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
+-export([update_permissions/2]).
 -endif.
 
 -export([
@@ -243,65 +243,3 @@ update_permissions(TID, Rl) ->
                     (_, Acc) ->
                         Acc
                 end, Rl, Permissions).
-
--ifdef(TEST).
-mkid() ->
-    {ecrdt:timestamp_us(), test}.
-
-update_perms_test() ->
-    %% Prepare permissions and expected update results
-    P1 = [<<"groups">>, <<"g1">>, <<"get">>],
-    P1u = [<<"roles">>, <<"g1">>, <<"get">>],
-    P2 = [<<"cloud">>, <<"groups">>, <<"list">>],
-    P2u = [<<"cloud">>, <<"roles">>, <<"list">>],
-    P3 = [<<"vms">>, <<"v1">>, <<"get">>],
-
-    %% Create role and grant permissions
-    R = new(mkid()),
-    R1 = grant(mkid(), P1, R),
-    R2 = grant(mkid(), P2, R1),
-    R3 = grant(mkid(), P3, R2),
-    %% Check if the result is as expected
-    Ps1 = lists:sort([P1, P2, P3]),
-    RPs1 = permissions(R3),
-    ?assertEqual(Ps1, RPs1),
-
-    %% Update and check for changes.
-    R4 = update_permissions(mkid(), R3),
-    Ps1u = lists:sort([P1u, P2u, P3]),
-    RPs1u = permissions(R4),
-    ?assertEqual(Ps1u, RPs1u).
-
-to_json_test() ->
-    Role = new(mkid()),
-    RoleJ = [{<<"metadata">>,[]},
-             {<<"name">>,<<>>},
-             {<<"permissions">>,[]},
-             {<<"uuid">>,<<>>}],
-    ?assertEqual(RoleJ, to_json(Role)).
-
-name_test() ->
-    Name0 = <<"Test0">>,
-    Role0 = new(mkid()),
-    Role1 = name(mkid(), Name0, Role0),
-    Name1 = <<"Test1">>,
-    Role2 = name(mkid(), Name1, Role1),
-    ?assertEqual(Name0, name(Role1)),
-    ?assertEqual(Name1, name(Role2)).
-
-permissions_test() ->
-    P0 = [<<"P0">>],
-    P1 = [<<"P1">>],
-    Role0 = new(mkid()),
-    Role1 = grant(mkid(), P0, Role0),
-    Role2 = grant(mkid(), P1, Role1),
-    Role3 = grant(mkid(), P0, Role2),
-    Role4 = revoke(mkid(), P0, Role3),
-    Role5 = revoke(mkid(), P1, Role3),
-    ?assertEqual([P0], permissions(Role1)),
-    ?assertEqual([P0, P1], permissions(Role2)),
-    ?assertEqual([P0, P1], permissions(Role3)),
-    ?assertEqual([P1], permissions(Role4)),
-    ?assertEqual([P0], permissions(Role5)).
-
--endif.

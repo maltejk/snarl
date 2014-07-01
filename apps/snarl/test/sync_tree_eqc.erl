@@ -109,7 +109,5 @@ prop_add_equal() ->
                           M == {lists:sort(D1), lists:sort(RO1), lists:sort(LO1)})
             end).
 
--define(EQC_NUM_TESTS, 100).
--include("eqc_helper.hrl").
 -endif.
 -endif.
