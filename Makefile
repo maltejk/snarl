@@ -26,18 +26,24 @@ clean:
 distclean: clean devclean relclean
 	$(REBAR) delete-deps
 
+long-test:
+	-rm -r apps/snarl/.eunit
+	$(REBAR) skip_deps=true -DEQC_LONG_TESTS eunit -v -r
+
 eunit: 
-	$(REBAR) skip_deps=true compile
-	$(REBAR) skip_deps=true eunit
+	$(REBAR) compile
+	-rm -r apps/snarl/.eunit
+	$(REBAR) eunit skip_deps=true -r -v
 
 test:  eunit
-	$(REBAR) skip_deps=true xref
+	$(REBAR) xref skip_deps=true -r
 
 quick-xref:
-	$(REBAR) xref skip_deps=true
+	$(REBAR) xref skip_deps=true -r
 
 quick-test:
-	$(REBAR) skip_deps=true eunit
+	-rm -r apps/snarl/.eunit
+	$(REBAR) -DEQC_SHORT_TEST skip_deps=true eunit -r
 
 rel: all zabbix
 	-rm -r rel/snarl/share

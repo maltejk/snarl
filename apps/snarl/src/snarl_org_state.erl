@@ -11,6 +11,7 @@
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+-export([jsonify_trigger/1]).
 -endif.
 
 -export([
@@ -239,7 +240,7 @@ remove_trigger({_T, ID}, Trigger, Org) ->
     Org#?ORG{triggers = V}.
 
 metadata(Org) ->
-    Org#?ORG.metadata.
+    snarl_map:value(Org#?ORG.metadata).
 
 set_metadata({T, ID}, P, Value, Org) when is_binary(P) ->
     set_metadata({T, ID}, snarl_map:split_path(P), Value, Org);

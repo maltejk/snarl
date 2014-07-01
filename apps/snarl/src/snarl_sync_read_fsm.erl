@@ -38,6 +38,7 @@
 %%--------------------------------------------------------------------
 update(_System, _Vsn, [], _From) ->
     ok;
+
 update(System, Vsn, List, From) ->
     snarl_sync_read_sup:start_child(System, Vsn, List, From).
 
@@ -101,6 +102,7 @@ read(_Event, State=#state{list=[E|R], system=Sys, version=Vsn,
             ok
     end,
     {next_state, read, State#state{list=R}, D};
+
 read(_Event, State=#state{system=Sys, from=F, version=Vsn, list=[]}) ->
     snarl_sync_tree:done(F, Sys, Vsn),
     {stop, normal, State}.

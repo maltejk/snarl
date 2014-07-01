@@ -100,10 +100,12 @@ vnode(snarl_role) -> snarl_role_vnode;
 vnode(snarl_user) -> snarl_user_vnode;
 vnode(snarl_org) -> snarl_org_vnode.
 
+bucket(System) -> list_to_binary(atom_to_list(System)).
+
 write(Sys, UUID, Op) ->
     write(Sys, UUID, Op, undefined).
 write(Sys, UUID, Op, Val) ->
-    term_to_binary({write, node(), vnode(Sys), Sys, UUID, Op, Val}).
+    term_to_binary({write, node(), vnode(Sys), Sys, bucket(Sys), UUID, Op, Val}).
 
 sync_diff(_, State = #state{
                         socket=Socket,

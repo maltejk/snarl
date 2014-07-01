@@ -9,12 +9,7 @@
 
 -ignore_xref([start_link/4]).
 
--record(state, {socket,
-                transport,
-                ok,
-                error,
-                closed}).
-
+-record(state, {socket, transport, ok, error, closed}).
 
 start_link(ListenerPid, Socket, Transport, Opts) ->
     proc_lib:start_link(?MODULE, init, [[ListenerPid, Socket, Transport, Opts]]).

@@ -188,9 +188,12 @@ grant({_T, ID}, Permission, Role = #?ROLE{}) ->
 
 
 revoke({_T, ID}, Permission, Role) ->
-    {ok, V} =  riak_dt_orswot:update({remove, Permission},
-                                     ID, Role#?ROLE.permissions),
-    Role#?ROLE{permissions = V}.
+    case riak_dt_orswot:update({remove, Permission}, ID, Role#?ROLE.permissions) of
+        {error, {precondition, {not_present, Permission}}} ->
+            Role;
+        {ok, V} ->
+            Role#?ROLE{permissions = V}
+    end.
 
 revoke_prefix({_T, ID}, Prefix, Role) ->
     P0 = Role#?ROLE.permissions,
@@ -198,8 +201,8 @@ revoke_prefix({_T, ID}, Prefix, Role) ->
     P1 = lists:foldl(fun (P, PAcc) ->
                              case lists:prefix(Prefix, P) of
                                  true ->
-                                     {ok, V} =  riak_dt_orswot:update(
-                                                  {remove, P}, ID, PAcc),
+                                     {ok, V} = riak_dt_orswot:update(
+                                                 {remove, P}, ID, PAcc),
                                      V;
                                  _ ->
                                      PAcc
@@ -210,7 +213,7 @@ revoke_prefix({_T, ID}, Prefix, Role) ->
            }.
 
 metadata(Role) ->
-    Role#?ROLE.metadata.
+    snarl_map:value(Role#?ROLE.metadata).
 
 set_metadata({T, ID}, P, Value, Role) when is_binary(P) ->
     set_metadata({T, ID}, snarl_map:split_path(P), Value, Role);

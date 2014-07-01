@@ -128,8 +128,8 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
             snarl_vnode:put(UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
-            lager:error("[~s] tried to write to a non existing element: ~p",
-                        [State#vstate.bucket, R]),
+            lager:error("[~s] tried to write to a non existing element: ~p => ~p",
+                        [State#vstate.bucket, UUID, R]),
             {reply, {ok, ReqID, not_found}, State}
     end.
 
@@ -186,10 +186,6 @@ handle_coverage({list, Requirements, Full}, _KeySpaces, Sender,
 handle_coverage(Req, _KeySpaces, _Sender, State) ->
     lager:warning("Unknown coverage request: ~p", [Req]),
     {stop, not_implemented, State}.
-
-
-handle_command(ping, _Sender, State) ->
-    {reply, {pong, State#vstate.partition}, State};
 
 handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender,
                State=#vstate{state=Mod}) ->

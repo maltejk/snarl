@@ -8,7 +8,6 @@
 
 -export([
          sync_repair/2,
-         ping/0,
          list/0,
          list_/0,
          list/2,
@@ -39,7 +38,7 @@
               list_/0,
               join_org/2, leave_org/2, select_org/2,
               lookup_/1, list_/0,
-              ping/0, raw/1, sync_repair/2
+              raw/1, sync_repair/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -51,13 +50,6 @@ wipe(UUID) ->
 
 sync_repair(UUID, Obj) ->
     do_write(UUID, sync_repair, Obj).
-
-%% @doc Pings a random vnode to make sure communication is functional
-ping() ->
-    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_user),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_user_vnode_master).
 
 -spec find_key(KeyID::binary()) ->
                       not_found |
@@ -271,8 +263,7 @@ get(User) ->
 get_(User) ->
     case snarl_entity_read_fsm:start(
            {snarl_user_vnode, snarl_user},
-           get, User
-          ) of
+           get, User) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -310,7 +301,7 @@ list(Requirements, true) ->
 list(Requirements, false) ->
     {ok, Res} = snarl_coverage:start(
                   snarl_user_vnode_master, snarl_user,
-                  {list, Requirements}),
+                  {list, Requirements, false}),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
@@ -321,7 +312,7 @@ list(Requirements, false) ->
                  {ok, UUID::fifo:user_id()}.
 
 add(undefined, User) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
+    UUID = uuid:uuid4s(),
     lager:info("[~p:create] Creation Started.", [UUID]),
     case create(UUID, User) of
         {ok, UUID} ->
@@ -426,7 +417,12 @@ import(User, Data) ->
                   {error, timeout} |
                   ok.
 join(User, Role) ->
-    do_write(User, join, Role).
+    case snarl_role:get_(Role) of
+        {ok, _} ->
+            do_write(User, join, Role);
+        E ->
+            E
+    end.
 
 -spec leave(User::fifo:user_id(), Role::fifo:role_id()) ->
                    not_found |
@@ -441,7 +437,12 @@ leave(User, Role) ->
                       {error, timeout} |
                       ok.
 join_org(User, Org) ->
-    do_write(User, join_org, Org).
+    case snarl_org:get_(Org) of
+        {ok, _} ->
+            do_write(User, join_org, Org);
+        E ->
+            E
+    end.
 
 -spec select_org(User::fifo:user_id(), Org::fifo:org_id()) ->
                         not_found |
@@ -490,7 +491,7 @@ delete(User) ->
               Prefix = [<<"users">>, User],
               {ok, Users} = snarl_user:list(),
               [snarl_user:revoke_prefix(U, Prefix) || U <- Users],
-              {ok, Roles} = list(),
+              {ok, Roles} = snarl_role:list(),
               [snarl_role:revoke_prefix(R, Prefix) || R <- Roles],
               {ok, Orgs} = snarl_org:list(),
               [snarl_org:remove_target(O, User) || O <- Orgs]
@@ -577,7 +578,10 @@ check_pw(UserR, Passwd) ->
                     true;
                 _ ->
                     false
-            end
+            end;
+        %% Unset passwords are always false
+        <<>> ->
+            false
     end.
 
 -ifndef(old_hash).
