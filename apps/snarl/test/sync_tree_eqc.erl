@@ -3,20 +3,11 @@
 -ifdef(TEST).
 -ifdef(EQC).
 
-
-
--include_lib("eqc/include/eqc.hrl").
--include_lib("eunit/include/eunit.hrl").
-
--import(snarl_test_helper, [non_blank_string/0]).
+-include_lib("fqc/include/fqc.hrl").
 
 -compile(export_all).
 -define(M, ?MODULE).
 -define(S, snarl_sync).
-
-
-
-%% -define(EQC_SETUP, true).
 
 kv() ->
     {non_blank_string(), int()}.
@@ -109,7 +100,5 @@ prop_add_equal() ->
                           M == {lists:sort(D1), lists:sort(RO1), lists:sort(LO1)})
             end).
 
--define(EQC_NUM_TESTS, 100).
--include("eqc_helper.hrl").
 -endif.
 -endif.

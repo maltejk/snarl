@@ -2,10 +2,6 @@
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
--ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
--endif.
-
 -export([
          sync_repair/2,
          list/0,

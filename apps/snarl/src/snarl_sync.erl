@@ -13,7 +13,6 @@
 -include("snarl_dtrace.hrl").
 
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
 -compile(export_all).
 -endif.
 
@@ -288,35 +287,3 @@ split_trees(L, [] , Diff, Get, Push) ->
 
 split_trees([], R , Diff, Get, Push) ->
     {Diff, Get ++ [K || {K, _} <- R], Push}.
-
--ifdef(TEST).
-split_tree_empty_test() ->
-    L = [],
-    R = [],
-    ?assertEqual({[], [], []}, split_trees(L, R)).
-
-split_tree_equal_test() ->
-    L = [{a, 1}],
-    R = [{a, 1}],
-    ?assertEqual({[], [], []}, split_trees(L, R)).
-
-split_tree_diff_test() ->
-    L = [{a, 1}],
-    R = [{a, 2}],
-    ?assertEqual({[a], [], []}, split_trees(L, R)).
-
-split_tree_get_test() ->
-    L = [{a, 1}],
-    R = [{a, 1}, {b, 1}],
-    ?assertEqual({[], [b], []}, split_trees(L, R)).
-
-split_tree_push_test() ->
-    L = [{a, 1}, {b, 1}],
-    R = [{a, 1}],
-    ?assertEqual({[], [], [b]}, split_trees(L, R)).
-
-split_tree_test() ->
-    L = [{a, 1}, {b, 2}, {c, 1}, {d, 1}],
-    R = [{a, 1}, {b, 1}, {d, 1}, {e, 1}],
-    ?assertEqual({[b], [e], [c]}, split_trees(L, R)).
--endif.

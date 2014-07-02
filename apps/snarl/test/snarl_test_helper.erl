@@ -41,10 +41,7 @@ perm_entry() ->
     oneof([<<"_">>, non_blank_string()]).
 
 maybe_oneof(L) ->
-    maybe_oneof(L, non_blank_string()).
-
-maybe_oneof(L, T) ->
-    ?LET(E, ?SUCHTHAT(E, T, not lists:member(E, L)), oneof([E | L])).
+    fqc:maybe_oneof(L, non_blank_string()).
 
 metadata_value() ->
     oneof([delete, non_blank_string()]).

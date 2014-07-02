@@ -18,19 +18,22 @@
 -define(FWD3(C),
         C({_, UUID}, A1, A2) ->
                ?RO:C(UUID, A1, A2)).
+-define(EQC_SETUP, true).
 
--include_lib("eqc/include/eqc.hrl").
+
+%-define(EQC_NUM_TESTS, 5000).
+-define(EQC_EUNIT_TIMEUT, 1200).
+
+-import(snarl_test_helper,
+        [id/0, permission/0, maybe_oneof/1, cleanup_mock_servers/0,
+         mock_vnode/2, start_mock_servers/0, metadata_value/0, metadata_kvs/0,
+         handoff/0, handon/1, delete/0]).
+
 -include_lib("eqc/include/eqc_statem.hrl").
--include_lib("eunit/include/eunit.hrl").
+-include_lib("fqc/include/fqc.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("snarl/include/snarl.hrl").
 
 -compile(export_all).
--import(snarl_test_helper,
-        [id/0, permission/0, non_blank_string/0, maybe_oneof/1, maybe_oneof/2,
-         lower_char/0, cleanup_mock_servers/0, mock_vnode/2,
-         start_mock_servers/0, metadata_value/0, metadata_kvs/0,
-         handoff/0, handon/1, delete/0]).
 
 -record(state, {added = [], next_uuid=uuid:uuid4s(), metadata = []}).
 
@@ -353,10 +356,5 @@ cleanup(_) ->
     meck:unload(snarl_opt),
     ok.
 
--define(EQC_SETUP, true).
-
-%-define(EQC_NUM_TESTS, 5000).
--define(EQC_EUNIT_TIMEUT, 1200).
--include("eqc_helper.hrl").
 -endif.
 -endif.
