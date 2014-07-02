@@ -3,13 +3,13 @@
 -ifdef(TEST).
 -ifdef(EQC).
 
--include_lib("eqc/include/eqc.hrl").
+-import(snarl_test_helper, [id/1, permission/0, maybe_oneof/1]).
+
 -include_lib("eqc/include/eqc_fsm.hrl").
--include_lib("eunit/include/eunit.hrl").
--include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fqc/include/fqc.hrl").
+
 -compile(export_all).
 
--import(snarl_test_helper, [id/1, permission/0, non_blank_string/0, maybe_oneof/1]).
 
 -define(U, snarl_user_state).
 
@@ -337,6 +337,5 @@ prop_remove_metadata() ->
                           model(U1) == M1)
             end).
 
--include("eqc_helper.hrl").
 -endif.
 -endif.

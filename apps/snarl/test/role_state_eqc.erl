@@ -3,36 +3,15 @@
 -ifdef(TEST).
 -ifdef(EQC).
 
--include_lib("eqc/include/eqc.hrl").
+-import(snarl_test_helper, [id/1, permission/0, maybe_oneof/1]).
 -include_lib("eqc/include/eqc_fsm.hrl").
--include_lib("eunit/include/eunit.hrl").
--include_lib("riak_core/include/riak_core_vnode.hrl").
--compile(export_all).
+-include_lib("fqc/include/fqc.hrl").
 
+-compile(export_all).
 -define(R, snarl_role_state).
 %% This is larger then and time we ever get in the size, used for ensure setting data
 %% in LWW registers.
 -define(BIG_TIME, 1000000000).
-
-id(T) ->
-    {T, eqc}.
-
-bin_str() ->
-    ?LET(S, ?SUCHTHAT(L, list(choose($a, $z)), L =/= []), list_to_binary(S)).
-
-permission() ->
-    ?SIZED(Size, permission(Size)).
-
-permission(Size) ->
-    ?LAZY(oneof([[oneof([<<"...">>, perm_entry()])] || Size == 0] ++
-                    [[perm_entry() | permission(Size -1)] || Size > 0])).
-
-perm_entry() ->
-    oneof([<<"_">>, bin_str()]).
-
-maybe_oneof(L) ->
-    ?LET(E, ?SUCHTHAT(E, bin_str(), not lists:member(E, L)),
-         oneof([E | L])).
 
 role() ->
     ?SIZED(Size, role(Size)).
@@ -43,8 +22,8 @@ role(Size) ->
                         [R], [role(Size - 1)],
                         oneof([
                                {call, ?R, load, [id(Size), R]},
-                               {call, ?R, uuid, [id(Size), bin_str(), R]},
-                               {call, ?R, name, [id(Size), bin_str(), R]},
+                               {call, ?R, uuid, [id(Size), non_blank_string(), R]},
+                               {call, ?R, name, [id(Size), non_blank_string(), R]},
                                {call, ?R, grant, [id(Size), permission(), R]},
                                {call, ?R, revoke, [id(Size), maybe_oneof(calc_perms(R)), R]}
                               ]))
@@ -102,7 +81,7 @@ metadata(U) ->
 
 prop_name() ->
     ?FORALL({N, R},
-            {bin_str(), role()},
+            {non_blank_string(), role()},
             begin
                 Role = eval(R),
                 ?WHENFAIL(io:format(user, "History: ~p~nRole: ~p~n", [R,Role]),
@@ -112,7 +91,7 @@ prop_name() ->
 
 prop_uuid() ->
     ?FORALL({N, R},
-            {bin_str(), role()},
+            {non_blank_string(), role()},
             begin
                 Role = eval(R),
                 ?WHENFAIL(io:format(user, "History: ~p~nRole: ~p~n", [R, Role]),
@@ -142,7 +121,7 @@ prop_revoke() ->
             end).
 
 prop_set_metadata() ->
-    ?FORALL({K, V, R}, {bin_str(), bin_str(), role()},
+    ?FORALL({K, V, R}, {non_blank_string(), non_blank_string(), role()},
             begin
                 Role = eval(R),
                 R1 = ?R:set_metadata(id(?BIG_TIME), K, V, Role),
@@ -163,6 +142,5 @@ prop_remove_metadata() ->
                           model(R1) == M1)
             end).
 
--include("eqc_helper.hrl").
 -endif.
 -endif.

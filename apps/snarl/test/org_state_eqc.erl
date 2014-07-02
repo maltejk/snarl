@@ -3,10 +3,11 @@
 -ifdef(TEST).
 -ifdef(EQC).
 
--include_lib("eqc/include/eqc.hrl").
+-import(snarl_test_helper, [id/1, permission/0, maybe_oneof/1]).
+
 -include_lib("eqc/include/eqc_fsm.hrl").
--include_lib("eunit/include/eunit.hrl").
--include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fqc/include/fqc.hrl").
+
 -compile(export_all).
 
 -define(O, snarl_org_state).
@@ -14,25 +15,6 @@
 %% in LWW registers.
 -define(BIG_TIME, 1000000000).
 
-id(T) ->
-    {T, eqc}.
-
-bin_str() ->
-    ?LET(S, ?SUCHTHAT(L, list(choose($a, $z)), L =/= []), list_to_binary(S)).
-
-permission() ->
-    ?SIZED(Size, permission(Size)).
-
-permission(Size) ->
-    ?LAZY(oneof([[oneof([<<"...">>, perm_entry()])] || Size == 0] ++
-                    [[perm_entry() | permission(Size -1)] || Size > 0])).
-
-perm_entry() ->
-    oneof([<<"_">>, bin_str()]).
-
-maybe_oneof(L) ->
-    ?LET(E, ?SUCHTHAT(E, bin_str(), not lists:member(E, L)),
-         oneof([E | L])).
 
 name() ->
     oneof([a, b, c, d, e, f, g]).
@@ -43,8 +25,8 @@ trigger() ->
 action() ->
     oneof([{grant, role, a, permission()},
            {grant, user, a, permission()},
-           {join, role, bin_str()},
-           {join, org, bin_str()}]).
+           {join, role, non_blank_string()},
+           {join, org, non_blank_string()}]).
 org() ->
     ?SIZED(Size, org(Size)).
 
@@ -54,11 +36,11 @@ org(Size) ->
                         [O], [org(Size - 1)],
                         oneof([
                                {call, ?O, load, [id(Size), O]},
-                               {call, ?O, uuid, [id(Size), bin_str(), O]},
-                               {call, ?O, name, [id(Size), bin_str(), O]},
-                               {call, ?O, set_metadata, [id(Size), bin_str(), bin_str(), O]},
+                               {call, ?O, uuid, [id(Size), non_blank_string(), O]},
+                               {call, ?O, name, [id(Size), non_blank_string(), O]},
+                               {call, ?O, set_metadata, [id(Size), non_blank_string(), non_blank_string(), O]},
                                {call, ?O, set_metadata, [id(Size), maybe_oneof(calc_metadata(O)), delete, O]},
-                               {call, ?O, add_trigger, [id(Size), bin_str(), trigger(), O]},
+                               {call, ?O, add_trigger, [id(Size), non_blank_string(), trigger(), O]},
                                {call, ?O, remove_trigger, [id(Size), maybe_oneof(calc_triggers(O)), O]}
 
                               ]))
@@ -117,7 +99,7 @@ triggers(U) ->
 
 prop_name() ->
     ?FORALL({N, R},
-            {bin_str(), org()},
+            {non_blank_string(), org()},
             begin
                 Org = eval(R),
                 ?WHENFAIL(io:format(user, "History: ~p~nOrg: ~p~n", [R,Org]),
@@ -127,7 +109,7 @@ prop_name() ->
 
 prop_uuid() ->
     ?FORALL({N, R},
-            {bin_str(), org()},
+            {non_blank_string(), org()},
             begin
                 Org = eval(R),
                 ?WHENFAIL(io:format(user, "History: ~p~nOrg: ~p~n", [R, Org]),
@@ -136,7 +118,7 @@ prop_uuid() ->
             end).
 
 prop_set_metadata() ->
-    ?FORALL({K, V, O}, {bin_str(), bin_str(), org()},
+    ?FORALL({K, V, O}, {non_blank_string(), non_blank_string(), org()},
             begin
                 Org = eval(O),
                 O1 = ?O:set_metadata(id(?BIG_TIME), K, V, Org),
@@ -158,7 +140,7 @@ prop_remove_metadata() ->
             end).
 
 prop_add_trigger() ->
-    ?FORALL({UUID, T, O}, {bin_str(), trigger(), org()},
+    ?FORALL({UUID, T, O}, {non_blank_string(), trigger(), org()},
             begin
                 Org = eval(O),
                 O1 = ?O:add_trigger(id(?BIG_TIME), UUID, T, Org),
@@ -178,6 +160,5 @@ prop_remove_trigger() ->
                           model(O1) == M1)
             end).
 
--include("eqc_helper.hrl").
 -endif.
 -endif.
