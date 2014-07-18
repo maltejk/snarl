@@ -35,7 +35,7 @@ eunit:
 	-rm -r apps/snarl/.eunit
 	$(REBAR) eunit skip_deps=true -r -v
 
-test:  eunit
+test: eunit
 	$(REBAR) xref skip_deps=true -r
 
 quick-xref:
