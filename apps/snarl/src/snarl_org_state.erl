@@ -66,8 +66,8 @@ new({T, _ID}) ->
     #?ORG{
         uuid = UUID,
         name = Name,
-        triggers = snarl_map:new(),
-        metadata = snarl_map:new()
+        triggers = fifo_map:new(),
+        metadata = fifo_map:new()
        }.
 
 %%-spec load({non_neg_integer(), atom()}, any_organisation()) -> organisation().
@@ -99,7 +99,7 @@ load({T, ID},
        }) ->
     UUIDb = riak_dt_lwwreg:value(UUID),
     Ts = [{trigger_uuid(UUIDb, Tr), Tr} || Tr <- riak_dt_orswot:value(Triggers)],
-    Triggers1 = snarl_map:from_orddict(orddict:from_list(Ts), ID, T),
+    Triggers1 = fifo_map:from_orddict(orddict:from_list(Ts), ID, T),
     load({T, ID},
          #organisation_0_1_2{
             uuid = UUID,
@@ -118,7 +118,7 @@ load({T, ID},
     {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID), T),
     {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name), T),
     {ok, Triggers1} = ?CONVERT_VORSET(Triggers),
-    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), ID, T),
+    Metadata1 = fifo_map:from_orddict(statebox:value(Metadata), ID, T),
     load({T, ID},
          #organisation_0_1_1{
             uuid = UUID1,
@@ -188,8 +188,8 @@ to_json(#?ORG{
       [
        {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
        {<<"name">>, riak_dt_lwwreg:value(Name)},
-       {<<"triggers">>, [{U, jsonify_trigger(T)} || {U, T} <- snarl_map:value(Triggers)]},
-       {<<"metadata">>, snarl_map:value(Metadata)}
+       {<<"triggers">>, [{U, jsonify_trigger(T)} || {U, T} <- fifo_map:value(Triggers)]},
+       {<<"metadata">>, fifo_map:value(Metadata)}
       ]).
 
 merge(#?ORG{
@@ -207,8 +207,8 @@ merge(#?ORG{
     #?ORG{
         uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
         name = riak_dt_lwwreg:merge(Name1, Name2),
-        triggers = snarl_map:merge(Triggers1, Triggers2),
-        metadata = snarl_map:merge(Metadata1, Metadata2)
+        triggers = fifo_map:merge(Triggers1, Triggers2),
+        metadata = fifo_map:merge(Metadata1, Metadata2)
        }.
 
 name(Org) ->
@@ -228,28 +228,28 @@ uuid({T, _ID}, UUID, Org) ->
 -spec triggers(Org::organisation()) -> [{ID::fifo:uuid(), Trigger::term()}].
 
 triggers(Org) ->
-    snarl_map:value(Org#?ORG.triggers).
+    fifo_map:value(Org#?ORG.triggers).
 
 add_trigger({T, ID}, UUID, Trigger, Org) ->
-    {ok, T1} = snarl_map:set(UUID, {reg, Trigger}, ID, T, Org#?ORG.triggers),
+    {ok, T1} = fifo_map:set(UUID, {reg, Trigger}, ID, T, Org#?ORG.triggers),
     Org#?ORG{triggers = T1}.
 
 remove_trigger({_T, ID}, Trigger, Org) ->
-    {ok, V} = snarl_map:remove(Trigger, ID, Org#?ORG.triggers),
+    {ok, V} = fifo_map:remove(Trigger, ID, Org#?ORG.triggers),
     Org#?ORG{triggers = V}.
 
 metadata(Org) ->
-    snarl_map:value(Org#?ORG.metadata).
+    fifo_map:value(Org#?ORG.metadata).
 
 set_metadata({T, ID}, P, Value, Org) when is_binary(P) ->
-    set_metadata({T, ID}, snarl_map:split_path(P), Value, Org);
+    set_metadata({T, ID}, fifo_map:split_path(P), Value, Org);
 
 set_metadata({_T, ID}, Attribute, delete, Org) ->
-    {ok, M1} = snarl_map:remove(Attribute, ID, Org#?ORG.metadata),
+    {ok, M1} = fifo_map:remove(Attribute, ID, Org#?ORG.metadata),
     Org#?ORG{metadata = M1};
 
 set_metadata({T, ID}, Attribute, Value, Org) ->
-    {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Org#?ORG.metadata),
+    {ok, M1} = fifo_map:set(Attribute, Value, ID, T, Org#?ORG.metadata),
     Org#?ORG{metadata = M1}.
 
 -spec trigger_uuid(UUID::uuid:uuid_string(), Trigger::term()) -> uuid:uuid().

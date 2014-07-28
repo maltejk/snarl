@@ -141,7 +141,7 @@ load({T, ID},
     {ok, Roles1} = ?CONVERT_VORSET(Roles),
     {ok, Keys1} = ?CONVERT_VORSET(Keys),
     {ok, Orgs1} = ?CONVERT_VORSET(Orgs),
-    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), ID, T),
+    Metadata1 = fifo_map:from_orddict(statebox:value(Metadata), ID, T),
     load({T, ID},
          #user_0_1_3{
             uuid = UUID1,
@@ -241,7 +241,7 @@ new({T, _ID}) ->
         yubikeys = riak_dt_orswot:new(),
         ssh_keys = riak_dt_orswot:new(),
         orgs = riak_dt_orswot:new(),
-        metadata = snarl_map:new()
+        metadata = fifo_map:new()
        }.
 
 to_json(#?USER{
@@ -265,7 +265,7 @@ to_json(#?USER{
        {<<"keys">>, riak_dt_orswot:value(Keys)},
        {<<"org">>, riak_dt_lwwreg:value(Org)},
        {<<"orgs">>, riak_dt_orswot:value(Orgs)},
-       {<<"metadata">>, snarl_map:value(Metadata)}
+       {<<"metadata">>, fifo_map:value(Metadata)}
       ]).
 
 merge(#?USER{
@@ -302,7 +302,7 @@ merge(#?USER{
         yubikeys = riak_dt_orswot:merge(YubiKeys1, YubiKeys2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
         orgs = riak_dt_orswot:merge(Orgs1, Orgs2),
-        metadata = snarl_map:merge(Metadata1, Metadata2)
+        metadata = fifo_map:merge(Metadata1, Metadata2)
        }.
 
 join_org({_T, ID}, Org, User) ->
@@ -439,17 +439,17 @@ leave({_T, ID}, Role, User) ->
     end.
 
 metadata(User) ->
-    snarl_map:value(User#?USER.metadata).
+    fifo_map:value(User#?USER.metadata).
 
 set_metadata({T, ID}, P, Value, User) when is_binary(P) ->
-    set_metadata({T, ID}, snarl_map:split_path(P), Value, User);
+    set_metadata({T, ID}, fifo_map:split_path(P), Value, User);
 
 set_metadata({_T, ID}, Attribute, delete, User) ->
-    {ok, M1} = snarl_map:remove(Attribute, ID, User#?USER.metadata),
+    {ok, M1} = fifo_map:remove(Attribute, ID, User#?USER.metadata),
     User#?USER{metadata = M1};
 
 set_metadata({T, ID}, Attribute, Value, User) ->
-    {ok, M1} = snarl_map:set(Attribute, Value, ID, T, User#?USER.metadata),
+    {ok, M1} = fifo_map:set(Attribute, Value, ID, T, User#?USER.metadata),
     User#?USER{metadata = M1}.
 
 update_permissions(TID, U) ->

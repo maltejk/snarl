@@ -61,7 +61,7 @@ start(_StartType, _StartArgs) ->
                 _ ->
                     ok
             end,
-
+            timer:apply_after(2000, snarl_opt, update, []),
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}

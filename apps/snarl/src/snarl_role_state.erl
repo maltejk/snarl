@@ -65,7 +65,7 @@ new({T, _ID}) ->
         uuid = UUID,
         name = Name,
         permissions = riak_dt_orswot:new(),
-        metadata = snarl_map:new()
+        metadata = fifo_map:new()
        }.
 
 %%-spec load({integer(), atom()}, any_role()) -> role().
@@ -98,7 +98,7 @@ load({T, ID},
     {ok, UUID1} = ?NEW_LWW(vlwwregister:value(UUID), T),
     {ok, Name1} = ?NEW_LWW(vlwwregister:value(Name), T),
     {ok, Permissions1} = ?CONVERT_VORSET(Permissions),
-    Metadata1 = snarl_map:from_orddict(statebox:value(Metadata), ID, T),
+    Metadata1 = fifo_map:from_orddict(statebox:value(Metadata), ID, T),
     load({T, ID},
          #group_0_1_1{
             uuid = UUID1,
@@ -138,7 +138,7 @@ to_json(#?ROLE{
        {<<"uuid">>, riak_dt_lwwreg:value(UUID)},
        {<<"name">>, riak_dt_lwwreg:value(Name)},
        {<<"permissions">>, riak_dt_orswot:value(Permissions)},
-       {<<"metadata">>, snarl_map:value(Metadata)}
+       {<<"metadata">>, fifo_map:value(Metadata)}
       ]).
 
 -spec merge(role(), role()) -> role().
@@ -159,7 +159,7 @@ merge(#?ROLE{
         uuid = riak_dt_lwwreg:merge(UUID1, UUID2),
         name = riak_dt_lwwreg:merge(Name1, Name2),
         permissions = riak_dt_orswot:merge(Permissions1, Permissions2),
-        metadata = snarl_map:merge(Metadata1, Metadata2)
+        metadata = fifo_map:merge(Metadata1, Metadata2)
        }.
 
 name(Role) ->
@@ -213,17 +213,17 @@ revoke_prefix({_T, ID}, Prefix, Role) ->
            }.
 
 metadata(Role) ->
-    snarl_map:value(Role#?ROLE.metadata).
+    fifo_map:value(Role#?ROLE.metadata).
 
 set_metadata({T, ID}, P, Value, Role) when is_binary(P) ->
-    set_metadata({T, ID}, snarl_map:split_path(P), Value, Role);
+    set_metadata({T, ID}, fifo_map:split_path(P), Value, Role);
 
 set_metadata({_T, ID}, Attribute, delete, Role) ->
-    {ok, M1} = snarl_map:remove(Attribute, ID, Role#?ROLE.metadata),
+    {ok, M1} = fifo_map:remove(Attribute, ID, Role#?ROLE.metadata),
     Role#?ROLE{metadata = M1};
 
 set_metadata({T, ID}, Attribute, Value, Role) ->
-    {ok, M1} = snarl_map:set(Attribute, Value, ID, T, Role#?ROLE.metadata),
+    {ok, M1} = fifo_map:set(Attribute, Value, ID, T, Role#?ROLE.metadata),
     Role#?ROLE{metadata = M1}.
 
 update_permissions(TID, Rl) ->
