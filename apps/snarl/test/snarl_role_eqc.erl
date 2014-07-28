@@ -268,7 +268,7 @@ postcondition(S, {call, _, lookup_, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
 
 postcondition(S, {call, _, lookup_, [{_, UUID}]}, {ok, Result}) ->
-    UUID == snarl_role_state:uuid(Result) andalso has_uuid(S, UUID);
+    UUID == ft_role:uuid(Result) andalso has_uuid(S, UUID);
 
 postcondition(S, {call, _, get_, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
@@ -305,7 +305,7 @@ postcondition(_S, C, R) ->
     false.
 
 metadata_match(S, UUID, U) ->
-    Ks = snarl_role_state:metadata(U),
+    Ks = ft_role:metadata(U),
     Ks == known_metadata(S, UUID).
 
 known_metadata(#state{metadata=Ms}, UUID) ->

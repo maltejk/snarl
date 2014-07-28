@@ -1,6 +1,7 @@
 -module(snarl_role).
--include("snarl.hrl").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          sync_repair/2,
@@ -41,7 +42,7 @@ import(Role, Data) ->
 lookup(Role) ->
     case lookup_(Role) of
         {ok, Obj} ->
-            {ok, snarl_role_state:to_json(Obj)};
+            {ok, ft_role:to_json(Obj)};
         R ->
             R
     end.
@@ -73,7 +74,7 @@ lookup_(Role) ->
 get(Role) ->
     case get_(Role) of
         {ok, RoleObj} ->
-            {ok, snarl_role_state:to_json(RoleObj)};
+            {ok, ft_role:to_json(RoleObj)};
         R  ->
             R
     end.

@@ -124,7 +124,7 @@ sync_diff(_, State = #state{
                             case Sys:raw(UUID) of
                                 {ok, LObj} ->
                                     Objs = [RObj, LObj],
-                                    Merged = snarl_obj:merge(snarl_entity_read_fsm, Objs),
+                                    Merged = ft_obj:merge(snarl_entity_read_fsm, Objs),
                                     NVS = {{remote, node()}, vnode(Sys), Sys},
                                     snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Merged),
                                     Msg = write(Sys, UUID, sync_repair, Merged),

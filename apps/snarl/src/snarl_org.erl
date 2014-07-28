@@ -1,6 +1,6 @@
 -module(snarl_org).
--include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          sync_repair/2,
@@ -66,7 +66,7 @@ remove_trigger(Org, Trigger) ->
 trigger(Org, Event, Payload) ->
     case get_(Org) of
         {ok, OrgObj} ->
-            Triggers = [T || {_, T} <- snarl_org_state:triggers(OrgObj)],
+            Triggers = [T || {_, T} <- ft_org:triggers(OrgObj)],
             Executed = do_events(Triggers, Event, Payload, 0),
             {ok, Executed};
         R  ->
@@ -146,7 +146,7 @@ lookup(OrgName) ->
 get(Org) ->
     case get_(Org) of
         {ok, OrgObj} ->
-            {ok, snarl_org_state:to_json(OrgObj)};
+            {ok, ft_org:to_json(OrgObj)};
         R  ->
             R
     end.
@@ -154,7 +154,7 @@ get(Org) ->
 -spec get_(Org::fifo:org_id()) ->
                   not_found |
                   {error, timeout} |
-                  {ok, Org::snarl_org_state:organisation()}.
+                  {ok, Org::ft_org:organisation()}.
 get_(Org) ->
     case snarl_entity_read_fsm:start(
            {snarl_org_vnode, snarl_org},

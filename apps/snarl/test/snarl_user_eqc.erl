@@ -515,7 +515,7 @@ postcondition(S, {call, _, lookup_, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
 
 postcondition(S, {call, _, lookup_, [{_, UUID}]}, {ok, Result}) ->
-    UUID == snarl_user_state:uuid(Result) andalso has_uuid(S, UUID);
+    UUID == ft_user:uuid(Result) andalso has_uuid(S, UUID);
 
 postcondition(S, {call, _, get_, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
@@ -560,21 +560,21 @@ roles_match(#state{roles=Rs}, UUID, U) ->
                 _ ->
                     []
             end,
-    snarl_user_state:roles(U) == Known.
+    ft_user:roles(U) == Known.
 
 orgs_match(S, UUID, U) ->
-    snarl_user_state:orgs(U) == known_orgs(S, UUID).
+    ft_user:orgs(U) == known_orgs(S, UUID).
 
 yubikeys_match(S, UUID, U) ->
-    snarl_user_state:yubikeys(U) == known_yubikeys(S, UUID).
+    ft_user:yubikeys(U) == known_yubikeys(S, UUID).
 
 keys_match(S, UUID, U) ->
-    Ks = snarl_user_state:keys(U),
+    Ks = ft_user:keys(U),
     Ks1 = [I || {I, _K} <- Ks],
     Ks1 == known_keys(S, UUID).
 
 metadata_match(S, UUID, U) ->
-    Ks = snarl_user_state:metadata(U),
+    Ks = ft_user:metadata(U),
     Ks == known_metadata(S, UUID).
 
 known_metadata(#state{metadata=Ms}, UUID) ->

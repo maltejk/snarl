@@ -3,6 +3,7 @@
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([start_vnode/1,
          init/1,
@@ -158,19 +159,19 @@ revoke_prefix(Preflist, ReqID, Role, Val) ->
 %%% VNode
 %%%===================================================================
 init([Part]) ->
-    snarl_vnode:init(Part, <<"group">>, ?SERVICE, ?MODULE, snarl_role_state).
+    snarl_vnode:init(Part, <<"group">>, ?SERVICE, ?MODULE, ft_role).
 
 %%%===================================================================
 %%% General
 %%%===================================================================
 
 handle_command({add, {ReqID, Coordinator} = ID, UUID, Role}, _Sender, State) ->
-    Role0 = snarl_role_state:new(ID),
-    Role1 = snarl_role_state:name(ID, Role, Role0),
-    Role2 = snarl_role_state:uuid(ID, UUID, Role1),
+    Role0 = ft_role:new(ID),
+    Role1 = ft_role:name(ID, Role, Role0),
+    Role2 = ft_role:uuid(ID, UUID, Role1),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    RoleObj = #snarl_obj{val=Role2, vclock=VC},
+    RoleObj = #ft_obj{val=Role2, vclock=VC},
     snarl_vnode:put(UUID, RoleObj, State),
     {reply, {ok, ReqID}, State};
 
@@ -204,21 +205,24 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {Role, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
+    {Role, O} = binary_to_term(Data),
+    Obj = ft_obj:update(O),
     ID = snarl_vnode:mkid(handoff),
-    V = snarl_role_state:load(ID, Vin),
-    case fifo_db:get(State#vstate.db, <<"group">>, Role) of
-        {ok, #snarl_obj{val = V0}} ->
-            V1 = snarl_role_state:load(ID, V0),
-            RoleObj = Obj#snarl_obj{val = snarl_role_state:merge(V, V1)},
+    V = ft_role:load(ID, ft_obj:val(Obj)),
+    case fifo_db:get(State#vstate.db, <<"role">>, Role) of
+        {ok, OldObj} ->
+            V1 = ft_role:load(ID, ft_obj:val(OldObj)),
+            RoleObj = #ft_obj{
+                         vclock = vclock:merge([ft_obj:vclock(Obj),
+                                                ft_obj:vclock(OldObj)]),
+                         val = ft_role:merge(V, V1)},
             snarl_vnode:put(Role, RoleObj, State);
         not_found ->
-            VC0 = vclock:fresh(),
-            VC = vclock:increment(node(), VC0),
-            RoleObj = #snarl_obj{val=V, vclock=VC},
+            RoleObj = Obj#ft_obj{val=V},
             snarl_vnode:put(Role, RoleObj, State)
     end,
     {reply, ok, State}.
+
 
 encode_handoff_item(Role, Data) ->
     term_to_binary({Role, Data}).

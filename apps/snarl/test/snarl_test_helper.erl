@@ -4,6 +4,7 @@
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("snarl/include/snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -compile(export_all).
 
@@ -113,7 +114,7 @@ start_fake_read_fsm() ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E),
                         Res = case R of
-                                  {ok, ReqID, _, #snarl_obj{val=V}} ->
+                                  {ok, ReqID, _, #ft_obj{val=V}} ->
                                       {ok, V};
                                   {ok, ReqID, _, O} ->
                                       O;
@@ -146,7 +147,7 @@ start_fake_write_fsm() ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E),
                         Res = case R of
-                                  {ok, ReqID, _, #snarl_obj{val=V}} ->
+                                  {ok, ReqID, _, #ft_obj{val=V}} ->
                                       {ok, V};
                                   {ok, ReqID, _, O} ->
                                       O;
@@ -162,7 +163,7 @@ start_fake_write_fsm() ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E, Val),
                         Res = case R of
-                                  {ok, ReqID, _, #snarl_obj{val=V}} ->
+                                  {ok, ReqID, _, #ft_obj{val=V}} ->
                                       {ok, V};
                                   {ok, ReqID, _, O} ->
                                       O;
@@ -199,7 +200,7 @@ start_fake_coverage(Pid) ->
                         snarl_full_coverage:start(A, B, {C, Req, Full});
                     (A, B, {C, Req, Full, false}) ->
                         {ok, R} = snarl_full_coverage:start(A, B, {C, Req, Full}),
-                        {ok, [U || #snarl_obj{val = U} <- R]};
+                        {ok, [U || #ft_obj{val = U} <- R]};
                     (_, O, {C, Req, Full}) ->
                         M = list_to_atom(atom_to_list(O) ++ "_vnode"),
                         Ref = make_ref(),
@@ -313,7 +314,7 @@ mock_vnode_loop(M, S) ->
                         mock_vnode_loop(M, S)
                 end;
             {coverage, M1, F, Ref, C} ->
-                F ! {Ref, {error, wrong_vnode}},
+                F ! {Ref, {ok, []}},
                 mock_vnode_loop(M, S);
             {info, F, Ref, C} ->
                 case M:handle_info(C, undefinded, F, S) of

@@ -3,6 +3,7 @@
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([start_vnode/1,
          init/1,
@@ -236,20 +237,20 @@ revoke_prefix(Preflist, ReqID, User, Val) ->
 %%% VNode
 %%%===================================================================
 init([Part]) ->
-    snarl_vnode:init(Part, <<"user">>, ?SERVICE, ?MODULE, snarl_user_state).
+    snarl_vnode:init(Part, <<"user">>, ?SERVICE, ?MODULE, ft_user).
 
 %%%===================================================================
 %%% General
 %%%===================================================================
 
 handle_command({add, {ReqID, Coordinator}=ID, UUID, User}, _Sender, State) ->
-    User0 = snarl_user_state:new(ID),
-    User1 = snarl_user_state:name(ID, User, User0),
-    User2 = snarl_user_state:uuid(ID, UUID, User1),
-    User3 = snarl_user_state:grant(ID, [<<"users">>, UUID, <<"...">>], User2),
+    User0 = ft_user:new(ID),
+    User1 = ft_user:name(ID, User, User0),
+    User2 = ft_user:uuid(ID, UUID, User1),
+    User3 = ft_user:grant(ID, [<<"users">>, UUID, <<"...">>], User2),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
-    UserObj = #snarl_obj{val=User3, vclock=VC},
+    UserObj = #ft_obj{val=User3, vclock=VC},
     snarl_vnode:put(UUID, UserObj, State),
     {reply, {ok, ReqID}, State};
 
@@ -283,18 +284,20 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {User, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
+    {User, O} = binary_to_term(Data),
+    Obj = ft_obj:update(O),
     ID = snarl_vnode:mkid(handoff),
-    V = snarl_user_state:load(ID, Vin),
+    V = ft_user:load(ID, ft_obj:val(Obj)),
     case fifo_db:get(State#vstate.db, <<"user">>, User) of
-        {ok, #snarl_obj{val = V0}} ->
-            V1 = snarl_user_state:load(ID, V0),
-            UserObj = Obj#snarl_obj{val = snarl_user_state:merge(V, V1)},
+        {ok, OldObj} ->
+            V1 = ft_user:load(ID, ft_obj:val(OldObj)),
+            UserObj = #ft_obj{
+                         vclock = vclock:merge([ft_obj:vclock(Obj),
+                                                ft_obj:vclock(OldObj)]),
+                         val = ft_user:merge(V, V1)},
             snarl_vnode:put(User, UserObj, State);
         not_found ->
-            VC0 = vclock:fresh(),
-            VC = vclock:increment(node(), VC0),
-            UserObj = #snarl_obj{val=V, vclock=VC},
+            UserObj = Obj#ft_obj{val=V},
             snarl_vnode:put(User, UserObj, State)
     end,
     {reply, ok, State}.
@@ -310,9 +313,10 @@ delete(State) ->
 
 handle_coverage({find_key, KeyID}, _KeySpaces, Sender, State) ->
     ID = snarl_vnode:mkid(findkey),
-    FoldFn = fun (UUID, #snarl_obj{val=U0}, [not_found]) ->
-                     U1 = snarl_user_state:load(ID, U0),
-                     Ks = snarl_user_state:keys(U1),
+    FoldFn = fun (UUID, O, [not_found]) ->
+                     U0 = ft_obj:val(O),
+                     U1 = ft_user:load(ID, U0),
+                     Ks = ft_user:keys(U1),
                      try
                          Ks1 = [key_to_id(K) || {_, K} <- Ks],
                          case lists:member(KeyID, Ks1) of

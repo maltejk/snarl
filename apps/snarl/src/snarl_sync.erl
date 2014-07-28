@@ -257,7 +257,7 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 
 hash(BKey, Obj) ->
-    list_to_binary(integer_to_list(erlang:phash2({BKey, snarl_obj:vclock(Obj)}))).
+    list_to_binary(integer_to_list(erlang:phash2({BKey, ft_obj:vclock(Obj)}))).
 
 sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     {Diff, Get, Push} = split_trees(LTree, RTree),
