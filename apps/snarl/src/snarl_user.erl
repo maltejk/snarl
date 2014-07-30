@@ -1,6 +1,6 @@
 -module(snarl_user).
--include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          sync_repair/2,
@@ -71,7 +71,7 @@ auth(User, Passwd, basic) ->
         {ok, UserR} ->
             case check_pw(UserR, Passwd) of
                 true ->
-                    {ok, snarl_user_state:uuid(UserR)};
+                    {ok, ft_user:uuid(UserR)};
                 _ ->
                     not_found
             end;
@@ -93,9 +93,9 @@ auth(User, Passwd, OTP) ->
            end,
     case Res1 of
         {ok, UserR1} ->
-            case snarl_user_state:yubikeys(UserR1) of
+            case ft_user:yubikeys(UserR1) of
                 [] ->
-                    {ok, snarl_user_state:uuid(UserR1)};
+                    {ok, ft_user:uuid(UserR1)};
                 Ks ->
                     case snarl_yubico:id(OTP) of
                         <<>> ->
@@ -107,7 +107,7 @@ auth(User, Passwd, OTP) ->
                                 true ->
                                     case snarl_yubico:verify(OTP) of
                                         {auth, ok} ->
-                                            {ok, snarl_user_state:uuid(UserR1)};
+                                            {ok, ft_user:uuid(UserR1)};
                                         _ ->
                                             not_found
                                     end
@@ -125,7 +125,7 @@ auth(User, Passwd, OTP) ->
 lookup(User) ->
     case lookup_(User) of
         {ok, Obj} ->
-            {ok, snarl_user_state:to_json(Obj)};
+            {ok, ft_user:to_json(Obj)};
         R ->
             R
     end.
@@ -180,7 +180,7 @@ revoke_key(User, KeyID) ->
 keys(User) ->
     case get_(User) of
         {ok, UserObj} ->
-            {ok, snarl_user_state:keys(UserObj)};
+            {ok, ft_user:keys(UserObj)};
         E ->
             E
     end.
@@ -195,7 +195,7 @@ remove_yubikey(User, KeyID) ->
 yubikeys(User) ->
     case get_(User) of
         {ok, UserObj} ->
-            {ok, snarl_user_state:yubikeys(UserObj)};
+            {ok, ft_user:yubikeys(UserObj)};
         E ->
             E
     end.
@@ -203,7 +203,7 @@ yubikeys(User) ->
 active(User) ->
     case get_(User) of
         {ok, UserObj} ->
-            {ok, snarl_user_state:active_org(UserObj)};
+            {ok, ft_user:active_org(UserObj)};
         E ->
             E
     end.
@@ -211,7 +211,7 @@ active(User) ->
 orgs(User) ->
     case get_(User) of
         {ok, UserObj} ->
-            {ok, snarl_user_state:orgs(UserObj)};
+            {ok, ft_user:orgs(UserObj)};
         E ->
             E
     end.
@@ -227,14 +227,14 @@ cache(User) ->
                    fun(Role, Permissions) ->
                            case snarl_role:get_(Role) of
                                {ok, RoleObj} ->
-                                   GrPerms = snarl_role_state:permissions(RoleObj),
+                                   GrPerms = ft_role:permissions(RoleObj),
                                    ordsets:union(Permissions, GrPerms);
                                _ ->
                                    Permissions
                            end
                    end,
-                   snarl_user_state:permissions(UserObj),
-                   snarl_user_state:roles(UserObj))};
+                   ft_user:permissions(UserObj),
+                   ft_user:roles(UserObj))};
         E ->
             E
     end.
@@ -247,7 +247,7 @@ cache(User) ->
 get(User) ->
     case get_(User) of
         {ok, UserObj} ->
-            {ok, snarl_user_state:to_json(UserObj)};
+            {ok, ft_user:to_json(UserObj)};
         R  ->
             R
     end.
@@ -337,7 +337,7 @@ add(Creator, User) when is_binary(Creator),
         {ok, UUID} = R ->
             case get_(Creator) of
                 {ok, C} ->
-                    case snarl_user_state:active_org(C) of
+                    case ft_user:active_org(C) of
                         <<>> ->
                             lager:info("[~s:create] Creator ~s has no "
                                        "active organisation.",
@@ -447,7 +447,7 @@ join_org(User, Org) ->
 select_org(User, Org) ->
     case get_(User) of
         {ok, UserObj} ->
-            Orgs = snarl_user_state:orgs(UserObj),
+            Orgs = ft_user:orgs(UserObj),
             case lists:member(Org, Orgs) of
                 true ->
                     do_write(User, select_org, Org);
@@ -465,7 +465,7 @@ select_org(User, Org) ->
 leave_org(User, Org) ->
     case get_(User) of
         {ok, UserObj} ->
-            case snarl_user_state:active_org(UserObj) of
+            case ft_user:active_org(UserObj) of
                 Org ->
                     do_write(User, select_org, <<"">>);
                 _ ->
@@ -538,7 +538,7 @@ test_roles(Permission, [Role|Roles]) ->
         {ok, RoleObj} ->
             case libsnarlmatch:test_perms(
                    Permission,
-                   snarl_role_state:permissions(RoleObj)) of
+                   ft_role:permissions(RoleObj)) of
                 true ->
                     true;
                 false ->
@@ -551,15 +551,15 @@ test_roles(Permission, [Role|Roles]) ->
 test_user(UserObj, Permission) ->
     case libsnarlmatch:test_perms(
            Permission,
-           snarl_user_state:permissions(UserObj)) of
+           ft_user:permissions(UserObj)) of
         true ->
             true;
         false ->
-            test_roles(Permission, snarl_user_state:roles(UserObj))
+            test_roles(Permission, ft_user:roles(UserObj))
     end.
 
 check_pw(UserR, Passwd) ->
-    case snarl_user_state:password(UserR) of
+    case ft_user:password(UserR) of
         {bcrypt, Hash} ->
             HashS = binary_to_list(Hash),
             case bcrypt:hashpw(Passwd, Hash) of

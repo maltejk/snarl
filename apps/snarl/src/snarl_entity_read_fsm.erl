@@ -4,6 +4,7 @@
 -module(snarl_entity_read_fsm).
 -behavior(gen_fsm).
 -include("snarl.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -include("snarl_dtrace.hrl").
 
@@ -191,7 +192,7 @@ waiting({ok, ReqID, IdxNode, Obj},
                     ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
                     Reply = case SD#state.raw of
                                 false ->
-                                    snarl_obj:val(Merged);
+                                    ft_obj:val(Merged);
                                 true ->
                                     Merged
                             end,
@@ -258,23 +259,23 @@ terminate(_Reason, _SN, _SD) ->
 %% @pure
 %%
 %% @doc Given a list of `Replies' return the merged value.
--spec merge([vnode_reply()]) -> snarl_obj() | not_found.
+-spec merge([vnode_reply()]) -> ft_obj() | not_found.
 merge(Replies) ->
     Objs = [Obj || {_,Obj} <- Replies],
-    snarl_obj:merge(snarl_entity_read_fsm, Objs).
+    ft_obj:merge(snarl_entity_read_fsm, Objs).
 
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: snarl_user_state:user() | snarl_user_state:role() ]) ->
-                       snarl_user_state:user() | snarl_user_state:role().
-%%-spec reconcile([A :: snarl_user_state:user() | snarl_user_state:role() ]) -> snarl_user_state:user();
-%%               ([A :: snarl_user_state:role()]) -> snarl_user_state:role().
+-spec reconcile([A :: ft_user:user() | ft_user:role() ]) ->
+                       ft_user:user() | ft_user:role().
+%%-spec reconcile([A :: ft_user:user() | ft_user:role() ]) -> ft_user:user();
+%%               ([A :: ft_user:role()]) -> ft_user:role().
 
 reconcile([V | Vs]) ->
-    case {snarl_user_state:is_a(V),
-          snarl_role_state:is_a(V),
-          snarl_org_state:is_a(V)} of
+    case {ft_user:is_a(V),
+          ft_role:is_a(V),
+          ft_org:is_a(V)} of
         {true, _, _} ->
             reconcile_user(Vs, V);
         {_, true, _} ->
@@ -286,17 +287,17 @@ reconcile([V | Vs]) ->
     end.
 
 reconcile_role([G | R], Acc) ->
-    reconcile_role(R, snarl_role_state:merge(Acc, G));
+    reconcile_role(R, ft_role:merge(Acc, G));
 reconcile_role(_, Acc) ->
     Acc.
 
 reconcile_user([U | R], Acc) ->
-    reconcile_user(R, snarl_user_state:merge(Acc, U));
+    reconcile_user(R, ft_user:merge(Acc, U));
 reconcile_user(_, Acc) ->
     Acc.
 
 reconcile_org([U | R], Acc) ->
-    reconcile_org(R, snarl_org_state:merge(Acc, U));
+    reconcile_org(R, ft_org:merge(Acc, U));
 reconcile_org(_, Acc) ->
     Acc.
 
@@ -310,16 +311,16 @@ needs_repair(MObj, Replies) ->
     lists:any(different(MObj), Objs).
 
 %% @pure
-different(A) -> fun(B) -> not snarl_obj:equal(A,B) end.
+different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
 
 %% @impure
 %%
 %% @doc Repair any vnodes that do not have the correct object.
--spec repair(atom(), string(), snarl_obj(), [vnode_reply()]) -> io.
+-spec repair(atom(), string(), any_obj(), [vnode_reply()]) -> io.
 repair(_, _, _, []) -> io;
 
 repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
-    case snarl_obj:equal(MObj, Obj) of
+    case ft_obj:equal(MObj, Obj) of
         true ->
             repair(VNode, StatName, MObj, T);
         false ->
@@ -327,7 +328,7 @@ repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
                 not_found ->
                     VNode:repair(IdxNode, StatName, not_found, MObj);
                 _ ->
-                    VNode:repair(IdxNode, StatName, Obj#snarl_obj.vclock, MObj)
+                    VNode:repair(IdxNode, StatName, ft_obj:vclock(Obj), MObj)
             end,
             repair(VNode, StatName, MObj, T)
     end.

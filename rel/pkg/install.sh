@@ -7,7 +7,7 @@ BACKUP_FILE=/var/db/snarl/backup_$DBID.tar.gz
 
 case $2 in
     PRE-INSTALL)
-        if grep '^Image: base64 13.[234].*$' /etc/product
+        if grep '^Image: base64 1[43].[1234].*$' /etc/product
         then
             echo "Image version supported"
         else

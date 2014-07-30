@@ -12,9 +12,5 @@ str() ->
 atom() ->
     elements([a,b,c,undefined]).
 
-prop_ensure_str() ->
-    ?FORALL(E, oneof([binary(), int(), real(), atom(), str()]),
-            is_list(snarl_util:ensure_str(E))).
-
 -endif.
 -endif.

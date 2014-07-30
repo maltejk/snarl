@@ -272,7 +272,7 @@ postcondition(_S, C, R) ->
     false.
 
 metadata_match(S, UUID, U) ->
-    Ks = snarl_org_state:metadata(U),
+    Ks = ft_org:metadata(U),
     Ks == known_metadata(S, UUID).
 
 known_metadata(#state{metadata=Ms}, UUID) ->

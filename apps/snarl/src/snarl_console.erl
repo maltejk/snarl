@@ -1,7 +1,8 @@
-%% @doc Interface for snarl-admin commands.
+% @doc Interface for snarl-admin commands.
 -module(snarl_console).
 
 -include("snarl.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          db_keys/1,
@@ -84,15 +85,15 @@ db_update([]) ->
 
 db_update(["users"]) ->
     io:format("Updating users...~n"),
-    do_update(snarl_user, snarl_user_state);
+    do_update(snarl_user, ft_user);
 
 db_update(["roles"]) ->
     io:format("Updating roles...~n"),
-    do_update(snarl_role, snarl_role_state);
+    do_update(snarl_role, ft_role);
 
 db_update(["orgs"]) ->
     io:format("Updating orgs...~n"),
-    do_update(snarl_org, snarl_org_state).
+    do_update(snarl_org, ft_org).
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
@@ -333,7 +334,7 @@ leave_role([User, Role]) ->
 passwd([User, Pass]) ->
     case snarl_user:lookup_(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:passwd(snarl_user_state:uuid(UserObj),
+            case snarl_user:passwd(ft_user:uuid(UserObj),
                                    list_to_binary(Pass)) of
                 ok ->
                     io:format("Password successfully changed for user '~s'.~n", [User]),
@@ -350,7 +351,7 @@ passwd([User, Pass]) ->
 grant_role([Role | P]) ->
     case snarl_role:lookup_(list_to_binary(Role)) of
         {ok, RoleObj} ->
-            case snarl_role:grant(snarl_role_state:uuid(RoleObj),
+            case snarl_role:grant(ft_role:uuid(RoleObj),
                                   build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
@@ -367,7 +368,7 @@ grant_role([Role | P]) ->
 grant_user([User | P ]) ->
     case snarl_user:lookup_(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:grant(snarl_user_state:uuid(UserObj),
+            case snarl_user:grant(ft_user:uuid(UserObj),
                                   build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
@@ -384,7 +385,7 @@ grant_user([User | P ]) ->
 revoke_user([User | P ]) ->
     case snarl_user:lookup_(list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:revoke(snarl_user_state:uuid(UserObj),
+            case snarl_user:revoke(ft_user:uuid(UserObj),
                                    build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
@@ -401,7 +402,7 @@ revoke_user([User | P ]) ->
 revoke_role([Role | P]) ->
     case snarl_role:lookup_(list_to_binary(Role)) of
         {ok, RoleObj} ->
-            case snarl_role:revoke(snarl_role_state:uuid(RoleObj),
+            case snarl_role:revoke(ft_role:uuid(RoleObj),
                                    build_permission(P)) of
                 ok ->
                     io:format("Revoked.~n", []),
@@ -759,8 +760,8 @@ do_update(MainMod, StateMod) ->
     io:format("  Grabbing UUIDs"),
     US1 = [begin
                io:format("."),
-               {StateMod:uuid(V), U}
-           end|| U = #snarl_obj{val = V} <- US],
+               {StateMod:uuid(ft_obj:val(U)), ft_obj:update(U)}
+           end|| U <- US],
     io:format(" done.~n"),
 
     io:format("  Wipeing old entries"),

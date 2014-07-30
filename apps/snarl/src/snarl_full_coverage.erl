@@ -1,6 +1,7 @@
 -module(snarl_full_coverage).
 
 -include("snarl.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -behaviour(riak_core_coverage_fsm).
 
@@ -94,10 +95,10 @@ raw_merge([{Score, V} | R]) ->
     raw_merge(R, Score, [V]).
 
 raw_merge([], recalculate, Vs) ->
-    {0, snarl_obj:merge(snarl_entity_read_fsm, Vs)};
+    {0, ft_obj:merge(snarl_entity_read_fsm, Vs)};
 
 raw_merge([], Score, Vs) ->
-    {Score, snarl_obj:merge(snarl_entity_read_fsm, Vs)};
+    {Score, ft_obj:merge(snarl_entity_read_fsm, Vs)};
 
 
 raw_merge([{Score, V} | R], Score, Vs) ->
@@ -124,11 +125,12 @@ merge([{_Score1, V} | R], _Score2, Vs) when _Score1 =/= _Score2->
 
 
 merge_obj(Vs) ->
-    case snarl_obj:merge(snarl_entity_read_fsm, Vs) of
-        #snarl_obj{val = V = #?USER{}} ->
-            snarl_user_state:to_json(V);
-        #snarl_obj{val = V = #?ORG{}} ->
-            snarl_org_state:to_json(V);
-        #snarl_obj{val = V = #?ROLE{}} ->
-            snarl_role_state:to_json(V)
+    O = ft_obj:merge(snarl_entity_read_fsm, Vs),
+    case ft_obj:val(O) of
+        V = #?USER{} ->
+            ft_user:to_json(V);
+        V = #?ORG{} ->
+            ft_org:to_json(V);
+        V = #?ROLE{} ->
+            ft_role:to_json(V)
     end.

@@ -2,6 +2,7 @@
 
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("fifo_dt/include/ft.hrl").
 
 -export([init/5,
          is_empty/1,
@@ -65,10 +66,10 @@ list_keys(Sender, State=#vstate{db=DB, bucket=Bucket}) ->
                 end,
     {async, {fold, AsyncWork, FinishFun}, Sender, State}.
 
-list_keys(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
+list_keys(Getter, Requirements, Sender, State=#vstate{state=SM}) ->
     ID = snarl_vnode:mkid(list),
     FoldFn = fun (Key, E, C) ->
-                     E1 = E#snarl_obj{val=StateMod:load(ID, E#snarl_obj.val)},
+                     E1 = ft_obj:update(SM:load(ID, ft_obj:val(E)), list, E),
                      case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
@@ -78,10 +79,10 @@ list_keys(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
              end,
     fold(FoldFn, [], Sender, State).
 
-list(Getter, Requirements, Sender, State=#vstate{state=StateMod}) ->
+list(Getter, Requirements, Sender, State=#vstate{state=SM}) ->
     ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
-                     E1 = E#snarl_obj{val=StateMod:load(ID, E#snarl_obj.val)},
+                     E1 = ft_obj:update(SM:load(ID, ft_obj:val(E)), list, E),
                      case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
@@ -104,27 +105,21 @@ put(Key, Obj, State) ->
     fifo_db:put(State#vstate.db, State#vstate.bucket, Key, Obj),
     snarl_sync_tree:update(State#vstate.service, Key, Obj),
     riak_core_aae_vnode:update_hashtree(
-      State#vstate.service_bin, Key, Obj#snarl_obj.vclock, State#vstate.hashtrees).
+      State#vstate.service_bin, Key, ft_obj:vclock(Obj), State#vstate.hashtrees).
 
 change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
        State=#vstate{state=Mod}) ->
     case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
-        {ok, #snarl_obj{val=H0} = O} ->
-            H1 = case Mod:load(ID, H0) of
-                     _H when _H =:= H0 ->
-                         H0;
-                     Hx ->
-                         O1 = O#snarl_obj{val=Hx},
-                         fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
-                         Hx
-                 end,
+        {ok, O} ->
+            H0 = ft_obj:val(O),
+            H1 = Mod:load(ID, H0),
             H2 = case Vals of
                      [Val] ->
                          Mod:Action(ID, Val, H1);
                      [Val1, Val2] ->
                          Mod:Action(ID, Val1, Val2, H1)
                  end,
-            Obj = snarl_obj:update(H2, Coordinator, O),
+            Obj = ft_obj:update(H2, Coordinator, O),
             snarl_vnode:put(UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
@@ -147,8 +142,8 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
     fifo_db:transact(State#vstate.db, Trans),
     {ok, State}.
 
-load_obj(ID, Mod, Obj = #snarl_obj{val = V}) ->
-    Obj#snarl_obj{val = Mod:load(ID, V)}.
+load_obj({_, A} = ID, Mod, Obj) ->
+    ft_obj:update(Mod:load(ID, ft_obj:val(Obj)), A, Obj).
 
 handle_coverage({wipe, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
     fifo_db:delete(State#vstate.db, State#vstate.bucket, UUID),
@@ -156,7 +151,8 @@ handle_coverage({wipe, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
 
 handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
     ID = mkid(lookup),
-    FoldFn = fun (U, #snarl_obj{val=V}, [not_found]) ->
+    FoldFn = fun (U, O, [not_found]) ->
+                     V = ft_obj:val(O),
                      case Mod:name(Mod:load(ID, V)) of
                          AName when AName =:= Name ->
                              [U];
@@ -187,14 +183,14 @@ handle_coverage(Req, _KeySpaces, _Sender, State) ->
     lager:warning("Unknown coverage request: ~p", [Req]),
     {stop, not_implemented, State}.
 
-handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender,
+handle_command({sync_repair, {ReqID, _}, UUID, Obj}, _Sender,
                State=#vstate{state=Mod}) ->
     case get(UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
             Old1 = load_obj(ID, Mod, Old),
             lager:info("[sync-repair:~s] Merging with old object", [UUID]),
-            Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
+            Merged = ft_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
             snarl_vnode:put(UUID, Merged, State);
         not_found ->
             lager:info("[sync-repair:~s] Writing new object", [UUID]),
@@ -205,13 +201,13 @@ handle_command({sync_repair, {ReqID, _}, UUID, Obj = #snarl_obj{}}, _Sender,
     end,
     {reply, {ok, ReqID}, State};
 
-handle_command({repair, UUID, _VClock, Obj = #snarl_obj{}}, _Sender,
+handle_command({repair, UUID, _VClock, Obj}, _Sender,
                State=#vstate{state=Mod}) ->
     case get(UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
             Old1 = load_obj(ID, Mod, Old),
-            Merged = snarl_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
+            Merged = ft_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
             snarl_vnode:put(UUID, Merged, State);
         not_found ->
             snarl_vnode:put(UUID, Obj, State);
@@ -223,13 +219,15 @@ handle_command({repair, UUID, _VClock, Obj = #snarl_obj{}}, _Sender,
 
 handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
     Res = case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
-              {ok, #snarl_obj{val = V0} = O} ->
+              {ok, O} ->
+                  V0 = ft_obj:val(O),
                   ID = {ReqID, load},
                   case Mod:load(ID, V0) of
                       _V when _V =:= V0 ->
                           O;
                       Hx ->
-                          O1 = O#snarl_obj{val=Hx},
+                          O0 = ft_obj:update(O),
+                          O1 = O0#ft_obj{val=Hx},
                           fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
                           O1
                   end;
@@ -248,13 +246,14 @@ handle_command({delete, {ReqID, _Coordinator}, UUID}, _Sender, State) ->
 handle_command({set, {ReqID, Coordinator}=ID, UUID, Attributes}, _Sender,
                State=#vstate{state=Mod, bucket=Bucket}) ->
     case fifo_db:get(State#vstate.db, Bucket, UUID) of
-        {ok, #snarl_obj{val=H0} = O} ->
+        {ok, O} ->
+            H0 = ft_obj:val(O),
             H1 = Mod:load(ID, H0),
             H2 = lists:foldr(
                    fun ({Attribute, Value}, H) ->
                            Mod:set_metadata(ID, Attribute, Value, H)
                    end, H1, Attributes),
-            Obj = snarl_obj:update(H2, Coordinator, O),
+            Obj = ft_obj:update(H2, Coordinator, O),
             snarl_vnode:put(UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
@@ -269,13 +268,13 @@ handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender,
     H2 = Mod:uuid(ID, UUID, H1),
     case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
         {ok, O} ->
-            Obj = snarl_obj:update(H2, Coordinator, O),
+            Obj = ft_obj:update(H2, Coordinator, O),
             snarl_vnode:put(UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         _R ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(Coordinator, VC0),
-            Obj = #snarl_obj{val=H2, vclock=VC},
+            Obj = #ft_obj{val=H2, vclock=VC},
             snarl_vnode:put(UUID, Obj, State),
             {reply, {ok, ReqID}, State}
     end;
@@ -307,7 +306,7 @@ handle_command({rehash, {_, UUID}}, _,
     case get(UUID, State) of
         {ok, Obj} ->
             riak_core_aae_vnode:update_hashtree(
-              ServiceBin, UUID, Obj#snarl_obj.vclock, HT);
+              ServiceBin, UUID, ft_obj:vclock(Obj), HT);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
             riak_core_index_hashtree:delete({ServiceBin, UUID}, HT)
