@@ -6,18 +6,19 @@
 -define(RO, snarl_role).
 -define(M, ?MODULE).
 
+-define(REALM, <<"realm">>).
 
 -define(FWD(C),
         C({_, UUID}) ->
-               ?RO:C(UUID)).
+               ?RO:C(?REALM, UUID)).
 
 -define(FWD2(C),
         C({_, UUID}, A1) ->
-               ?RO:C(UUID, A1)).
+               ?RO:C(?REALM, UUID, A1)).
 
 -define(FWD3(C),
         C({_, UUID}, A1, A2) ->
-               ?RO:C(UUID, A1, A2)).
+               ?RO:C(?REALM, UUID, A1, A2)).
 -define(EQC_SETUP, true).
 
 
@@ -75,9 +76,9 @@ command(S) ->
            {call, ?M, raw, [maybe_a_uuid(S)]},
 
            %% List
-           {call, ?RO, list, []},
-           {call, ?RO, list, [[], bool()]},
-           {call, ?RO, list_, []},
+           {call, ?RO, list, [?REALM]},
+           {call, ?RO, list, [?REALM, [], bool()]},
+           {call, ?RO, list_, [?REALM]},
 
            %% Permissions
            {call, ?M, grant, [maybe_a_uuid(S), permission()]},
@@ -99,7 +100,7 @@ handoff_handon() ->
 
 %% Normal auth takes a name.
 auth({_, N}, P) ->
-    ?RO:auth(N, P, <<>>).
+    ?RO:auth(?REALM, N, P, <<>>).
 
 %% BASIC auth takes the uuid.
 ?FWD3(auth).
@@ -107,7 +108,7 @@ auth({_, N}, P) ->
 add(UUID, Role) ->
     meck:new(uuid, [passthrough]),
     meck:expect(uuid, uuid4s, fun() -> UUID end),
-    R = case ?RO:add(Role) of
+    R = case ?RO:add(?REALM, Role) of
             duplicate ->
                 duplicate;
             {ok, UUID} ->
@@ -121,10 +122,10 @@ add(UUID, Role) ->
 ?FWD(raw).
 
 lookup({N, _}) ->
-    ?RO:lookup(N).
+    ?RO:lookup(?REALM, N).
 
 lookup_({N, _}) ->
-    ?RO:lookup_(N).
+    ?RO:lookup_(?REALM, N).
 
 ?FWD2(grant).
 ?FWD2(revoke).
@@ -237,16 +238,16 @@ postcondition(S, {call, _, set, [{_, UUID}, _]}, ok) ->
 
 %% List
 
-postcondition(#state{added = A}, {call, _, list, []}, {ok, R}) ->
+postcondition(#state{added = A}, {call, _, list, [?REALM]}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) == lists:usort(R);
 
-postcondition(#state{added = A}, {call, _, list, [_, true]}, {ok, R}) ->
+postcondition(#state{added = A}, {call, _, list, [?REALM, _, true]}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) == lists:usort([UUID || {_, {UUID, _}} <- R]);
 
-postcondition(#state{added = A}, {call, _, list, [_, false]}, {ok, R}) ->
+postcondition(#state{added = A}, {call, _, list, [?REALM, _, false]}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) == lists:usort([UUID || {_, UUID} <- R]);
 
-postcondition(#state{added = A}, {call, _, list_, []}, {ok, R}) ->
+postcondition(#state{added = A}, {call, _, list_, [?REALM]}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) ==
         lists:usort([UUID || {UUID, _} <- R]);
 
@@ -337,14 +338,14 @@ setup() ->
     start_mock_servers(),
     mock_vnode(snarl_role_vnode, [0]),
     meck:new(snarl_org, [passthrough]),
-    meck:expect(snarl_org, remove_target, fun(_, _) -> ok end),
-    meck:expect(snarl_org, list, fun() -> {ok, []} end),
-    meck:expect(snarl_org, get_, fun(_) -> {ok, dummy} end),
+    meck:expect(snarl_org, remove_target, fun(?REALM, _, _) -> ok end),
+    meck:expect(snarl_org, list, fun(?REALM) -> {ok, []} end),
+    meck:expect(snarl_org, get_, fun(?REALM, _) -> {ok, dummy} end),
     meck:new(snarl_user, [passthrough]),
-    meck:expect(snarl_user, revoke_prefix, fun(_, _) -> ok end),
-    meck:expect(snarl_user, leave, fun(_, _) -> ok end),
-    meck:expect(snarl_user, list, fun() -> {ok, []} end),
-    meck:expect(snarl_user, get_, fun(_) -> {ok, dummy} end),
+    meck:expect(snarl_user, revoke_prefix, fun(?REALM, _, _) -> ok end),
+    meck:expect(snarl_user, leave, fun(?REALM, _, _) -> ok end),
+    meck:expect(snarl_user, list, fun(?REALM) -> {ok, []} end),
+    meck:expect(snarl_user, get_, fun(?REALM, _) -> {ok, dummy} end),
     meck:new(snarl_opt, [passthrough]),
     meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),
     ok.

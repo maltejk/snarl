@@ -37,6 +37,8 @@ eunit:
 
 test: eunit
 	$(REBAR) xref skip_deps=true -r
+xref: compile
+	$(REBAR) xref skip_deps=true -r
 
 quick-xref:
 	$(REBAR) xref skip_deps=true -r

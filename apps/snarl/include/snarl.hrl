@@ -11,7 +11,6 @@
           partition,
           service,
           bucket,
-          service_bin,
           node,
           hashtrees,
           internal,

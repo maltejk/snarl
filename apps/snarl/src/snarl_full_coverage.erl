@@ -14,10 +14,10 @@
 
 -record(state, {replies, r, reqid, from, reqs, raw = false}).
 
-start(VNodeMaster, NodeCheckService, {list, Requirements, true}) ->
-    start(VNodeMaster, NodeCheckService, {list, Requirements, true, false});
+start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, true}) ->
+    start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, true, false});
 
-start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
+start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true, _}) ->
     ReqID = mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, Requirements},
@@ -32,7 +32,7 @@ start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
     end.
 
 %% The first is the vnode service used
-init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Requirements, Full, Raw}}) ->
+init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Realm, Requirements, Full, Raw}}) ->
     {NVal, R, _W} = ?NRW(NodeCheckService),
     %% all - full coverage; allup - partial coverage
     VNodeSelector = allup,
@@ -43,7 +43,7 @@ init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Requirem
     State = #state{replies = dict:new(), r = R,
                    from = From, reqid = ReqID,
                    reqs = Requirements, raw = Raw},
-    Request = {Cmd, Requirements, Full},
+    Request = {Cmd, Realm, Requirements, Full},
     {Request, VNodeSelector, NVal, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 

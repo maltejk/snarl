@@ -4,7 +4,7 @@
 -ignore_xref([update/0]).
 
 get(Prefix, SubPrefix, Key, EnvKey, Dflt) ->
-    fifo_opt:get(opts(), Prefix, SubPrefix, Key, EnvKey, Dflt).
+    fifo_opt:get(opts(), Prefix, SubPrefix, Key, {sniffle, EnvKey}, Dflt).
 
 set(Ks, Val) ->
     fifo_opt:set(opts(), Ks, Val).
@@ -35,7 +35,9 @@ update(A, B, C) ->
 
 
 opts() ->
-    [{"defaults",
-      [{"users", [{"inital_role", binary}, {"inital_org", binary}]}]},
+    [{"users",
+      [{'_',
+        [{"inital_role", binary}, {"inital_org", binary}]}]},
      {"yubico",
       [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].
+

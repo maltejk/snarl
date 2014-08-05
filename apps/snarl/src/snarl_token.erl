@@ -3,37 +3,32 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
-         get/1,
-         add/1,
-         delete/1
+         get/2,
+         add/2,
+         delete/2
         ]).
 
 %% Public API
 
-get(Token) ->
+get(Realm, Token) ->
     snarl_entity_read_fsm:start(
       {snarl_token_vnode, snarl_token},
-      get, Token).
+      get, {Realm, Token}).
 
-add(User) ->
-    Token = list_to_binary(uuid:to_string(uuid:uuid4())),
-    case snarl_token:get(Token) of
-        {ok, not_found} ->
-            do_write(Token, add, User);
-        {ok, _TokenObj} ->
-            duplicate
-    end.
+add(Realm, User) ->
+    do_write(Realm, uuid:uuid4s(), add, User).
 
-delete(Token) ->
-    do_write(Token, delete).
+delete(Realm, Token) ->
+    do_write(Realm, Token, delete).
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
 
-do_write(User, Op) ->
-    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token}, User, Op).
-
-do_write(Token, Op, Val) ->
+do_write(Realm, Token, Op) ->
     snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token},
-                                 Token, Op, Val).
+                                 {Realm, Token}, Op).
+
+do_write(Realm, Token, Op, Val) ->
+    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token},
+                                 {Realm, Token}, Op, Val).

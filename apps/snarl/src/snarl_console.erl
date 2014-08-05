@@ -79,21 +79,21 @@
               status/1
              ]).
 
-db_update([]) ->
-    [db_update([E]) || E <- ["users", "roles", "orgs"]],
+db_update([Realm]) ->
+    [db_update([Realm, E]) || E <- ["users", "roles", "orgs"]],
     ok;
 
-db_update(["users"]) ->
+db_update([Realm, "users"]) ->
     io:format("Updating users...~n"),
-    do_update(snarl_user, ft_user);
+    do_update(Realm, snarl_user, ft_user);
 
-db_update(["roles"]) ->
+db_update([Realm, "roles"]) ->
     io:format("Updating roles...~n"),
-    do_update(snarl_role, ft_role);
+    do_update(Realm, snarl_role, ft_role);
 
-db_update(["orgs"]) ->
+db_update([Realm, "orgs"]) ->
     io:format("Updating orgs...~n"),
-    do_update(snarl_org, ft_org).
+    do_update(Realm, snarl_org, ft_org).
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
@@ -189,37 +189,42 @@ db_keys([CHashS, PrefixS]) ->
             ok
     end.
 
-list_user([]) ->
-    {ok, Users} = snarl_user:list(),
+list_user([RealmS]) ->
+    Realm = list_to_binary(RealmS),
+    {ok, Users} = snarl_user:list(Realm),
     io:format("UUID                                 Name~n"),
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
-                      {ok, User} = snarl_user:get(UUID),
+                      {ok, User} = snarl_user:get(Realm, UUID),
                       io:format("~36s ~-15s~n",
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
-list_role([]) ->
-    {ok, Users} = snarl_role:list(),
+list_role([RealmS]) ->
+    Realm = list_to_binary(RealmS),
+    {ok, Users} = snarl_role:list(Realm),
     io:format("UUID                                 Name~n"),
     io:format("------------------------------------ ---------------~n", []),
     lists:map(fun(UUID) ->
-                      {ok, User} = snarl_role:get(UUID),
+                      {ok, User} = snarl_role:get(Realm, UUID),
                       io:format("~36s ~-15s~n",
                                 [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
               end, Users),
     ok.
 
-delete_user([User]) ->
-    snarl_user:delete(list_to_binary(User)),
+delete_user([RealmS, User]) ->
+    Realm = list_to_binary(RealmS),
+    snarl_user:delete(Realm, list_to_binary(User)),
     ok.
 
-delete_role([User]) ->
-    snarl_user:delete(list_to_binary(User)),
+delete_role([RealmS, User]) ->
+    Realm = list_to_binary(RealmS),
+    snarl_user:delete(Realm, list_to_binary(User)),
     ok.
 
-add_user([User]) ->
-    case snarl_user:add(list_to_binary(User)) of
+add_user([RealmS, User]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:add(Realm, list_to_binary(User)) of
         {ok, UUID} ->
             io:format("User '~s' added with id '~s'.~n", [User, UUID]),
             ok;
@@ -228,8 +233,9 @@ add_user([User]) ->
             error
     end.
 
-export_user([UUID]) ->
-    case snarl_user:get(list_to_binary(UUID)) of
+export_user([RealmS, UUID]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:get(Realm, list_to_binary(UUID)) of
         {ok, UserObj} ->
             io:format("~s~n", [jsx:encode(jsxd:update(<<"password">>, fun base64:encode/1, UserObj))]),
             ok;
@@ -237,29 +243,31 @@ export_user([UUID]) ->
             error
     end.
 
-import_user([File]) ->
+import_user([RealmS, File]) ->
     case file:read_file(File) of
         {error,enoent} ->
             io:format("That file does not exist or is not an absolute path.~n"),
             error;
         {ok, B} ->
+            Realm = list_to_binary(RealmS),
             JSON = jsx:decode(B),
             JSX = jsxd:from_list(JSON),
             UUID = case jsxd:get([<<"uuid">>], JSX) of
                        {ok, U} ->
                            U;
                        undefined ->
-                           list_to_binary(uuid:to_string(uuid:uuid4()))
+                           uuid:uuid4s()
                    end,
             As = jsxd:thread([{set, [<<"uuid">>], UUID},
                               {update, [<<"password">>],  fun base64:decode/1}],
                              JSX),
-            snarl_user:import(UUID, statebox:new(fun() -> As end))
+            snarl_user:import(Realm, UUID, statebox:new(fun() -> As end))
     end.
 
 
-export_role([UUID]) ->
-    case snarl_role:get(list_to_binary(UUID)) of
+export_role([RealmS, UUID]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_role:get(Realm, list_to_binary(UUID)) of
         {ok, RoleObj} ->
             io:format("~s~n", [jsx:encode(RoleObj)]),
             ok;
@@ -267,26 +275,28 @@ export_role([UUID]) ->
             error
     end.
 
-import_role([File]) ->
+import_role([RealmS, File]) ->
     case file:read_file(File) of
         {error,enoent} ->
             io:format("That file does not exist or is not an absolute path.~n"),
             error;
         {ok, B} ->
+            Realm = list_to_binary(RealmS),
             JSON = jsx:decode(B),
             JSX = jsxd:from_list(JSON),
             UUID = case jsxd:get([<<"uuid">>], JSX) of
                        {ok, U} ->
                            U;
                        undefined ->
-                           list_to_binary(uuid:to_string(uuid:uuid4()))
+                           uuid:uuid4s()
                    end,
             As = jsxd:thread([{set, [<<"uuid">>], UUID}], JSX),
-            snarl_role:import(UUID, statebox:new(fun() -> As end))
+            snarl_role:import(Realm, UUID, statebox:new(fun() -> As end))
     end.
 
-add_role([Role]) ->
-    case snarl_role:add(list_to_binary(Role)) of
+add_role([RealmS, Role]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_role:add(Realm, list_to_binary(Role)) of
         {ok, UUID} ->
             io:format("Role '~s' added with id '~s'.~n", [Role, UUID]),
             ok;
@@ -295,13 +305,15 @@ add_role([Role]) ->
             error
     end.
 
-join_role([User, Role]) ->
-    case snarl_user:lookup(list_to_binary(User)) of
+join_role([RealmS, User, Role]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:lookup_(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_role:lookup(list_to_binary(Role)) of
+            case snarl_role:lookup_(Realm, list_to_binary(Role)) of
                 {ok, RoleObj} ->
-                    ok = snarl_user:join(jsxd:get(<<"uuid">>, <<>>, UserObj),
-                                         jsxd:get(<<"uuid">>, <<>>, RoleObj)),
+                    ok = snarl_user:join(Realm,
+                                         ft_user:uuid(UserObj),
+                                         ft_role:uuid(RoleObj)),
                     io:format("User '~s' added to role '~s'.~n", [User, Role]),
                     ok;
                 _ ->
@@ -313,13 +325,15 @@ join_role([User, Role]) ->
             error
     end.
 
-leave_role([User, Role]) ->
-    case snarl_user:lookup(list_to_binary(User)) of
+leave_role([RealmS, User, Role]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:lookup_(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_role:lookup(list_to_binary(Role)) of
+            case snarl_role:lookup_(Realm, list_to_binary(Role)) of
                 {ok, RoleObj} ->
-                    ok = snarl_user:leave(jsxd:get(<<"uuid">>, <<>>, UserObj),
-                                          jsxd:get(<<"uuid">>, <<>>, RoleObj)),
+                    ok = snarl_user:leave(Realm,
+                                          ft_user:uuid(UserObj),
+                                          ft_role:uuid(RoleObj)),
                     io:format("User '~s' removed from role '~s'.~n", [User, Role]),
                     ok;
                 _ ->
@@ -331,10 +345,12 @@ leave_role([User, Role]) ->
             error
     end.
 
-passwd([User, Pass]) ->
-    case snarl_user:lookup_(list_to_binary(User)) of
+passwd([RealmS, User, Pass]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:lookup_(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:passwd(ft_user:uuid(UserObj),
+            case snarl_user:passwd(Realm,
+                                   ft_user:uuid(UserObj),
                                    list_to_binary(Pass)) of
                 ok ->
                     io:format("Password successfully changed for user '~s'.~n", [User]),
@@ -348,10 +364,11 @@ passwd([User, Pass]) ->
             error
     end.
 
-grant_role([Role | P]) ->
-    case snarl_role:lookup_(list_to_binary(Role)) of
+grant_role([RealmS, Role | P]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_role:lookup_(Realm, list_to_binary(Role)) of
         {ok, RoleObj} ->
-            case snarl_role:grant(ft_role:uuid(RoleObj),
+            case snarl_role:grant(Realm, ft_role:uuid(RoleObj),
                                   build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
@@ -365,10 +382,12 @@ grant_role([Role | P]) ->
             error
     end.
 
-grant_user([User | P ]) ->
-    case snarl_user:lookup_(list_to_binary(User)) of
+grant_user([RealmS, User | P ]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:lookup_(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:grant(ft_user:uuid(UserObj),
+            case snarl_user:grant(Realm,
+                                  ft_user:uuid(UserObj),
                                   build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
@@ -382,10 +401,12 @@ grant_user([User | P ]) ->
             error
     end.
 
-revoke_user([User | P ]) ->
-    case snarl_user:lookup_(list_to_binary(User)) of
+revoke_user([RealmS, User | P ]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_user:lookup_(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_user:revoke(ft_user:uuid(UserObj),
+            case snarl_user:revoke(Realm,
+                                   ft_user:uuid(UserObj),
                                    build_permission(P)) of
                 ok ->
                     io:format("Granted.~n", []),
@@ -399,10 +420,12 @@ revoke_user([User | P ]) ->
             error
     end.
 
-revoke_role([Role | P]) ->
-    case snarl_role:lookup_(list_to_binary(Role)) of
+revoke_role([RealmS, Role | P]) ->
+    Realm = list_to_binary(RealmS),
+    case snarl_role:lookup_(Realm, list_to_binary(Role)) of
         {ok, RoleObj} ->
-            case snarl_role:revoke(ft_role:uuid(RoleObj),
+            case snarl_role:revoke(Realm,
+                                   ft_role:uuid(RoleObj),
                                    build_permission(P)) of
                 ok ->
                     io:format("Revoked.~n", []),
@@ -753,28 +776,29 @@ fields([], [], {Fmt, Vars}) ->
     io:format(Fmt, Vars).
 
 
-do_update(MainMod, StateMod) ->
-    {ok, US} = MainMod:list_(),
+do_update(RealmS, MainMod, StateMod) ->
+    Realm = list_to_binary(RealmS),
+    {ok, US} = MainMod:list_(undefined),
     io:format("  Entries found: ~p~n", [length(US)]),
-
     io:format("  Grabbing UUIDs"),
     US1 = [begin
                io:format("."),
-               {StateMod:uuid(ft_obj:val(U)), ft_obj:update(U)}
+               U1 = ft_obj:update(U),
+               {StateMod:uuid(ft_obj:val(U1)), U1}
            end|| U <- US],
     io:format(" done.~n"),
 
     io:format("  Wipeing old entries"),
     [begin
          io:format("."),
-         MainMod:wipe(UUID)
+         MainMod:wipe(undefined, UUID)
      end || {UUID, _} <- US1],
     io:format(" done.~n"),
 
     io:format("  Restoring entries"),
     [begin
          io:format("."),
-         MainMod:sync_repair(UUID, O)
+         MainMod:sync_repair(Realm, UUID, O)
      end || {UUID, O} <- US1],
     io:format(" done.~n"),
     io:format("Update complete.~n"),

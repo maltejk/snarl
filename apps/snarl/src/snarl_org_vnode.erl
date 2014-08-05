@@ -68,9 +68,9 @@ master() ->
 hash_object(Key, Obj) ->
     snarl_vnode:hash_object(Key, Obj).
 
-aae_repair(_, Key) ->
+aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_org:get_(Key).
+    snarl_org:get_(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -156,22 +156,21 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator} = ID, UUID, Org}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, State) ->
     Org0 = ft_org:new(ID),
     Org1 = ft_org:name(ID, Org, Org0),
     Org2 = ft_org:uuid(ID, UUID, Org1),
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     OrgObj = #ft_obj{val=Org2, vclock=VC},
-    snarl_vnode:put(UUID, OrgObj, State),
+    snarl_vnode:put(Realm, UUID, OrgObj, State),
     {reply, {ok, ReqID}, State};
 
 handle_command(Message, Sender, State) ->
     snarl_vnode:handle_command(Message, Sender, State).
 
-handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = fifo_db:fold(State#vstate.db, <<"org">>, Fun, Acc0),
-    {reply, Acc, State};
+handle_handoff_command(?FOLD_REQ{} = FR, Sender, State) ->
+    handle_command(FR, Sender, State);
 
 handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
     handle_command(Req, Sender, State);
@@ -196,24 +195,7 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {Org, O} = binary_to_term(Data),
-    Obj = ft_obj:update(O),
-    ID = snarl_vnode:mkid(handoff),
-    V = ft_org:load(ID, ft_obj:val(Obj)),
-    case fifo_db:get(State#vstate.db, <<"org">>, Org) of
-        {ok, OldObj} ->
-            V1 = ft_org:load(ID, ft_obj:val(OldObj)),
-            OrgObj = #ft_obj{
-                        vclock = vclock:merge([ft_obj:vclock(Obj),
-                                               ft_obj:vclock(OldObj)]),
-                        val = ft_org:merge(V, V1)},
-            snarl_vnode:put(Org, OrgObj, State);
-        not_found ->
-            OrgObj = Obj#ft_obj{val=V},
-            snarl_vnode:put(Org, OrgObj, State)
-    end,
-    {reply, ok, State}.
-
+    snarl_vnode:handle_handoff_data(Data, State).
 
 encode_handoff_item(Org, Data) ->
     term_to_binary({Org, Data}).
