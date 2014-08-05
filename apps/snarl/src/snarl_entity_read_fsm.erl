@@ -9,7 +9,7 @@
 -include("snarl_dtrace.hrl").
 
 %% API
--export([start_link/7, start/2, start/3, start/4, start/5]).
+-export([start_link/7, start/3, start/4, start/5]).
 
 
 -export([reconcile/1, different/1, needs_repair/2, repair/4, unique/1]).
@@ -34,7 +34,6 @@
               prepare/2,
               reconcile/1,
               repair/4,
-              start/2,
               start/4,
               start_link/7,
               terminate/3,
@@ -65,25 +64,19 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqID, {VNode, System}, Op, From, Entity, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, Entity, Val, Raw], []);
+start_link(ReqID, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw) ->
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw], []).
 
-start_link(ReqID, {VNode, System, Bucket}, Op, From, Entity, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System, Bucket}, Op, From, Entity, Val, Raw], []).
+start(VNodeInfo, Op, {Realm, Entity}) ->
+    start(VNodeInfo, Op, {Realm, Entity}, undefined).
 
-start(VNodeInfo, Op) ->
-    start(VNodeInfo, Op, undefined).
+start(VNodeInfo, Op, {Realm, Entity}, Val) ->
+    start(VNodeInfo, Op, {Realm, Entity}, Val, false).
 
-start(VNodeInfo, Op, User) ->
-    start(VNodeInfo, Op, User, undefined).
-
-start(VNodeInfo, Op, User, Val) ->
-    start(VNodeInfo, Op, User, Val, false).
-
-start(VNodeInfo, Op, User, Val, Raw) ->
+start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
     ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_read_fsm_sup:start_read_fsm(
-      [ReqID, VNodeInfo, Op, self(), User, Val, Raw]
+      [ReqID, VNodeInfo, Op, self(), {Realm, Entity}, Val, Raw]
      ),
     receive
         {ReqID, ok} ->
@@ -98,15 +91,11 @@ start(VNodeInfo, Op, User, Val, Raw) ->
 %%% States
 %%%===================================================================
 
-%% Intiailize state data.
-init([ReqId, {VNode, System} | R]) ->
-    init([ReqId, {VNode, System, list_to_binary(atom_to_list(System))} | R]);
-
-init([ReqId, {VNode, System, Bucket}, Op, From, Entity, Val, Raw]) ->
+init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) ->
     ?DT_READ_ENTRY(Entity, Op),
     {N, R, _W} = ?NRW(System),
     SD = #state{raw=Raw,
-                bucket=Bucket,
+                bucket=Realm,
                 req_id=ReqId,
                 from=From,
                 op=Op,
@@ -119,56 +108,41 @@ init([ReqId, {VNode, System, Bucket}, Op, From, Entity, Val, Raw]) ->
                 entity=Entity},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System, Bucket}, Op, From, Entity]) ->
+init([ReqId, {VNode, System}, Op, From, {Realm, Entity}]) ->
     ?DT_READ_ENTRY(Entity, Op),
     SD = #state{req_id=ReqId,
-                bucket=Bucket,
+                bucket=Realm,
                 from=From,
                 op=Op,
                 start=now(),
                 vnode=VNode,
                 system=System,
                 entity=Entity},
-    {ok, prepare, SD, 0};
-
-init([ReqId, {VNode, System, Bucket}, Op, From]) ->
-    ?DT_READ_ENTRY("undefined", Op),
-    SD = #state{req_id=ReqId,
-                bucket=Bucket,
-                from=From,
-                vnode=VNode,
-                start=now(),
-                system=System,
-                op=Op},
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
 prepare(timeout, SD0=#state{entity=Entity,
-                            bucket=Bucket,
+                            bucket=Realm,
                             n = N,
                             system=System}) ->
-    DocIdx = riak_core_util:chash_key({Bucket, Entity}),
+    DocIdx = riak_core_util:chash_key({Realm, Entity}),
     Prelist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Prelist},
     {next_state, execute, SD, 0}.
 
 %% @doc Execute the get reqs.
 execute(timeout, SD0=#state{req_id=ReqId,
+                            bucket=Realm,
                             entity=Entity,
                             op=Op,
                             val=Val,
                             vnode=VNode,
                             preflist=Prelist}) ->
-    case Entity of
+    case Val of
         undefined ->
-            VNode:Op(Prelist, ReqId);
+            VNode:Op(Prelist, ReqId, {Realm, Entity});
         _ ->
-            case Val of
-                undefined ->
-                    VNode:Op(Prelist, ReqId, Entity);
-                _ ->
-                    VNode:Op(Prelist, ReqId, Entity, Val)
-            end
+            VNode:Op(Prelist, ReqId, {Realm, Entity}, Val)
     end,
     {next_state, waiting, SD0}.
 

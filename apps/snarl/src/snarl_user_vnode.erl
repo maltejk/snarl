@@ -64,8 +64,6 @@
               import/4,
               join/4,
               leave/4,
-              list/2,
-              list/3,
               passwd/4,
               repair/4,
               revoke/4,
@@ -92,9 +90,9 @@ master() ->
 hash_object(Key, Obj) ->
     snarl_vnode:hash_object(Key, Obj).
 
-aae_repair(_, Key) ->
+aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_user:get_(Key).
+    snarl_user:get_(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -104,9 +102,9 @@ start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
 
-repair(IdxNode, User, VClock, Obj) ->
+repair(IdxNode, {Realm, UUID}, VClock, Obj) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, User, VClock, Obj},
+                                   {repair, {Realm, UUID}, VClock, Obj},
                                    ignore,
                                    ?MASTER).
 
@@ -114,9 +112,9 @@ repair(IdxNode, User, VClock, Obj) ->
 %%% API - reads
 %%%===================================================================g
 
-get(Preflist, ReqID, User) ->
+get(Preflist, ReqID, {Realm, UUID}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {get, ReqID, User},
+                                   {get, ReqID, {Realm, UUID}},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -125,111 +123,111 @@ get(Preflist, ReqID, User) ->
 %%%===================================================================
 
 
-sync_repair(Preflist, ReqID, UUID, Obj) ->
+sync_repair(Preflist, ReqID, {Realm, UUID}, Obj) ->
     riak_core_vnode_master:command(Preflist,
-                                   {sync_repair, ReqID, UUID, Obj},
+                                   {sync_repair, ReqID, {Realm, UUID}, Obj},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add(Preflist, ReqID, UUID, User) ->
+add(Preflist, ReqID, {Realm, UUID}, User) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, UUID, User},
+                                   {add, ReqID, {Realm, UUID}, User},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add_key(Preflist, ReqID, UUID, {KeyId, Key}) ->
+add_key(Preflist, ReqID, {Realm, UUID}, {KeyId, Key}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add_key, ReqID, UUID, KeyId, Key},
+                                   {add_key, ReqID, {Realm, UUID}, KeyId, Key},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-revoke_key(Preflist, ReqID, UUID, KeyId) ->
+revoke_key(Preflist, ReqID, {Realm, UUID}, KeyId) ->
     riak_core_vnode_master:command(Preflist,
-                                   {revoke_key, ReqID, UUID, KeyId},
+                                   {revoke_key, ReqID, {Realm, UUID}, KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add_yubikey(Preflist, ReqID, UUID, OTP) ->
+add_yubikey(Preflist, ReqID, {Realm, UUID}, OTP) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add_yubikey, ReqID, UUID, OTP},
+                                   {add_yubikey, ReqID, {Realm, UUID}, OTP},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-remove_yubikey(Preflist, ReqID, UUID, KeyId) ->
+remove_yubikey(Preflist, ReqID, {Realm, UUID}, KeyId) ->
     riak_core_vnode_master:command(Preflist,
-                                   {remove_yubikey, ReqID, UUID, KeyId},
+                                   {remove_yubikey, ReqID, {Realm, UUID}, KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, UUID, Attributes) ->
+set(Preflist, ReqID, {Realm, UUID}, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, UUID, Attributes},
+                                   {set, ReqID, {Realm, UUID}, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-import(Preflist, ReqID, UUID, Import) ->
+import(Preflist, ReqID, {Realm, UUID}, Import) ->
     riak_core_vnode_master:command(Preflist,
-                                   {import, ReqID, UUID, Import},
+                                   {import, ReqID, {Realm, UUID}, Import},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-delete(Preflist, ReqID, User) ->
+delete(Preflist, ReqID, {Realm, UUID}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {delete, ReqID, User},
+                                   {delete, ReqID, {Realm, UUID}},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-passwd(Preflist, ReqID, User, Val) ->
+passwd(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {password, ReqID, User, Val},
+                                   {password, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
 
-join(Preflist, ReqID, User, Val) ->
+join(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {join, ReqID, User, Val},
+                                   {join, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-leave(Preflist, ReqID, User, Val) ->
+leave(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {leave, ReqID, User, Val},
+                                   {leave, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-join_org(Preflist, ReqID, User, Val) ->
+join_org(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {join_org, ReqID, User, Val},
+                                   {join_org, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-leave_org(Preflist, ReqID, User, Val) ->
+leave_org(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {leave_org, ReqID, User, Val},
+                                   {leave_org, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-select_org(Preflist, ReqID, User, Val) ->
+select_org(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {select_org, ReqID, User, Val},
+                                   {select_org, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
-grant(Preflist, ReqID, User, Val) ->
+grant(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {grant, ReqID, User, Val},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-revoke(Preflist, ReqID, User, Val) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {revoke, ReqID, User, Val},
+                                   {grant, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-revoke_prefix(Preflist, ReqID, User, Val) ->
+revoke(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {revoke_prefix, ReqID, User, Val},
+                                   {revoke, ReqID, {Realm, UUID}, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+revoke_prefix(Preflist, ReqID, {Realm, UUID}, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {revoke_prefix, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -243,7 +241,7 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator}=ID, UUID, User}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, User}, _Sender, State) ->
     User0 = ft_user:new(ID),
     User1 = ft_user:name(ID, User, User0),
     User2 = ft_user:uuid(ID, UUID, User1),
@@ -251,15 +249,14 @@ handle_command({add, {ReqID, Coordinator}=ID, UUID, User}, _Sender, State) ->
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     UserObj = #ft_obj{val=User3, vclock=VC},
-    snarl_vnode:put(UUID, UserObj, State),
+    snarl_vnode:put(Realm, UUID, UserObj, State),
     {reply, {ok, ReqID}, State};
 
 handle_command(Message, Sender, State) ->
     snarl_vnode:handle_command(Message, Sender, State).
 
-handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = fifo_db:fold(State#vstate.db, <<"user">>, Fun, Acc0),
-    {reply, Acc, State};
+handle_handoff_command(?FOLD_REQ{} = FR, Sender, State) ->
+    handle_command(FR, Sender, State);
 
 handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
     handle_command(Req, Sender, State);
@@ -284,26 +281,10 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {User, O} = binary_to_term(Data),
-    Obj = ft_obj:update(O),
-    ID = snarl_vnode:mkid(handoff),
-    V = ft_user:load(ID, ft_obj:val(Obj)),
-    case fifo_db:get(State#vstate.db, <<"user">>, User) of
-        {ok, OldObj} ->
-            V1 = ft_user:load(ID, ft_obj:val(OldObj)),
-            UserObj = #ft_obj{
-                         vclock = vclock:merge([ft_obj:vclock(Obj),
-                                                ft_obj:vclock(OldObj)]),
-                         val = ft_user:merge(V, V1)},
-            snarl_vnode:put(User, UserObj, State);
-        not_found ->
-            UserObj = Obj#ft_obj{val=V},
-            snarl_vnode:put(User, UserObj, State)
-    end,
-    {reply, ok, State}.
+    snarl_vnode:handle_handoff_data(Data, State).
 
-encode_handoff_item(User, Data) ->
-    term_to_binary({User, Data}).
+encode_handoff_item({Realm, UUID}, Data) ->
+    term_to_binary({{Realm, UUID}, Data}).
 
 is_empty(State) ->
     snarl_vnode:is_empty(State).
@@ -311,7 +292,7 @@ is_empty(State) ->
 delete(State) ->
     snarl_vnode:delete(State).
 
-handle_coverage({find_key, KeyID}, _KeySpaces, Sender, State) ->
+handle_coverage({find_key, Realm, KeyID}, _KeySpaces, Sender, State) ->
     ID = snarl_vnode:mkid(findkey),
     FoldFn = fun (UUID, O, [not_found]) ->
                      U0 = ft_obj:val(O),
@@ -334,7 +315,8 @@ handle_coverage({find_key, KeyID}, _KeySpaces, Sender, State) ->
                  (_U, _, Res) ->
                      Res
              end,
-    snarl_vnode:fold(FoldFn, [not_found], Sender, State);
+    Prefix = snarl_vnode:mk_pfx(Realm, State),
+    snarl_vnode:fold(Prefix, FoldFn, [not_found], Sender, State);
 
 handle_coverage(Req, KeySpaces, Sender, State) ->
     snarl_vnode:handle_coverage(Req, KeySpaces, Sender, State).

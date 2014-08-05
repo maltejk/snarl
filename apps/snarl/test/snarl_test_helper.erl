@@ -196,15 +196,15 @@ start_fake_coverage(Pid) ->
                 end),
     meck:new(snarl_full_coverage, [passthrough]),
     meck:expect(snarl_full_coverage, start,
-                fun (A, B, {C, Req, Full, true}) ->
-                        snarl_full_coverage:start(A, B, {C, Req, Full});
-                    (A, B, {C, Req, Full, false}) ->
-                        {ok, R} = snarl_full_coverage:start(A, B, {C, Req, Full}),
+                fun (A, B, {C, Realm, Req, Full, true}) ->
+                        snarl_full_coverage:start(A, B, {C, Realm, Req, Full});
+                    (A, B, {C, Realm, Req, Full, false}) ->
+                        {ok, R} = snarl_full_coverage:start(A, B, {C, Realm, Req, Full}),
                         {ok, [U || #ft_obj{val = U} <- R]};
-                    (_, O, {C, Req, Full}) ->
+                    (_, O, {C, Realm, Req, Full}) ->
                         M = list_to_atom(atom_to_list(O) ++ "_vnode"),
                         Ref = make_ref(),
-                        Pid ! {coverage, M, self(), Ref, {C, Req, Full}},
+                        Pid ! {coverage, M, self(), Ref, {C, Realm, Req, Full}},
                         receive
                             {Ref,  {ok, _, _, Res}} ->
                                 {ok, Res};
@@ -241,7 +241,7 @@ handoff() ->
     Ref = make_ref(),
     eqc_vnode ! {handoff, self(), Ref},
     receive
-        {Ref, ok, L} ->
+        {Ref, {ok, Ref, _, L}} ->
             {ok, L};
         {Ref, E} ->
             E
@@ -274,14 +274,13 @@ delete() ->
 
 
 mock_vnode_loop(M, S) ->
-    try
-        receive
+    try receive
             {command, F, Ref, C} ->
                 try M:handle_command(C, F, S) of
                     {reply, R, S1} ->
                         F ! {Ref, R},
                         mock_vnode_loop(M, S1);
-                    {_, _, S1} = E->
+                    {_, _, S1} ->
                         mock_vnode_loop(M, S1);
                     E ->
                         io:format(user, "VNode command Error: ~p~n", [E]),
@@ -313,7 +312,7 @@ mock_vnode_loop(M, S) ->
                                   [C, E, E1]),
                         mock_vnode_loop(M, S)
                 end;
-            {coverage, M1, F, Ref, C} ->
+            {coverage, _M1, F, Ref, _C} ->
                 F ! {Ref, {ok, []}},
                 mock_vnode_loop(M, S);
             {info, F, Ref, C} ->
@@ -332,9 +331,15 @@ mock_vnode_loop(M, S) ->
                               [M:encode_handoff_item(K, V) | A]
                       end,
                 FR = ?FOLD_REQ{foldfun=Fun, acc0=[]},
-                case M:handle_handoff_command(FR, self(), S) of
+                From = {raw, Ref, F},
+                case M:handle_handoff_command(FR, From, S) of
                     {reply, L, S1} ->
                         F ! {Ref, ok, L},
+                        mock_vnode_loop(M, S1);
+                    {async, {fold, Fun1, Fun2}, _, S1} ->
+                        R1 = Fun1(),
+                        L = Fun2(R1),
+                        F ! L,
                         mock_vnode_loop(M, S1);
                     E ->
                         F ! {Ref, {error, E}},
@@ -356,9 +361,8 @@ mock_vnode_loop(M, S) ->
                 mock_vnode_loop(M, S)
         end
     catch
-        Te:Te1 ->
-            io:format(user, "mock vnode error: ~p:~p~n", [Te, Te1]),
+        Er:Er1 ->
+            io:format(user, "VNode crash: ~p:~p~n", [Er, Er1]),
             mock_vnode_loop(M, S)
     end.
-
 -endif.

@@ -5,12 +5,15 @@
 -include_lib("fifo_dt/include/ft.hrl").
 
 -export([init/5,
+         mk_pfx/2,
          is_empty/1,
          delete/1,
-         put/3,
-         change/5,
-         fold/4,
+         delete/2,
+         get/3,
+         put/4,
+         fold/5,
          handle_command/3,
+         handle_handoff_data/2,
          handle_coverage/4,
          handle_info/2,
          mkid/0,
@@ -18,10 +21,10 @@
          hash_object/2,
          mk_reqid/0]).
 
--ignore_xref([change/5, mkid/0]).
+-ignore_xref([mkid/0, delete/2]).
 
 hash_object(Key, Obj) ->
-    Obj1 = lists:sort(Obj),
+    Obj1 = Obj,
     Hash = term_to_binary(erlang:phash2({Key, Obj1})),
     lager:debug("Hashing Key: ~p + ~p -> ~p", [Key, Obj1, Hash]),
     Hash.
@@ -35,6 +38,21 @@ mkid(Actor) ->
 mk_reqid() ->
     {MegaSecs,Secs,MicroSecs} = erlang:now(),
     (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+
+mk_bkt(#vstate{bucket = Bucket})
+  when byte_size(Bucket) < 256 ->
+    <<0:16,
+      (byte_size(Bucket)):8/integer, Bucket/binary>>.
+
+mk_pfx(Realm, State)
+  when byte_size(Realm) < 256 ->
+    <<(mk_bkt(State))/binary,
+      (byte_size(Realm)):8/integer, Realm/binary>>.
+
+%% extract_pfx(<<0:16,
+%%               _BS:8/integer, Bucket:_BS/binary,
+%%               _RS:8/integer, Realm:_RS/binary, UUID/binary>>) ->
+%%     {Bucket, Realm, UUID}.
 
 init(Partition, Bucket, Service, VNode, StateMod) ->
     DB = list_to_atom(integer_to_list(Partition)),
@@ -50,11 +68,11 @@ init(Partition, Bucket, Service, VNode, StateMod) ->
     FoldWorkerPool = {pool, snarl_worker, WorkerPoolSize, []},
     {ok,
      #vstate{db=DB, hashtrees=HT, partition=Partition, node=node(),
-             service_bin=list_to_binary(atom_to_list(Service)),
              service=Service, bucket=Bucket, state=StateMod, vnode=VNode},
      [FoldWorkerPool]}.
 
-list_keys(Sender, State=#vstate{db=DB, bucket=Bucket}) ->
+list_keys(Realm, Sender, State = #vstate{db=DB}) ->
+    Bucket = mk_pfx(Realm, State),
     FoldFn = fun (K, L) ->
                      [K|L]
              end,
@@ -66,7 +84,8 @@ list_keys(Sender, State=#vstate{db=DB, bucket=Bucket}) ->
                 end,
     {async, {fold, AsyncWork, FinishFun}, Sender, State}.
 
-list_keys(Getter, Requirements, Sender, State=#vstate{state=SM}) ->
+list_keys(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
+    Prefix = mk_pfx(Realm, State),
     ID = snarl_vnode:mkid(list),
     FoldFn = fun (Key, E, C) ->
                      E1 = ft_obj:update(SM:load(ID, ft_obj:val(E)), list, E),
@@ -77,9 +96,10 @@ list_keys(Getter, Requirements, Sender, State=#vstate{state=SM}) ->
                              [{Pts, Key} | C]
                      end
              end,
-    fold(FoldFn, [], Sender, State).
+    fold(Prefix, FoldFn, [], Sender, State).
 
-list(Getter, Requirements, Sender, State=#vstate{state=SM}) ->
+list(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
+    Prefix = mk_pfx(Realm, State),
     ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
                      E1 = ft_obj:update(SM:load(ID, ft_obj:val(E)), list, E),
@@ -90,26 +110,27 @@ list(Getter, Requirements, Sender, State=#vstate{state=SM}) ->
                              [{Pts, {Key, E1}} | C]
                      end
              end,
-    fold(FoldFn, [], Sender, State).
+    fold(Prefix, FoldFn, [], Sender, State).
 
-fold(Fun, Acc0, Sender, State=#vstate{db=DB, bucket=Bucket}) ->
+fold(Prefix, Fun, Acc0, Sender, State=#vstate{db=DB}) ->
     AsyncWork = fun() ->
-                        fifo_db:fold(DB, Bucket, Fun, Acc0)
+                        fifo_db:fold(DB, Prefix, Fun, Acc0)
                 end,
     FinishFun = fun(Data) ->
                         reply(Data, Sender, State)
                 end,
     {async, {fold, AsyncWork, FinishFun}, Sender, State}.
 
-put(Key, Obj, State) ->
-    fifo_db:put(State#vstate.db, State#vstate.bucket, Key, Obj),
+put(Realm, Key, Obj, State) ->
+    Bucket = mk_pfx(Realm, State),
+    fifo_db:put(State#vstate.db, Bucket, Key, Obj),
     snarl_sync_tree:update(State#vstate.service, Key, Obj),
     riak_core_aae_vnode:update_hashtree(
-      State#vstate.service_bin, Key, ft_obj:vclock(Obj), State#vstate.hashtrees).
+      Realm, Key, ft_obj:vclock(Obj), State#vstate.hashtrees).
 
-change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
+change(Realm, UUID, Action, Vals, {ReqID, Coordinator} = ID,
        State=#vstate{state=Mod}) ->
-    case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
+    case snarl_vnode:get(Realm, UUID, State) of
         {ok, O} ->
             H0 = ft_obj:val(O),
             H1 = Mod:load(ID, H0),
@@ -120,7 +141,7 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
                          Mod:Action(ID, Val1, Val2, H1)
                  end,
             Obj = ft_obj:update(H2, Coordinator, O),
-            snarl_vnode:put(UUID, Obj, State),
+            snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[~s] tried to write to a non existing element: ~p => ~p",
@@ -132,11 +153,19 @@ change(UUID, Action, Vals, {ReqID, Coordinator} = ID,
 %%% Callbacks
 %%%===================================================================
 
-is_empty(State=#vstate{db=DB, bucket=Bucket}) ->
+is_empty(State=#vstate{db=DB}) ->
     FoldFn = fun (_, _) -> {false, State} end,
-    fifo_db:fold_keys(DB, Bucket, FoldFn, {true, State}).
+    fifo_db:fold_keys(DB, mk_bkt(State), FoldFn, {true, State}).
 
-delete(State=#vstate{db=DB, bucket=Bucket}) ->
+delete(State=#vstate{db=DB}) ->
+    Bucket = mk_bkt(State),
+    FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
+    Trans = fifo_db:fold_keys(DB, Bucket, FoldFn, []),
+    fifo_db:transact(State#vstate.db, Trans),
+    {ok, State}.
+
+delete(Realm, State=#vstate{db=DB}) ->
+    Bucket = mk_pfx(Realm, State),
     FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
     Trans = fifo_db:fold_keys(DB, Bucket, FoldFn, []),
     fifo_db:transact(State#vstate.db, Trans),
@@ -145,11 +174,13 @@ delete(State=#vstate{db=DB, bucket=Bucket}) ->
 load_obj({_, A} = ID, Mod, Obj) ->
     ft_obj:update(Mod:load(ID, ft_obj:val(Obj)), A, Obj).
 
-handle_coverage({wipe, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
-    fifo_db:delete(State#vstate.db, State#vstate.bucket, UUID),
+handle_coverage({wipe, Realm, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
+    Bucket = mk_pfx(Realm, State),
+    fifo_db:delete(State#vstate.db, Bucket, UUID),
     {reply, {ok, ReqID}, State};
 
-handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
+handle_coverage({lookup, Realm, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
+    Bucket = mk_pfx(Realm, State),
     ID = mkid(lookup),
     FoldFn = fun (U, O, [not_found]) ->
                      V = ft_obj:val(O),
@@ -162,63 +193,70 @@ handle_coverage({lookup, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
                  (_, _O, Res) ->
                      Res
              end,
-    fold(FoldFn, [not_found], Sender, State);
+    fold(Bucket, FoldFn, [not_found], Sender, State);
 
 handle_coverage(list, _KeySpaces, Sender, State) ->
-    list_keys(Sender, State);
+    Bucket = mk_bkt(State),
+    FoldFn = fun(<<_RS:8/integer, Realm:_RS/binary, K/binary>>, _V, Acc) ->
+                     [{Realm, K} | Acc]
+             end,
+    fold(Bucket, FoldFn, [], Sender, State);
 
-handle_coverage({list, Requirements}, _KeySpaces, Sender, State) ->
-    handle_coverage({list, Requirements, false}, _KeySpaces, Sender, State);
+handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
+    list_keys(Realm, Sender, State);
 
-handle_coverage({list, Requirements, Full}, _KeySpaces, Sender,
+handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
+    handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
+
+handle_coverage({list, Realm, Requirements, Full}, _KeySpaces, Sender,
                 State = #vstate{state=Mod}) ->
     case Full of
         true ->
-            list(fun Mod:getter/2, Requirements, Sender, State);
+            list(Realm, fun Mod:getter/2, Requirements, Sender, State);
         false ->
-            list_keys(fun Mod:getter/2, Requirements, Sender, State)
+            list_keys(Realm, fun Mod:getter/2, Requirements, Sender, State)
     end;
 
 handle_coverage(Req, _KeySpaces, _Sender, State) ->
     lager:warning("Unknown coverage request: ~p", [Req]),
     {stop, not_implemented, State}.
 
-handle_command({sync_repair, {ReqID, _}, UUID, Obj}, _Sender,
+handle_command({sync_repair, {ReqID, _}, {Realm, UUID}, Obj}, _Sender,
                State=#vstate{state=Mod}) ->
-    case get(UUID, State) of
+    case get(Realm, UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
             Old1 = load_obj(ID, Mod, Old),
             lager:info("[sync-repair:~s] Merging with old object", [UUID]),
             Merged = ft_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
-            snarl_vnode:put(UUID, Merged, State);
+            snarl_vnode:put(Realm, UUID, Merged, State);
         not_found ->
             lager:info("[sync-repair:~s] Writing new object", [UUID]),
-            snarl_vnode:put(UUID, Obj, State);
+            snarl_vnode:put(Realm, UUID, Obj, State);
         _ ->
             lager:error("[~s] Read repair failed, data was updated too recent.",
                         [State#vstate.bucket])
     end,
     {reply, {ok, ReqID}, State};
 
-handle_command({repair, UUID, _VClock, Obj}, _Sender,
+handle_command({repair, {Realm, UUID}, _VClock, Obj}, _Sender,
                State=#vstate{state=Mod}) ->
-    case get(UUID, State) of
+    case get(Realm, UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
             Old1 = load_obj(ID, Mod, Old),
             Merged = ft_obj:merge(snarl_entity_read_fsm, [Old1, Obj]),
-            snarl_vnode:put(UUID, Merged, State);
+            snarl_vnode:put(Realm, UUID, Merged, State);
         not_found ->
-            snarl_vnode:put(UUID, Obj, State);
+            snarl_vnode:put(Realm, UUID, Obj, State);
         _ ->
             lager:error("[~s] Read repair failed, data was updated too recent.",
                         [State#vstate.bucket])
     end,
     {noreply, State};
 
-handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
-    Res = case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
+handle_command({get, ReqID, {Realm, UUID}}, _Sender, State=#vstate{state=Mod}) ->
+    Res = case get(Realm, UUID, State) of
               {ok, O} ->
                   V0 = ft_obj:val(O),
                   ID = {ReqID, load},
@@ -228,7 +266,7 @@ handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
                       Hx ->
                           O0 = ft_obj:update(O),
                           O1 = O0#ft_obj{val=Hx},
-                          fifo_db:put(State#vstate.db, State#vstate.bucket, UUID, O1),
+                          snarl_vnode:put(Realm, UUID, O1, State),
                           O1
                   end;
               not_found ->
@@ -237,15 +275,16 @@ handle_command({get, ReqID, UUID}, _Sender, State=#vstate{state=Mod}) ->
     NodeIdx = {State#vstate.partition, State#vstate.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
-handle_command({delete, {ReqID, _Coordinator}, UUID}, _Sender, State) ->
-    fifo_db:delete(State#vstate.db, State#vstate.bucket, UUID),
+handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender, State) ->
+    Bucket = mk_pfx(Realm, State),
+    fifo_db:delete(State#vstate.db, Bucket, UUID),
     riak_core_index_hashtree:delete(
-      {State#vstate.service_bin, UUID}, State#vstate.hashtrees),
+      {Realm, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
 
-handle_command({set, {ReqID, Coordinator}=ID, UUID, Attributes}, _Sender,
+handle_command({set, {ReqID, Coordinator}=ID, {Realm, UUID}, Attributes}, _Sender,
                State=#vstate{state=Mod, bucket=Bucket}) ->
-    case fifo_db:get(State#vstate.db, Bucket, UUID) of
+    case get(Realm, UUID, State) of
         {ok, O} ->
             H0 = ft_obj:val(O),
             H1 = Mod:load(ID, H0),
@@ -254,7 +293,7 @@ handle_command({set, {ReqID, Coordinator}=ID, UUID, Attributes}, _Sender,
                            Mod:set_metadata(ID, Attribute, Value, H)
                    end, H1, Attributes),
             Obj = ft_obj:update(H2, Coordinator, O),
-            snarl_vnode:put(UUID, Obj, State),
+            snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
             lager:error("[~s] tried to write to a non existing uuid: ~p",
@@ -262,20 +301,20 @@ handle_command({set, {ReqID, Coordinator}=ID, UUID, Attributes}, _Sender,
             {reply, {ok, ReqID, not_found}, State}
     end;
 
-handle_command({import, {ReqID, Coordinator} = ID, UUID, Data}, _Sender,
+handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data}, _Sender,
                State=#vstate{state=Mod}) ->
     H1 = Mod:load(ID, Data),
     H2 = Mod:uuid(ID, UUID, H1),
-    case fifo_db:get(State#vstate.db, State#vstate.bucket, UUID) of
+    case get(Realm, UUID, State) of
         {ok, O} ->
             Obj = ft_obj:update(H2, Coordinator, O),
-            snarl_vnode:put(UUID, Obj, State),
+            snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         _R ->
             VC0 = vclock:fresh(),
             VC = vclock:increment(Coordinator, VC0),
             Obj = #ft_obj{val=H2, vclock=VC},
-            snarl_vnode:put(UUID, Obj, State),
+            snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State}
     end;
 
@@ -301,39 +340,58 @@ handle_command({hashtree_pid, Node}, _, State) ->
             {reply, {error, wrong_node}, State}
     end;
 
-handle_command({rehash, {_, UUID}}, _,
-               State=#vstate{service_bin=ServiceBin, hashtrees=HT}) ->
-    case get(UUID, State) of
+handle_command({rehash, {Realm, UUID}}, _,
+               State=#vstate{hashtrees=HT}) ->
+    case get(Realm, UUID, State) of
         {ok, Obj} ->
             riak_core_aae_vnode:update_hashtree(
-              ServiceBin, UUID, ft_obj:vclock(Obj), HT);
+              Realm, UUID, ft_obj:vclock(Obj), HT);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
-            riak_core_index_hashtree:delete({ServiceBin, UUID}, HT)
+            riak_core_index_hashtree:delete({Realm, UUID}, HT)
     end,
     {noreply, State};
 
 handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender, State) ->
-    FoldFn = fun(K, V, O) ->
-                     Fun({State#vstate.service_bin, K}, V, O)
+    Bucket = mk_bkt(State),
+    FoldFn = fun(<<_RS:8/integer, Realm:_RS/binary, K/binary>>, V, O) ->
+                     Fun({Realm, K}, V, O)
              end,
-    fold(FoldFn, Acc0, Sender, State);
+    fold(Bucket, FoldFn, Acc0, Sender, State);
 
-handle_command({Action, ID, UUID, Param1, Param2}, _Sender, State) ->
-    change(UUID, Action, [Param1, Param2], ID, State);
+handle_command({Action, ID, {Realm, UUID}, Param1, Param2}, _Sender, State) ->
+    change(Realm, UUID, Action, [Param1, Param2], ID, State);
 
-handle_command({Action, ID, UUID, Param}, _Sender, State) ->
-    change(UUID, Action, [Param], ID, State);
+handle_command({Action, ID, {Realm, UUID}, Param}, _Sender, State) ->
+    change(Realm, UUID, Action, [Param], ID, State);
 
 handle_command(Message, _Sender, State) ->
     lager:error("[~s] Unknown command: ~p", [State#vstate.bucket, Message]),
     {noreply, State}.
 
+handle_handoff_data(Data, State=#vstate{state=SM}) ->
+    {{Realm, UUID}, O} = binary_to_term(Data),
+    Obj = ft_obj:update(O),
+    ID = snarl_vnode:mkid(handoff),
+    V = SM:load(ID, ft_obj:val(Obj)),
+    Obj1 = case snarl_vnode:get(Realm, UUID, State) of
+               {ok, OldObj} ->
+                   V1 = SM:load(ID, ft_obj:val(OldObj)),
+                   #ft_obj{
+                      vclock = vclock:merge([ft_obj:vclock(Obj),
+                                             ft_obj:vclock(OldObj)]),
+                      val = SM:merge(V, V1)};
+               not_found ->
+                   Obj#ft_obj{val=V}
+           end,
+    snarl_vnode:put(Realm, UUID, Obj1, State),
+    {reply, ok, State}.
 reply(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
     riak_core_vnode:reply(Sender, {ok, ReqID, {P, N}, Reply}).
 
-get(UUID, State) ->
-    fifo_db:get(State#vstate.db, State#vstate.bucket, UUID).
+get(Realm, UUID, State) ->
+    Bucket = mk_pfx(Realm, State),
+    fifo_db:get(State#vstate.db, Bucket, UUID).
 
 handle_info(retry_create_hashtree,
             State=#vstate{service=Srv, hashtrees=undefined, partition=Idx,

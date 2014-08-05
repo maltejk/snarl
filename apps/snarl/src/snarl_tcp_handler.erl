@@ -26,167 +26,167 @@ message(version, State) ->
 %%% Org Functions
 %%%===================================================================
 
-message({org, list}, State) ->
-    {reply, snarl_org:list(), State};
+message({org, list, Realm}, State) ->
+    {reply, snarl_org:list(Realm), State};
 
-message({org, list, Requirements}, State) ->
-    message({org, list, Requirements, false}, State);
+message({org, list, Realm, Requirements}, State) ->
+    message({org, list, Realm, Requirements, false}, State);
 
-message({org, list, Requirements, Full}, State) ->
-    {reply, snarl_org:list(Requirements, Full), State};
+message({org, list, Realm, Requirements, Full}, State) ->
+    {reply, snarl_org:list(Realm, Requirements, Full), State};
 
-message({org, get, Org}, State) ->
-    {reply, snarl_org:get(Org), State};
+message({org, get, Realm, Org}, State) ->
+    {reply, snarl_org:get(Realm, Org), State};
 
-message({org, set, Org, Attribute, Value}, State) when
+message({org, set, Realm, Org, Attribute, Value}, State) when
       is_binary(Org) ->
     {reply,
-     snarl_org:set(Org, Attribute, Value),
+     snarl_org:set(Realm, Org, Attribute, Value),
      State};
 
-message({org, set, Org, Attributes}, State) when
+message({org, set, Realm, Org, Attributes}, State) when
       is_binary(Org) ->
     {reply,
-     snarl_org:set(Org, Attributes),
+     snarl_org:set(Realm, Org, Attributes),
      State};
 
-message({org, add, Org}, State) ->
-    {reply, snarl_org:add(Org), State};
+message({org, add, Realm, Org}, State) ->
+    {reply, snarl_org:add(Realm, Org), State};
 
-message({org, delete, Org}, State) ->
-    {reply, snarl_org:delete(Org), State};
+message({org, delete, Realm, Org}, State) ->
+    {reply, snarl_org:delete(Realm, Org), State};
 
-message({org, trigger, add, Org, Trigger}, State) ->
-    {reply, snarl_org:add_trigger(Org, Trigger), State};
+message({org, trigger, add, Realm, Org, Trigger}, State) ->
+    {reply, snarl_org:add_trigger(Realm, Org, Trigger), State};
 
-message({org, trigger, remove, Org, Trigger}, State) ->
-    {reply, snarl_org:remove_trigger(Org, Trigger), State};
+message({org, trigger, remove, Realm, Org, Trigger}, State) ->
+    {reply, snarl_org:remove_trigger(Realm, Org, Trigger), State};
 
-message({org, trigger, execute, Org, Event, Payload}, State) ->
-    {reply, snarl_org:trigger(Org, Event, Payload), State};
+message({org, trigger, execute, Realm, Org, Event, Payload}, State) ->
+    {reply, snarl_org:trigger(Realm, Org, Event, Payload), State};
 
 %%%===================================================================
 %%% User Functions
 %%%===================================================================
 
-message({user, list}, State) ->
-    {reply, snarl_user:list(), State};
+message({user, list, Realm}, State) ->
+    {reply, snarl_user:list(Realm), State};
 
-message({user, list, Requirements}, State) ->
-    message({user, list, Requirements, false}, State);
+message({user, list, Realm, Requirements}, State) ->
+    message({user, list, Realm, Requirements, false}, State);
 
-message({user, list, Requirements, Full}, State) ->
-    {reply, snarl_user:list(Requirements, Full), State};
+message({user, list, Realm, Requirements, Full}, State) ->
+    {reply, snarl_user:list(Realm, Requirements, Full), State};
 
-message({user, get, {token, Token}}, State) ->
-    case snarl_token:get(Token) of
+message({user, get, Realm, {token, Token}}, State) ->
+    case snarl_token:get(Realm, Token) of
         {ok, not_found} ->
             {reply, not_found, State};
         {ok, User} ->
-            message({user, get, User}, State)
+            message({user, get, Realm, User}, State)
     end;
 
-message({user, get, User}, State) when
+message({user, get, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:get(User),
+     snarl_user:get(Realm, User),
      State};
 
-message({user, keys, find, KeyID}, State) when
+message({user, keys, find, Realm, KeyID}, State) when
       is_binary(KeyID) ->
     {reply,
-     snarl_user:find_key(KeyID),
+     snarl_user:find_key(Realm, KeyID),
      State};
 
-message({user, keys, get, User}, State) when
+message({user, keys, get, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:keys(User),
+     snarl_user:keys(Realm, User),
      State};
 
-message({user, keys, add, User, KeyId, Key}, State) when
+message({user, keys, add, Realm, User, KeyId, Key}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:add_key(User, KeyId, Key),
+     snarl_user:add_key(Realm, User, KeyId, Key),
      State};
 
-message({user, keys, revoke, User, KeyId}, State) when
+message({user, keys, revoke, Realm, User, KeyId}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:revoke_key(User, KeyId),
+     snarl_user:revoke_key(Realm, User, KeyId),
      State};
 
 
-message({user, yubikeys, get, User}, State) when
+message({user, yubikeys, get, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:yubikeys(User),
+     snarl_user:yubikeys(Realm, User),
      State};
 
-message({user, yubikeys, add, User, OTP}, State) when
+message({user, yubikeys, add, Realm, User, OTP}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:add_yubikey(User, OTP),
+     snarl_user:add_yubikey(Realm, User, OTP),
      State};
 
-message({user, yubikeys, remove, User, KeyId}, State) when
+message({user, yubikeys, remove, Realm, User, KeyId}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:remove_yubikey(User, KeyId),
+     snarl_user:remove_yubikey(Realm, User, KeyId),
      State};
 
-message({user, set, User, Attribute, Value}, State) when
+message({user, set, Realm, User, Attribute, Value}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:set(User, Attribute, Value),
+     snarl_user:set(Realm, User, Attribute, Value),
      State};
 
-message({user, set, User, Attributes}, State) when
+message({user, set, Realm, User, Attributes}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:set(User, Attributes),
+     snarl_user:set(Realm, User, Attributes),
      State};
 
-message({user, lookup, User}, State) when is_binary(User) ->
+message({user, lookup, Realm, User}, State) when is_binary(User) ->
     {reply,
-     snarl_user:lookup(User),
+     snarl_user:lookup(Realm, User),
      State};
 
-message({user, cache, {token, Token}}, State) ->
-    case snarl_token:get(Token) of
+message({user, cache, Realm, {token, Token}}, State) ->
+    case snarl_token:get(Realm, Token) of
         {ok, not_found} ->
             {reply, not_found, State};
         {ok, User} ->
-            message({user, cache, User}, State)
+            message({user, cache, Realm, User}, State)
     end;
 
-message({user, cache, User}, State) when
+message({user, cache, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:cache(User),
+     snarl_user:cache(Realm, User),
      State};
 
-message({user, add, User}, State) when
+message({user, add, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:add(User),
+     snarl_user:add(Realm, User),
      State};
 
-message({user, add, Creator, User}, State) when
+message({user, add, Realm, Creator, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:add(Creator, User),
+     snarl_user:add(Realm, Creator, User),
      State};
 
-message({user, auth, User, Pass}, State) when
+message({user, auth, Realm, User, Pass}, State) when
       is_binary(User),
       is_binary(Pass) ->
-    message({user, auth, User, Pass, <<>>}, State);
+    message({user, auth, Realm, User, Pass, <<>>}, State);
 
-message({user, auth, User, Pass, basic}, State) when
+message({user, auth, Realm, User, Pass, basic}, State) when
       is_binary(User),
       is_binary(Pass) ->
-    Res = case snarl_user:auth(User, Pass, basic) of
+    Res = case snarl_user:auth(Realm, User, Pass, basic) of
               not_found ->
                   {error, not_found};
               {ok, UUID}  ->
@@ -196,161 +196,161 @@ message({user, auth, User, Pass, basic}, State) when
      Res,
      State};
 
-message({user, auth, User, Pass, OTP}, State) when
+message({user, auth, Realm, User, Pass, OTP}, State) when
       is_binary(User),
       is_binary(Pass),
       is_binary(OTP) ->
-    Res = case snarl_user:auth(User, Pass, OTP) of
+    Res = case snarl_user:auth(Realm, User, Pass, OTP) of
               not_found ->
                   {error, not_found};
               {ok, UUID}  ->
-                  {ok, Token} = snarl_token:add(UUID),
+                  {ok, Token} = snarl_token:add(Realm, UUID),
                   {ok, {token, Token}}
           end,
     {reply,
      Res,
      State};
 
-message({user, allowed, {token, Token}, Permission}, State) ->
-    case snarl_token:get(Token) of
+message({user, allowed, Realm, {token, Token}, Permission}, State) ->
+    case snarl_token:get(Realm, Token) of
         {ok, not_found} ->
             {reply, false, State};
         {ok, User} ->
             {reply,
-             snarl_user:allowed(User, Permission),
+             snarl_user:allowed(Realm, User, Permission),
              State}
     end;
 
-message({user, allowed, User, Permission}, State) when
+message({user, allowed, Realm, User, Permission}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:allowed(User, Permission),
+     snarl_user:allowed(Realm, User, Permission),
      State};
 
-message({user, delete, User}, State) when
+message({user, delete, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:delete(User),
+     snarl_user:delete(Realm, User),
      State};
 
-message({user, passwd, User, Pass}, State) when
+message({user, passwd, Realm, User, Pass}, State) when
       is_binary(User),
       is_binary(Pass) ->
     {reply,
-     snarl_user:passwd(User, Pass),
+     snarl_user:passwd(Realm, User, Pass),
      State};
 
-message({user, join, User, Role}, State) when
+message({user, join, Realm, User, Role}, State) when
       is_binary(User),
       is_binary(Role) ->
-    {reply, snarl_user:join(User, Role), State};
+    {reply, snarl_user:join(Realm, User, Role), State};
 
-message({user, leave, User, Role}, State) when
+message({user, leave, Realm, User, Role}, State) when
       is_binary(User),
       is_binary(Role) ->
-    {reply, snarl_user:leave(User, Role), State};
+    {reply, snarl_user:leave(Realm, User, Role), State};
 
-message({user, grant, User, Permission}, State) when
+message({user, grant, Realm, User, Permission}, State) when
       is_binary(User) ->
-    {reply, snarl_user:grant(User, Permission), State};
+    {reply, snarl_user:grant(Realm, User, Permission), State};
 
-message({user, revoke, User, Permission}, State) when
+message({user, revoke, Realm, User, Permission}, State) when
       is_binary(User) ->
-    {reply, snarl_user:revoke(User, Permission), State};
+    {reply, snarl_user:revoke(Realm, User, Permission), State};
 
-message({user, revoke_prefix, User, Prefix}, State) when
+message({user, revoke_prefix, Realm, User, Prefix}, State) when
       is_binary(User) ->
-    {reply, snarl_user:revoke_prefix(User, Prefix), State};
+    {reply, snarl_user:revoke_prefix(Realm, User, Prefix), State};
 
-message({token, delete, Token}, State) when
+message({token, delete, Realm, Token}, State) when
       is_binary(Token) ->
-    {reply, snarl_token:delete(Token), State};
+    {reply, snarl_token:delete(Realm, Token), State};
 
-message({user, org, get, User}, State) when
+message({user, org, get, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:orgs(User),
+     snarl_user:orgs(Realm, User),
      State};
 
-message({user, org, active, User}, State) when
+message({user, org, active, Realm, User}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:active(User),
+     snarl_user:active(Realm, User),
      State};
 
-message({user, org, join, User, Org}, State) when
+message({user, org, join, Realm, User, Org}, State) when
       is_binary(User),
       is_binary(Org) ->
-    {reply, snarl_user:join_org(User, Org), State};
+    {reply, snarl_user:join_org(Realm, User, Org), State};
 
-message({user, org, leave, User, Org}, State) when
+message({user, org, leave, Realm, User, Org}, State) when
       is_binary(User),
       is_binary(Org) ->
-    {reply, snarl_user:leave_org(User, Org), State};
+    {reply, snarl_user:leave_org(Realm, User, Org), State};
 
-message({user, org, select, User, Org}, State) when
+message({user, org, select, Realm, User, Org}, State) when
       is_binary(User),
       is_binary(Org) ->
-    {reply, snarl_user:select_org(User, Org), State};
+    {reply, snarl_user:select_org(Realm, User, Org), State};
 
 %%%===================================================================
 %%% Role Functions
 %%%===================================================================
 
-message({role, list}, State) ->
-    {reply, snarl_role:list(), State};
+message({role, list, Realm}, State) ->
+    {reply, snarl_role:list(Realm), State};
 
-message({role, list, Requirements}, State) ->
-    message({role, list, Requirements, false}, State);
+message({role, list, Realm, Requirements}, State) ->
+    message({role, list, Realm, Requirements, false}, State);
 
-message({role, list, Requirements, Full}, State) ->
-    {reply, snarl_role:list(Requirements, Full), State};
+message({role, list, Realm, Requirements, Full}, State) ->
+    {reply, snarl_role:list(Realm, Requirements, Full), State};
 
-message({role, get, Role}, State) ->
-    {reply, snarl_role:get(Role), State};
+message({role, get, Realm, Role}, State) ->
+    {reply, snarl_role:get(Realm, Role), State};
 
-message({role, set, Role, Attribute, Value}, State) when
+message({role, set, Realm, Role, Attribute, Value}, State) when
       is_binary(Role) ->
     {reply,
-     snarl_role:set(Role, Attribute, Value),
+     snarl_role:set(Realm, Role, Attribute, Value),
      State};
 
-message({role, set, Role, Attributes}, State) when
+message({role, set, Realm, Role, Attributes}, State) when
       is_binary(Role) ->
     {reply,
-     snarl_role:set(Role, Attributes),
+     snarl_role:set(Realm, Role, Attributes),
      State};
 
-message({role, add, Role}, State) ->
-    {reply, snarl_role:add(Role), State};
+message({role, add, Realm, Role}, State) ->
+    {reply, snarl_role:add(Realm, Role), State};
 
-message({role, delete, Role}, State) ->
-    {reply, snarl_role:delete(Role), State};
+message({role, delete, Realm, Role}, State) ->
+    {reply, snarl_role:delete(Realm, Role), State};
 
-message({role, grant, Role, Permission}, State) when
+message({role, grant, Realm, Role, Permission}, State) when
       is_binary(Role),
       is_list(Permission)->
-    {reply, snarl_role:grant(Role, Permission), State};
+    {reply, snarl_role:grant(Realm, Role, Permission), State};
 
-message({role, revoke, Role, Permission}, State) ->
-    {reply, snarl_role:revoke(Role, Permission), State};
+message({role, revoke, Realm, Role, Permission}, State) ->
+    {reply, snarl_role:revoke(Realm, Role, Permission), State};
 
-message({role, revoke_prefix, Role, Prefix}, State) ->
-    {reply, snarl_role:revoke_prefix(Role, Prefix), State};
+message({role, revoke_prefix, Realm, Role, Prefix}, State) ->
+    {reply, snarl_role:revoke_prefix(Realm, Role, Prefix), State};
 
-message({cloud, status}, State) ->
+message({cloud, status, Realm}, State) ->
     {reply,
-     status(),
+     status(Realm),
      State};
 
 message(Message, State) ->
     lager:warning("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
 
-status() ->
-    {ok, Us} = snarl_user:list(),
-    {ok, Gs} = snarl_role:list(),
-    {ok, Os} = snarl_org:list(),
+status(Realm) ->
+    {ok, Us} = snarl_user:list(Realm),
+    {ok, Gs} = snarl_role:list(Realm),
+    {ok, Os} = snarl_org:list(Realm),
     Resources = [{<<"users">>, length(Us)},
                  {<<"roles">>, length(Gs)},
                  {<<"orgs">>, length(Os)}],
