@@ -164,6 +164,7 @@ delete(State=#vstate{db=DB}) ->
     fifo_db:transact(State#vstate.db, Trans),
     {ok, State}.
 
+
 delete(Realm, State=#vstate{db=DB}) ->
     Bucket = mk_pfx(Realm, State),
     FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
@@ -207,6 +208,13 @@ handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
 
 handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
     handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
+
+handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
+    FoldFn = fun(K, V, Acc) ->
+                     [{K, V} | Acc]
+             end,
+    fold(Bucket, FoldFn, [], Sender, State);
+
 
 handle_coverage({list, Realm, Requirements, Full}, _KeySpaces, Sender,
                 State = #vstate{state=Mod}) ->
@@ -275,12 +283,18 @@ handle_command({get, ReqID, {Realm, UUID}}, _Sender, State=#vstate{state=Mod}) -
     NodeIdx = {State#vstate.partition, State#vstate.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
+handle_command({delete, {ReqID, _Coordinator}, {undefined, UUID}}, _Sender, State) ->
+    Bucket = State#vstate.bucket,
+    fifo_db:delete(State#vstate.db, Bucket, UUID),
+    {reply, {ok, ReqID}, State};
+
 handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender, State) ->
     Bucket = mk_pfx(Realm, State),
     fifo_db:delete(State#vstate.db, Bucket, UUID),
     riak_core_index_hashtree:delete(
       {Realm, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
+
 
 handle_command({set, {ReqID, Coordinator}=ID, {Realm, UUID}, Attributes}, _Sender,
                State=#vstate{state=Mod, bucket=Bucket}) ->

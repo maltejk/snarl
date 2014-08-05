@@ -171,9 +171,9 @@ import(Preflist, ReqID, {Realm, UUID}, Import) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-delete(Preflist, ReqID, {Realm, UUID}) ->
+delete(Preflist, ReqID, E) ->
     riak_core_vnode_master:command(Preflist,
-                                   {delete, ReqID, {Realm, UUID}},
+                                   {delete, ReqID, E},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
