@@ -79,6 +79,9 @@
               status/1
              ]).
 
+db_update([]) ->
+    db_update(["default"]);
+
 db_update([Realm]) ->
     [db_update([Realm, E]) || E <- ["users", "roles", "orgs"]],
     ok;

@@ -109,39 +109,39 @@ init([Partition]) ->
        timeout_cycle = TimeoutCycle
       }}.
 
-handle_command({repair, Token, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
+handle_command({repair, {Realm, Token}, _, Obj}, _Sender, #state{tokens=Tokens0}=State) ->
     lager:warning("repair performed ~p~n", [Obj]),
-    Tokens1 = dict:store(Token, {now(), Obj}, Tokens0),
+    Tokens1 = dict:store({Realm, Token}, {now(), Obj}, Tokens0),
     {noreply, State#state{tokens=Tokens1}};
 
-handle_command({get, ReqID, Token}, _Sender, #state{tokens = Tokens0} = State) ->
+handle_command({get, ReqID, {Realm, Token}}, _Sender, #state{tokens = Tokens0} = State) ->
     NodeIdx = {State#state.partition, State#state.node},
-    {Tokens1, Res} = case dict:find(Token, Tokens0) of
+    {Tokens1, Res} = case dict:find({Realm, Token}, Tokens0) of
                          error ->
                              {Tokens0,
                               {ok, ReqID, NodeIdx, not_found}};
                          {ok, {_, V}} ->
-                             {dict:update(Token, fun({_, User}) ->
-                                                         {now(), User}
-                                                 end, Tokens0),
+                             {dict:update({Realm, Token}, fun({_, User}) ->
+                                                                  {now(), User}
+                                                          end, Tokens0),
                               {ok, ReqID, NodeIdx, V}}
                      end,
     {reply,
      Res,
      State#state{tokens = Tokens1}};
 
-handle_command({delete, {ReqID, _Coordinator}, Token}, _Sender, State) ->
+handle_command({delete, {ReqID, _Coordinator}, {Realm, Token}}, _Sender, State) ->
     {reply, {ok, ReqID},
      State#state{
-       tokens = dict:erase(Token, State#state.tokens)
+       tokens = dict:erase({Realm, Token}, State#state.tokens)
       }};
 
-handle_command({add, {ReqID, Coordinator}, Token, User}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator}, {Realm, Token}, User}, _Sender, State) ->
     VC0 = vclock:fresh(),
     VC = vclock:increment(Coordinator, VC0),
     TObject = #ft_obj{val=User, vclock=VC},
     State1 = expire(State),
-    Ts0 = dict:store(Token, {now(), TObject}, State1#state.tokens),
+    Ts0 = dict:store({Realm, Token}, {now(), TObject}, State1#state.tokens),
 
     {reply, {ok, ReqID, Token}, State1#state{
                                   tokens = Ts0,
@@ -166,8 +166,8 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {Token, HObject} = binary_to_term(Data),
-    Hs0 = dict:store(Token, {now(), HObject}, State#state.tokens),
+    {{Realm, Token}, HObject} = binary_to_term(Data),
+    Hs0 = dict:store({Realm, Token}, {now(), HObject}, State#state.tokens),
     {reply, ok, State#state{tokens = Hs0}}.
 
 encode_handoff_item(Token, {_, Data}) ->
@@ -184,9 +184,10 @@ is_empty(State) ->
 delete(State) ->
     {ok, State#state{tokens = dict:new()}}.
 
-handle_coverage({list, ReqID}, _KeySpaces, _Sender, State) ->
+handle_coverage({list, Realm, ReqID}, _KeySpaces, _Sender, State) ->
+    Ks = [T || {R, T} <- dict:fetch_keys(State#state.tokens), R =:= Realm],
     {reply,
-     {ok, ReqID, {State#state.partition,State#state.node}, dict:fetch_keys(State#state.tokens)},
+     {ok, ReqID, {State#state.partition, State#state.node}, Ks},
      State};
 
 handle_coverage(_Req, _KeySpaces, _Sender, State) ->
