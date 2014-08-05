@@ -209,7 +209,7 @@ handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
 handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
     handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
 
-handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
+handle_coverage({list, undefined, [], true, true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
     FoldFn = fun(K, V, Acc) ->
                      [{0, {K, V}} | Acc]
              end,
