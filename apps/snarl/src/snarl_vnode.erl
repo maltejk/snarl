@@ -44,6 +44,9 @@ mk_bkt(#vstate{bucket = Bucket})
     <<0:16,
       (byte_size(Bucket)):8/integer, Bucket/binary>>.
 
+mk_pfx(undefined, #vstate{bucket = B}) ->
+    B;
+
 mk_pfx(Realm, State)
   when byte_size(Realm) < 256 ->
     <<(mk_bkt(State))/binary,
@@ -209,7 +212,7 @@ handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
 handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
     handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
 
-handle_coverage({list, undefined, [], true, true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
+handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
     FoldFn = fun(K, V, Acc) ->
                      [{0, {K, V}} | Acc]
              end,
