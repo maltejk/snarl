@@ -79,21 +79,21 @@
               status/1
              ]).
 
-db_update([]) ->
-    [db_update([E]) || E <- ["users", "roles", "orgs"]],
+db_update([Realm]) ->
+    [db_update([Realm, E]) || E <- ["users", "roles", "orgs"]],
     ok;
 
-db_update(["users"]) ->
+db_update([Realm, "users"]) ->
     io:format("Updating users...~n"),
-    do_update(snarl_user, ft_user);
+    do_update(Realm, snarl_user, ft_user);
 
-db_update(["roles"]) ->
+db_update([Realm, "roles"]) ->
     io:format("Updating roles...~n"),
-    do_update(snarl_role, ft_role);
+    do_update(Realm, snarl_role, ft_role);
 
-db_update(["orgs"]) ->
+db_update([Realm, "orgs"]) ->
     io:format("Updating orgs...~n"),
-    do_update(snarl_org, ft_org).
+    do_update(Realm, snarl_org, ft_org).
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
@@ -776,28 +776,29 @@ fields([], [], {Fmt, Vars}) ->
     io:format(Fmt, Vars).
 
 
-do_update(MainMod, StateMod) ->
-    {ok, US} = MainMod:list_(),
+do_update(RealmS, MainMod, StateMod) ->
+    Realm = list_to_binary(RealmS),
+    {ok, US} = MainMod:list_(undefined),
     io:format("  Entries found: ~p~n", [length(US)]),
-
     io:format("  Grabbing UUIDs"),
     US1 = [begin
                io:format("."),
-               {StateMod:uuid(ft_obj:val(U)), ft_obj:update(U)}
+               U1 = ft_obj:update(U),
+               {StateMod:uuid(ft_obj:val(U1)), U1}
            end|| U <- US],
     io:format(" done.~n"),
 
     io:format("  Wipeing old entries"),
     [begin
          io:format("."),
-         MainMod:wipe(UUID)
+         MainMod:wipe(undefined, UUID)
      end || {UUID, _} <- US1],
     io:format(" done.~n"),
 
     io:format("  Restoring entries"),
     [begin
          io:format("."),
-         MainMod:sync_repair(UUID, O)
+         MainMod:sync_repair(Realm, UUID, O)
      end || {UUID, O} <- US1],
     io:format(" done.~n"),
     io:format("Update complete.~n"),
