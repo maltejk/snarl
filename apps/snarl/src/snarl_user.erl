@@ -271,8 +271,13 @@ get_(Realm, User) ->
     end.
 
 raw(Realm, User) ->
-    snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
-                                {Realm, User}, undefined, true).
+    case snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
+                                     {Realm, User}, undefined, true) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
 
 -spec list(Realm::binary()) ->
                   {error, timeout} |
