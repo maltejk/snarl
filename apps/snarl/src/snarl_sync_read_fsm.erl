@@ -90,7 +90,7 @@ init([System, Vsn, List, From]) ->
 read(_Event, State=#state{list=[{Realm, E}|R], system=Sys, version=Vsn,
                           from=F, delay=D}) ->
     lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, E]),
-    case Sys:raw({Realm, E}) of
+    case Sys:raw(Realm, E) of
         {ok, O} ->
             lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, E]),
             snarl_sync_tree:insert(F, Sys, Vsn, E, snarl_sync:hash(E, O));
