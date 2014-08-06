@@ -100,19 +100,17 @@ vnode(snarl_role) -> snarl_role_vnode;
 vnode(snarl_user) -> snarl_user_vnode;
 vnode(snarl_org) -> snarl_org_vnode.
 
-bucket(System) -> list_to_binary(atom_to_list(System)).
-
-write(Sys, UUID, Op) ->
-    write(Sys, UUID, Op, undefined).
-write(Sys, UUID, Op, Val) ->
-    term_to_binary({write, node(), vnode(Sys), Sys, bucket(Sys), UUID, Op, Val}).
+write(Sys, Realm, UUID, Op) ->
+    write(Sys, Realm, UUID, Op, undefined).
+write(Sys, Realm, UUID, Op, Val) ->
+    term_to_binary({write, node(), vnode(Sys), Sys, Realm, UUID, Op, Val}).
 
 sync_diff(_, State = #state{
                         socket=Socket,
                         timeout=Timeout,
-                        diff=[{Sys, UUID}|R]}) ->
-    lager:debug("[sync-exchange] Diff: ~p", [{Sys, UUID}]),
-    case gen_tcp:send(Socket, term_to_binary({raw, Sys, UUID})) of
+                        diff=[{Sys, {Realm, UUID}}|R]}) ->
+    lager:debug("[sync-exchange] Diff: ~p", [{Sys, {Realm, UUID}}]),
+    case gen_tcp:send(Socket, term_to_binary({raw, Sys, Realm, UUID})) of
         ok ->
             case gen_tcp:recv(Socket, 0, Timeout) of
                 {error, E} ->
@@ -121,12 +119,12 @@ sync_diff(_, State = #state{
                 {ok, Bin} ->
                     case binary_to_term(Bin) of
                         {ok, RObj} ->
-                            case Sys:raw(UUID) of
+                            case Sys:raw(Realm, UUID) of
                                 {ok, LObj} ->
                                     Objs = [RObj, LObj],
                                     Merged = ft_obj:merge(snarl_entity_read_fsm, Objs),
                                     NVS = {{remote, node()}, vnode(Sys), Sys},
-                                    snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Merged),
+                                    snarl_entity_write_fsm:write(NVS, {Realm, UUID}, sync_repair, Merged),
                                     Msg = write(Sys, UUID, sync_repair, Merged),
                                     case gen_tcp:send(Socket, Msg) of
                                         ok ->
@@ -182,13 +180,13 @@ sync_get(_, State = #state{get=[]}) ->
 
 sync_push(_, State = #state{
                         socket=Socket,
-                        push=[{Sys, UUID}|R]}) ->
+                        push=[{Sys, {Realm, UUID}}|R]}) ->
     lager:debug("[sync-exchange] Push: ~p", [{Sys, UUID}]),
     Msg  = case Sys:raw(UUID) of
                {ok, Obj} ->
-                   write(Sys, UUID, sync_repair, Obj);
+                   write(Sys, Realm, UUID, sync_repair, Obj);
                not_found ->
-                   write(Sys, UUID, delete)
+                   write(Sys, Realm, UUID, delete)
            end,
     case gen_tcp:send(Socket, Msg) of
         ok ->
