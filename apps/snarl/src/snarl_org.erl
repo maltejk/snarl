@@ -177,8 +177,13 @@ get_(Org) ->
     end.
 
 raw(Org) ->
-    snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
-                                Org, undefined, true).
+    case snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
+                                     Org, undefined, true) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
 
 list_() ->
     {ok, Res} = snarl_full_coverage:start(

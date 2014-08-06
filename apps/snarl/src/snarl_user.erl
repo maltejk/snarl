@@ -280,8 +280,14 @@ get_(User) ->
     end.
 
 raw(User) ->
-    snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
-                                User, undefined, true).
+    case snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
+                                     User, undefined, true) of
+        {ok, not_found} ->
+            not_found;
+        R ->
+            R
+    end.
+
 
 -spec list() ->
                   {error, timeout} |
