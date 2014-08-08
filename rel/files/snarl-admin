@@ -327,7 +327,7 @@ case "$1" in
         echo "               db delete <hash> <prefix> <key>    - deletes directly from db."
         echo "               config show                        - shows global config options."
         echo "               config set <key> <value>           - sets global config options."
-        echo "               users list gorups                          - list users."
+        echo "               users list <realm>                         - list users."
         echo "               users add <realm> <user>                   - adds a new user."
         echo "               users delete <realm> <uuid>                - deletes a user."
         echo "               users passwd <realm> <user> <passwd>       - sets user password."
