@@ -152,7 +152,7 @@ handle_cast({write, Node, VNode, System, Bucket, ID, Op, Val},
 
 handle_cast(reconnect, State = #state{socket = Old, ip=IP, port=Port,
                                       timeout=Timeout}) ->
-    gen_tcp:close(Old),
+    maybe_close(Old),
     case gen_tcp:connect(IP, Port,
                          [binary, {active,false}, {packet,4}],
                          Timeout) of
@@ -232,6 +232,12 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 %%% Internal functions
 %%%===================================================================
+
+maybe_close(undefined) ->
+    ok;
+
+maybe_close(Old) ->
+    gen_tcp:close(Old).
 
 hash(BKey, Obj) ->
     list_to_binary(integer_to_list(erlang:phash2({BKey, snarl_obj:vclock(Obj)}))).
