@@ -188,9 +188,12 @@ grant({_T, ID}, Permission, Role = #?ROLE{}) ->
 
 
 revoke({_T, ID}, Permission, Role) ->
-    {ok, V} =  riak_dt_orswot:update({remove, Permission},
-                                     ID, Role#?ROLE.permissions),
-    Role#?ROLE{permissions = V}.
+    case riak_dt_orswot:update({remove, Permission}, ID, Role#?ROLE.permissions) of
+        {error, {precondition, {not_present, Permission}}} ->
+            Role;
+        {ok, V} ->
+            Role#?ROLE{permissions = V}
+    end.
 
 revoke_prefix({_T, ID}, Prefix, Role) ->
     P0 = Role#?ROLE.permissions,

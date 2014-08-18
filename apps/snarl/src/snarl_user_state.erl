@@ -311,13 +311,17 @@ join_org({_T, ID}, Org, User) ->
     User#?USER{orgs = O1}.
 
 leave_org(TID={_T, ID}, Org, User) ->
-    {ok, O1} = riak_dt_orswot:update({remove, Org}, ID, User#?USER.orgs),
-    User1 = User#?USER{orgs = O1},
-    case active_org(User1) of
-        _O when _O =:= Org ->
-            select_org(TID, <<>>, User1);
-        _ ->
-            User1
+    case riak_dt_orswot:update({remove, Org}, ID, User#?USER.orgs) of
+        {error,{precondition,{not_present, Org}}} ->
+            User;
+        {ok, O1} ->
+            User1 = User#?USER{orgs = O1},
+            case active_org(User1) of
+                _O when _O =:= Org ->
+                    select_org(TID, <<>>, User1);
+                _ ->
+                    User1
+            end
     end.
 
 select_org({T, _ID}, Org, User) ->
@@ -339,9 +343,12 @@ revoke_key({_T, ID}, KeyID, User) ->
         false ->
             User;
         Tpl ->
-            {ok, S1} = riak_dt_orswot:update({remove, Tpl}, ID,
-                                             User#?USER.ssh_keys),
-            User#?USER{ssh_keys = S1}
+            case riak_dt_orswot:update({remove, Tpl}, ID, User#?USER.ssh_keys) of
+                {error,{precondition,{not_present, Tpl}}} ->
+                    User;
+                {ok, S1} ->
+                    User#?USER{ssh_keys = S1}
+            end
     end.
 
 keys(User) ->
@@ -352,8 +359,12 @@ add_yubikey({_T, ID}, KeyID, User) ->
     User#?USER{yubikeys = S1}.
 
 remove_yubikey({_T, ID}, KeyID, User) ->
-    {ok, S1} = riak_dt_orswot:update({remove, KeyID}, ID, User#?USER.yubikeys),
-    User#?USER{yubikeys = S1}.
+    case riak_dt_orswot:update({remove, KeyID}, ID, User#?USER.yubikeys) of
+        {error,{precondition,{not_present, KeyID}}} ->
+            User;
+        {ok, S1} ->
+            User#?USER{yubikeys = S1}
+    end.
 
 yubikeys(User) ->
     riak_dt_orswot:value(User#?USER.yubikeys).
@@ -388,8 +399,12 @@ grant({_T, ID}, P, User) ->
 
 
 revoke({_T, ID}, P, User) ->
-    {ok, P1} = riak_dt_orswot:update({remove, P}, ID, User#?USER.permissions),
-    User#?USER{permissions = P1}.
+    case riak_dt_orswot:update({remove, P}, ID, User#?USER.permissions) of
+        {error,{precondition,{not_present, P}}} ->
+            User;
+        {ok, P1} ->
+            User#?USER{permissions = P1}
+     end.
 
 revoke_prefix({_T, ID}, Prefix, User) ->
     P0 = User#?USER.permissions,
@@ -417,8 +432,12 @@ join({_T, ID}, Role, User) ->
     User#?USER{roles = G}.
 
 leave({_T, ID}, Role, User) ->
-    {ok, G} = riak_dt_orswot:update({remove, Role}, ID, User#?USER.roles),
-    User#?USER{roles = G}.
+    case riak_dt_orswot:update({remove, Role}, ID, User#?USER.roles) of
+        {error,{precondition,{not_present, Role}}} ->
+            User;
+        {ok, G} ->
+            User#?USER{roles = G}
+    end.
 
 metadata(User) ->
     User#?USER.metadata.
