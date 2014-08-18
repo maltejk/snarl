@@ -397,3 +397,13 @@
   {default, on},
   {datatype, {enum, [on, off]}}
 ]}.
+
+%% @doc Status count
+%% Disabeling the count in status significantly increases
+%% the performance since otherwise every cloud status call
+%% will itterate over the whoel database.
+
+{mapping, "status.include_count", "snarl.status_include_count", [
+  {default, true},
+  {datatype, {enum, [true, false]}}
+]}.
