@@ -348,9 +348,15 @@ message(Message, State) ->
     {noreply, State}.
 
 status() ->
-    {ok, Us} = snarl_user:list(),
-    {ok, Gs} = snarl_role:list(),
-    {ok, Os} = snarl_org:list(),
+    {Us, Gs, Os} = case application:get_env(snarl, status_include_count) of
+                       {ok, ture} ->
+                           {ok, UsX} = snarl_user:list(),
+                           {ok, GsX} = snarl_role:list(),
+                           {ok, OsX} = snarl_org:list(),
+                           {UsX, GsX, OsX};
+                       _ ->
+                           {[], [], []}
+                   end,
     Resources = [{<<"users">>, length(Us)},
                  {<<"roles">>, length(Gs)},
                  {<<"orgs">>, length(Os)}],
