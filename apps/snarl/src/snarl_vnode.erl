@@ -23,6 +23,11 @@
 
 -ignore_xref([mkid/0, delete/2]).
 
+-define(FM(Mod, Fun, Args),
+        folsom_metrics:histogram_timed_update(
+          {Mod, Fun},
+          Mod, Fun, Args)).
+
 hash_object(Key, Obj) ->
     Obj1 = Obj,
     Hash = term_to_binary(erlang:phash2({Key, Obj1})),
@@ -80,7 +85,7 @@ list_keys(Realm, Sender, State = #vstate{db=DB}) ->
                      [K|L]
              end,
     AsyncWork = fun() ->
-                        fifo_db:fold_keys(DB, Bucket, FoldFn, [])
+                        ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []])
                 end,
     FinishFun = fun(Data) ->
                         reply(Data, Sender, State)
@@ -117,7 +122,7 @@ list(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
 
 fold(Prefix, Fun, Acc0, Sender, State=#vstate{db=DB}) ->
     AsyncWork = fun() ->
-                        fifo_db:fold(DB, Prefix, Fun, Acc0)
+                        ?FM(fifo_db, fold, [DB, Prefix, Fun, Acc0])
                 end,
     FinishFun = fun(Data) ->
                         reply(Data, Sender, State)
@@ -126,7 +131,7 @@ fold(Prefix, Fun, Acc0, Sender, State=#vstate{db=DB}) ->
 
 put(Realm, Key, Obj, State) ->
     Bucket = mk_pfx(Realm, State),
-    fifo_db:put(State#vstate.db, Bucket, Key, Obj),
+    ?FM(fifo_db, put, [State#vstate.db, Bucket, Key, Obj]),
     snarl_sync_tree:update(State#vstate.service, {Realm, Key}, Obj),
     riak_core_aae_vnode:update_hashtree(
       Realm, Key, ft_obj:vclock(Obj), State#vstate.hashtrees).
@@ -158,21 +163,21 @@ change(Realm, UUID, Action, Vals, {ReqID, Coordinator} = ID,
 
 is_empty(State=#vstate{db=DB}) ->
     FoldFn = fun (_, _) -> {false, State} end,
-    fifo_db:fold_keys(DB, mk_bkt(State), FoldFn, {true, State}).
+    ?FM(fifo_db, fold_keys, [DB, mk_bkt(State), FoldFn, {true, State}]).
 
 delete(State=#vstate{db=DB}) ->
     Bucket = mk_bkt(State),
     FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
-    Trans = fifo_db:fold_keys(DB, Bucket, FoldFn, []),
-    fifo_db:transact(State#vstate.db, Trans),
+    Trans = ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []]),
+    ?FM(fifo_db, transact, [State#vstate.db, Trans]),
     {ok, State}.
 
 
 delete(Realm, State=#vstate{db=DB}) ->
     Bucket = mk_pfx(Realm, State),
     FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
-    Trans = fifo_db:fold_keys(DB, Bucket, FoldFn, []),
-    fifo_db:transact(State#vstate.db, Trans),
+    Trans = ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []]),
+    ?FM(fifo_db, transact, [State#vstate.db, Trans]),
     {ok, State}.
 
 load_obj({_, A} = ID, Mod, Obj) ->
@@ -180,7 +185,7 @@ load_obj({_, A} = ID, Mod, Obj) ->
 
 handle_coverage({wipe, Realm, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
     Bucket = mk_pfx(Realm, State),
-    fifo_db:delete(State#vstate.db, Bucket, UUID),
+    ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     {reply, {ok, ReqID}, State};
 
 handle_coverage({lookup, Realm, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
@@ -288,12 +293,12 @@ handle_command({get, ReqID, {Realm, UUID}}, _Sender, State=#vstate{state=Mod}) -
 
 handle_command({delete, {ReqID, _Coordinator}, {undefined, UUID}}, _Sender, State) ->
     Bucket = State#vstate.bucket,
-    fifo_db:delete(State#vstate.db, Bucket, UUID),
+    ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     {reply, {ok, ReqID}, State};
 
 handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender, State) ->
     Bucket = mk_pfx(Realm, State),
-    fifo_db:delete(State#vstate.db, Bucket, UUID),
+    ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     riak_core_index_hashtree:delete(
       {Realm, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
@@ -408,7 +413,7 @@ reply(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
 
 get(Realm, UUID, State) ->
     Bucket = mk_pfx(Realm, State),
-    fifo_db:get(State#vstate.db, Bucket, UUID).
+    ?FM(fifo_db, get, [State#vstate.db, Bucket, UUID]).
 
 handle_info(retry_create_hashtree,
             State=#vstate{service=Srv, hashtrees=undefined, partition=Idx,

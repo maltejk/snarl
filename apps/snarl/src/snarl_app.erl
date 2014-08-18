@@ -3,7 +3,9 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1]).
+-export([start/2, stop/1, init_folsom/0]).
+
+-ignore_xref([init_folsom/0]).
 
 -define(SRV(VNode, Srv),
         ok = riak_core:register([{vnode_module, VNode}]),
@@ -20,23 +22,7 @@
 %% ===================================================================
 
 start(_StartType, _StartArgs) ->
-    case application:get_env(fifo_db, db_path) of
-        {ok, _} ->
-            ok;
-        undefined ->
-            case application:get_env(snarl, db_path) of
-                {ok, P} ->
-                    application:set_env(fifo_db, db_path, P);
-                _ ->
-                    application:set_env(fifo_db, db_path, "/var/db/snarl")
-            end
-    end,
-    case application:get_env(fifo_db, backend) of
-        {ok, _} ->
-            ok;
-        undefined ->
-            application:set_env(fifo_db, backend, fifo_db_hanoidb)
-    end,
+    init_folsom(),
     case snarl_sup:start_link() of
         {ok, Pid} ->
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
@@ -69,3 +55,16 @@ start(_StartType, _StartArgs) ->
 
 stop(_State) ->
     ok.
+
+
+init_folsom() ->
+    [folsom_metrics:new_histogram(Name, slide, 60) ||
+        Name <-
+            [
+             {fifo_db, fold_keys},
+             {fifo_db, fold},
+             {fifo_db, get},
+             {fifo_db, put},
+             {fifo_db, delete},
+             {fifo_db, transact}
+            ]].
