@@ -152,8 +152,8 @@ change(Realm, UUID, Action, Vals, {ReqID, Coordinator} = ID,
             snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
-            lager:error("[~s] tried to write to a non existing element: ~p => ~p",
-                        [State#vstate.bucket, UUID, R]),
+            lager:error("[~s:~s] Tried to write to a non existing element: ~p => ~p",
+                        [State#vstate.bucket, Action, UUID, R]),
             {reply, {ok, ReqID, not_found}, State}
     end.
 
