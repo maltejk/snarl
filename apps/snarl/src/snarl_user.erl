@@ -283,7 +283,7 @@ get_(Realm, User) ->
     end.
 
 raw(Realm, User) ->
-    case ?FM(raw, snarl_entity_read_fsm, start,
+    case ?FM(get, snarl_entity_read_fsm, start,
              [{snarl_user_vnode, snarl_user}, get, {Realm, User}, undefined,
               true]) of
         {ok, not_found} ->
@@ -305,7 +305,7 @@ list() ->
 
 list_(Realm) ->
     {ok, Res} =
-        ?FM(list_, snarl_full_coverage, start,
+        ?FM(list, snarl_full_coverage, start,
             [snarl_user_vnode_master, snarl_user,
              {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
@@ -317,7 +317,7 @@ list_(Realm) ->
 list(Realm, Requirements, Full)
   when Full == true orelse Full == false ->
     {ok, Res} =
-        ?FM(list_full, snarl_full_coverage, start,
+        ?FM(list, snarl_full_coverage, start,
             [snarl_user_vnode_master, snarl_user,
              {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),

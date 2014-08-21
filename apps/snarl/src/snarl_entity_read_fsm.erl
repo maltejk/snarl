@@ -39,7 +39,8 @@
               terminate/3,
               unique/1,
               wait_for_n/2,
-              waiting/2
+              waiting/2,
+              start/3, start/5
              ]).
 
 -record(state, {raw = false ::boolean(),

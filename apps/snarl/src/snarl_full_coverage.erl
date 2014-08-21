@@ -12,6 +12,8 @@
          start/3
         ]).
 
+-ignore_xref([start/3]).
+
 -record(state, {replies, r, reqid, from, reqs, raw = false}).
 
 start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, true}) ->

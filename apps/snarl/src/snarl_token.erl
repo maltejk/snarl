@@ -8,12 +8,16 @@
          delete/2
         ]).
 
+-define(FM(Met, Mod, Fun, Args),
+        folsom_metrics:histogram_timed_update(
+          {snarl, token, Met},
+          Mod, Fun, Args)).
+
 %% Public API
 
 get(Realm, Token) ->
-    snarl_entity_read_fsm:start(
-      {snarl_token_vnode, snarl_token},
-      get, {Realm, Token}).
+    ?FM(get, snarl_entity_read_fsm, start,
+        [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]).
 
 add(Realm, User) ->
     do_write(Realm, uuid:uuid4s(), add, User).
@@ -26,9 +30,9 @@ delete(Realm, Token) ->
 %%%===================================================================
 
 do_write(Realm, Token, Op) ->
-    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token},
-                                 {Realm, Token}, Op).
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_token_vnode, snarl_token}, {Realm, Token}, Op]).
 
 do_write(Realm, Token, Op, Val) ->
-    snarl_entity_write_fsm:write({snarl_token_vnode, snarl_token},
-                                 {Realm, Token}, Op, Val).
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_token_vnode, snarl_token}, {Realm, Token}, Op, Val]).
