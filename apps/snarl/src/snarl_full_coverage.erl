@@ -20,7 +20,7 @@ start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, Full}) ->
     start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, Full, false});
 
 start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, false, _}) ->
-    snarl_full_coverage:start(VNodeMaster, NodeCheckService, {list, Realm, Requirements});
+    snarl_coverage:start(VNodeMaster, NodeCheckService, {list, Realm, Requirements});
 
 start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true, _}) ->
     ReqID = mk_reqid(),
