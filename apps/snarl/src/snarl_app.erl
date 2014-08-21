@@ -32,8 +32,10 @@ start(_StartType, _StartArgs) ->
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),
             ok = riak_core_node_watcher:service_up(snarl_token, self()),
 
-            ok = riak_core_ring_events:add_guarded_handler(snarl_ring_event_handler, []),
-            ok = riak_core_node_watcher_events:add_guarded_handler(snarl_node_event_handler, []),
+            ok = riak_core_ring_events:add_guarded_handler(
+                   snarl_ring_event_handler, []),
+            ok = riak_core_node_watcher_events:add_guarded_handler(
+                   snarl_node_event_handler, []),
 
             snarl_snmp_handler:start(),
             case application:get_env(snarl, sync) of
@@ -58,13 +60,13 @@ stop(_State) ->
 
 
 init_folsom() ->
+    DBMs = [fold_keys, fold, get, put, delete, transact],
+    UserMs = [wipe, get, raw, list, list_all, list_, list_full, sync_repair,
+              revoke_prefix, add_key, revoke_key, add_yubikey, remove_yubikey,
+              add, set, passwd, import, join, leave, join_org, select_org,
+              leave_org, delete, grant, revoke, lookup, find_key],
     [folsom_metrics:new_histogram(Name, slide, 60) ||
         Name <-
-            [
-             {fifo_db, fold_keys},
-             {fifo_db, fold},
-             {fifo_db, get},
-             {fifo_db, put},
-             {fifo_db, delete},
-             {fifo_db, transact}
-            ]].
+            [{fifo_db, M} || M <- DBMs] ++
+            [{snarl, user, M} || M <- UserMs]
+    ].
