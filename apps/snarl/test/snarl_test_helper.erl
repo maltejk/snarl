@@ -73,6 +73,8 @@ start_mock_servers() ->
     application:start(compiler),
     application:start(goldrush),
     application:start(lager),
+    ok = application:start(folsom),
+    snarl_app:init_folsom(),
     ok = application:start(fifo_db),
     start_fake_read_fsm(),
     start_fake_write_fsm().
@@ -90,6 +92,7 @@ cleanup_mock_servers() ->
     application:stop(goldrush),
     application:stop(hanoidb),
     application:stop(lager),
+    application:stop(folsom),
     application:stop(syntax_tools).
 
 start_fake_vnode_master(Pid) ->

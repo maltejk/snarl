@@ -27,14 +27,20 @@
               sync_repair/3,
               wipe/2
              ]).
+
 -define(TIMEOUT, 5000).
+
+-define(FM(Met, Mod, Fun, Args),
+        folsom_metrics:histogram_timed_update(
+          {snarl, org, Met},
+          Mod, Fun, Args)).
 
 -type template() :: [binary()|placeholder].
 %% Public API
 
 wipe(Realm, UUID) ->
-    snarl_coverage:start(snarl_org_vnode_master, snarl_org,
-                         {wipe, Realm, UUID}).
+    ?FM(wipe, snarl_coverage, start,
+        [snarl_org_vnode_master, snarl_org, {wipe, Realm, UUID}]).
 
 sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
@@ -110,9 +116,9 @@ import(Realm, Org, Data) ->
                     {ok, Org::fifo:org()}.
 
 lookup(Realm, OrgName) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_org_vnode_master, snarl_org,
-                  {lookup, Realm, OrgName}),
+    {ok, Res} =
+        ?FM(lookup, snarl_coverage, start,
+            [snarl_org_vnode_master, snarl_org, {lookup, Realm, OrgName}]),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -142,9 +148,8 @@ get(Realm, Org) ->
                   {error, timeout} |
                   {ok, Org::ft_org:organisation()}.
 get_(Realm, Org) ->
-    case snarl_entity_read_fsm:start(
-           {snarl_org_vnode, snarl_org},
-           get, {Realm, Org}) of
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_org_vnode, snarl_org}, get, {Realm, Org}]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -152,8 +157,9 @@ get_(Realm, Org) ->
     end.
 
 raw(Realm, Org) ->
-    case snarl_entity_read_fsm:start({snarl_org_vnode, snarl_org}, get,
-                                     {Realm, Org}, undefined, true) of
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_org_vnode, snarl_org}, get,
+              {Realm, Org}, undefined, true]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -161,9 +167,9 @@ raw(Realm, Org) ->
     end.
 
 list_(Realm) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_org_vnode_master, snarl_org,
-                  {list, Realm, [], true, true}),
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_org_vnode_master, snarl_org, {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
@@ -172,28 +178,22 @@ list_(Realm) ->
                                {error, timeout}.
 
 list(Realm) ->
-    snarl_coverage:start(
-      snarl_org_vnode_master, snarl_org,
-      {list, Realm}).
+    ?FM(list, snarl_coverage, start,
+        [snarl_org_vnode_master, snarl_org, {list, Realm}]).
 
 list() ->
-    snarl_coverage:start(
-      snarl_org_vnode_master, snarl_org,
-      list).
+    ?FM(list_all, snarl_coverage, start,
+        [snarl_org_vnode_master, snarl_org, list]).
 
--spec list(Realm::binary(), [fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
+-spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
+                  {error, timeout} | {ok, [fifo:uuid()]}.
 
-list(Realm, Requirements, true) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_org_vnode_master, snarl_org,
-                  {list, Realm, Requirements, true}),
-    Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)};
-
-list(Realm, Requirements, false) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_org_vnode_master, snarl_org,
-                  {list, Realm, Requirements}),
+list(Realm, Requirements, Full)
+  when Full == true orelse Full == false ->
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_org_vnode_master, snarl_org,
+             {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
@@ -258,9 +258,9 @@ set(Realm, Org, Attributes) ->
 %%%===================================================================
 
 do_write(Realm, Org, Op) ->
-    snarl_entity_write_fsm:write({snarl_org_vnode, snarl_org},
-                                 {Realm, Org}, Op).
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_org_vnode, snarl_org}, {Realm, Org}, Op]).
 
 do_write(Realm, Org, Op, Val) ->
-    snarl_entity_write_fsm:write({snarl_org_vnode, snarl_org},
-                                 {Realm, Org}, Op, Val).
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_org_vnode, snarl_org}, {Realm, Org}, Op, Val]).

@@ -27,7 +27,7 @@
               start_link/5,
               start_link/6,
               terminate/3,
-              waiting/2
+              waiting/2, write/3
              ]).
 
 %% req_id: The request id so the caller can verify the response.

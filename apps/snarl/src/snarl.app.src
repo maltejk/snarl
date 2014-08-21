@@ -8,6 +8,7 @@
      stdlib,
      riak_core,
      fifo_db,
+     folsom_ddb,
      mdns_server_lib,
      lager,
      libsnarlmatch,

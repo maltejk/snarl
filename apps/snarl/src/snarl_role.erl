@@ -25,11 +25,16 @@
 
 -define(TIMEOUT, 5000).
 
+-define(FM(Met, Mod, Fun, Args),
+        folsom_metrics:histogram_timed_update(
+          {snarl, role, Met},
+          Mod, Fun, Args)).
+
 %% Public API
 
 wipe(Realm, UUID) ->
-    snarl_coverage:start(snarl_role_vnode_master, snarl_role,
-                         {wipe, Realm, UUID}).
+    ?FM(wipe, snarl_coverage, start,
+        [snarl_role_vnode_master, snarl_role, {wipe, Realm, UUID}]).
 
 sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
@@ -54,9 +59,9 @@ lookup(Realm, Role) ->
                      {error, timeout} |
                      {ok, Role::#?ROLE{}}.
 lookup_(Realm, Role) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {lookup, Realm, Role}),
+    {ok, Res} =
+        ?FM(lookup, snarl_coverage,start,
+            [snarl_role_vnode_master, snarl_role, {lookup, Realm, Role}]),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -64,7 +69,7 @@ lookup_(Realm, Role) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            snarl_role:get_(Realm, UUID);
+            get_(Realm, UUID);
         R ->
             R
     end.
@@ -86,9 +91,8 @@ get(Realm, Role) ->
                   {error, timeout} |
                   {ok, Role::#?ROLE{}}.
 get_(Realm, Role) ->
-    case snarl_entity_read_fsm:start(
-           {snarl_role_vnode, snarl_role},
-           get, {Realm, Role}) of
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_role_vnode, snarl_role}, get, {Realm, Role}]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -96,8 +100,8 @@ get_(Realm, Role) ->
     end.
 
 raw(Realm, Role) ->
-    case snarl_entity_read_fsm:start({snarl_role_vnode, snarl_role}, get,
-                                     {Realm, Role}, undefined, true) of
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_role_vnode, snarl_role}, get, {Realm, Role}, undefined, true]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -105,23 +109,22 @@ raw(Realm, Role) ->
     end.
 
 list() ->
-    snarl_coverage:start(
-      snarl_role_vnode_master, snarl_role,
-      list).
+    ?FM(list_all, snarl_coverage, start,
+        [snarl_role_vnode_master, snarl_role, list]).
 
 -spec list(Realm::binary()) -> {ok, [fifo:role_id()]} |
                 not_found |
                 {error, timeout}.
 
 list(Realm) ->
-    snarl_coverage:start(
-      snarl_role_vnode_master, snarl_role,
-      {list, Realm}).
+    ?FM(list, snarl_coverage, start,
+        [snarl_role_vnode_master, snarl_role, {list, Realm}]).
 
 list_(Realm) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {list, Realm, [], true, true}),
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_role_vnode_master, snarl_role,
+             {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
@@ -133,17 +136,12 @@ list_(Realm) ->
 -spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
                   {error, timeout} | {ok, [fifo:uuid()]}.
 
-list(Realm, Requirements, true) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {list, Realm, Requirements, true}),
-    Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)};
-
-list(Realm, Requirements, false) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {list, Realm, Requirements}),
+list(Realm, Requirements, Full)
+  when Full == true orelse Full == false ->
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_role_vnode_master, snarl_role,
+             {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
@@ -235,9 +233,9 @@ set(Realm, Role, Attributes) ->
 %%%===================================================================
 
 do_write(Realm, Role, Op) ->
-    snarl_entity_write_fsm:write(
-      {snarl_role_vnode, snarl_role}, {Realm, Role}, Op).
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_role_vnode, snarl_role}, {Realm, Role}, Op]).
 
 do_write(Realm, Role, Op, Val) ->
-    snarl_entity_write_fsm:write(
-      {snarl_role_vnode, snarl_role}, {Realm, Role}, Op, Val).
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_role_vnode, snarl_role}, {Realm, Role}, Op, Val]).

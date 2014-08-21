@@ -40,10 +40,15 @@
 
 -define(TIMEOUT, 5000).
 
+-define(FM(Met, Mod, Fun, Args),
+        folsom_metrics:histogram_timed_update(
+          {snarl, user, Met},
+          Mod, Fun, Args)).
+
 %% Public API
 wipe(Realm, UUID) ->
-    snarl_coverage:start(snarl_user_vnode_master, snarl_user,
-                         {wipe, Realm, UUID}).
+    ?FM(wipe, snarl_coverage, start,
+        [snarl_user_vnode_master, snarl_user, {wipe, Realm, UUID}]).
 
 sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
@@ -53,14 +58,18 @@ sync_repair(Realm, UUID, Obj) ->
                       {error, timeout} |
                       {ok, User::fifo:user_id()}.
 find_key(Realm, KeyID) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_user_vnode_master, snarl_user,
-                  {find_key, Realm, KeyID}),
-    lists:foldl(fun (not_found, Acc) ->
-                        Acc;
-                    (R, _) ->
-                        {ok, R}
-                end, not_found, Res).
+    folsom_metrics:histogram_timed_update(
+      {snarl, user, find_key},
+      fun() ->
+              {ok, Res} = snarl_coverage:start(
+                            snarl_user_vnode_master, snarl_user,
+                            {find_key, Realm, KeyID}),
+              lists:foldl(fun (not_found, Acc) ->
+                                  Acc;
+                              (R, _) ->
+                                  {ok, R}
+                          end, not_found, Res)
+      end).
 
 -spec auth(Realm::binary(), User::binary(), Passwd::binary(),
            OTP::binary()|basic) ->
@@ -137,20 +146,24 @@ lookup(Realm, User) ->
                      {error, timeout} |
                      {ok, User::#?USER{}}.
 lookup_(Realm, User) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_user_vnode_master, snarl_user,
-                  {lookup, Realm, User}),
-    R0 = lists:foldl(fun (not_found, Acc) ->
-                             Acc;
-                         (R, _) ->
-                             {ok, R}
-                     end, not_found, Res),
-    case R0 of
-        {ok, UUID} ->
-            snarl_user:get_(Realm, UUID);
-        R ->
-            R
-    end.
+    folsom_metrics:histogram_timed_update(
+      {snarl, user, lookup},
+      fun() ->
+              {ok, Res} = snarl_coverage:start(
+                            snarl_user_vnode_master, snarl_user,
+                            {lookup, Realm, User}),
+              R0 = lists:foldl(fun (not_found, Acc) ->
+                                       Acc;
+                                   (R, _) ->
+                                       {ok, R}
+                               end, not_found, Res),
+              case R0 of
+                  {ok, UUID} ->
+                      snarl_user:get_(Realm, UUID);
+                  R ->
+                      R
+              end
+      end).
 
 -spec revoke_prefix(Realm::binary(),
                     User::fifo:user_id(),
@@ -261,9 +274,8 @@ get(Realm, User) ->
                   {error, timeout} |
                   {ok, User::#?USER{}}.
 get_(Realm, User) ->
-    case snarl_entity_read_fsm:start(
-           {snarl_user_vnode, snarl_user},
-           get, {Realm, User}) of
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_user_vnode, snarl_user}, get, {Realm, User}]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -271,8 +283,9 @@ get_(Realm, User) ->
     end.
 
 raw(Realm, User) ->
-    case snarl_entity_read_fsm:start({snarl_user_vnode, snarl_user}, get,
-                                     {Realm, User}, undefined, true) of
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_user_vnode, snarl_user}, get, {Realm, User}, undefined,
+              true]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -283,36 +296,30 @@ raw(Realm, User) ->
                   {error, timeout} |
                   {ok, Users::[fifo:user_id()]}.
 list(Realm) ->
-    snarl_coverage:start(
-      snarl_user_vnode_master, snarl_user,
-      {list, Realm}).
+    ?FM(list, snarl_coverage, start,
+        [snarl_user_vnode_master, snarl_user, {list, Realm}]).
 
 list() ->
-    snarl_coverage:start(
-      snarl_user_vnode_master, snarl_user,
-      list).
+    ?FM(list_all, snarl_coverage, start,
+        [snarl_user_vnode_master, snarl_user, list]).
 
 list_(Realm) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_user_vnode_master, snarl_user,
-                  {list, Realm, [], true, true}),
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_user_vnode_master, snarl_user,
+             {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
 -spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
                   {error, timeout} | {ok, [fifo:uuid()]}.
 
-list(Realm, Requirements, true) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_user_vnode_master, snarl_user,
-                  {list, Realm, Requirements, true}),
-    Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)};
-
-list(Realm, Requirements, false) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_user_vnode_master, snarl_user,
-                  {list, Realm, Requirements, false}),
+list(Realm, Requirements, Full)
+  when Full == true orelse Full == false ->
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_user_vnode_master, snarl_user,
+             {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
@@ -411,10 +418,7 @@ passwd(Realm, User, Passwd) ->
             {ok, sha512} ->
                 Salt = crypto:rand_bytes(64),
                 Hash = hash(sha512, Salt, Passwd),
-
                 {Salt, Hash};
-            %% {ok, bcrypt} ->
-            %% undefined ->
             _ ->
                 {ok, Salt} = bcrypt:gen_salt(),
                 {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
@@ -532,8 +536,8 @@ revoke(Realm, User, Permission) ->
 %%%===================================================================
 
 do_write(Realm, User, Op) ->
-    case snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user},
-                                      {Realm, User}, Op) of
+    case ?FM(Op, snarl_entity_write_fsm, write,
+             [{snarl_user_vnode, snarl_user}, {Realm, User}, Op]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -541,8 +545,8 @@ do_write(Realm, User, Op) ->
     end.
 
 do_write(Realm, User, Op, Val) ->
-    case snarl_entity_write_fsm:write({snarl_user_vnode, snarl_user},
-                                      {Realm, User}, Op, Val) of
+    case ?FM(Op, snarl_entity_write_fsm, write,
+             [{snarl_user_vnode, snarl_user}, {Realm, User}, Op, Val]) of
         {ok, not_found} ->
             not_found;
         R ->
