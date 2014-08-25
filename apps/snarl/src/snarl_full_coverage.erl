@@ -1,7 +1,6 @@
 -module(snarl_full_coverage).
 
 -include("snarl.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -behaviour(riak_core_coverage_fsm).
 
@@ -131,11 +130,4 @@ merge([{_Score1, V} | R], _Score2, Vs) when _Score1 =/= _Score2->
 
 merge_obj(Vs) ->
     O = ft_obj:merge(snarl_entity_read_fsm, Vs),
-    case ft_obj:val(O) of
-        V = #?USER{} ->
-            ft_user:to_json(V);
-        V = #?ORG{} ->
-            ft_org:to_json(V);
-        V = #?ROLE{} ->
-            ft_role:to_json(V)
-    end.
+    ft_obj:val(O).

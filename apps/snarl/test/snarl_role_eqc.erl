@@ -70,7 +70,6 @@ command(S) ->
            {call, ?M, delete, [maybe_a_uuid(S)]},
            {call, ?M, wipe, [maybe_a_uuid(S)]},
            {call, ?M, get, [maybe_a_uuid(S)]},
-           {call, ?M, get_, [maybe_a_uuid(S)]},
            {call, ?M, lookup, [maybe_a_uuid(S)]},
            {call, ?M, lookup_, [maybe_a_uuid(S)]},
            {call, ?M, raw, [maybe_a_uuid(S)]},
@@ -118,7 +117,6 @@ add(UUID, Role) ->
     R.
 
 ?FWD(get).
-?FWD(get_).
 ?FWD(raw).
 
 lookup({N, _}) ->
@@ -271,12 +269,6 @@ postcondition(S, {call, _, lookup_, [{_, UUID}]}, not_found) ->
 postcondition(S, {call, _, lookup_, [{_, UUID}]}, {ok, Result}) ->
     UUID == ft_role:uuid(Result) andalso has_uuid(S, UUID);
 
-postcondition(S, {call, _, get_, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, get_, [{_, UUID}]}, {ok, U}) ->
-    has_uuid(S, UUID) andalso metadata_match(S, UUID, U);
-
 postcondition(S, {call, _, raw, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
 
@@ -340,12 +332,12 @@ setup() ->
     meck:new(snarl_org, [passthrough]),
     meck:expect(snarl_org, remove_target, fun(?REALM, _, _) -> ok end),
     meck:expect(snarl_org, list, fun(?REALM) -> {ok, []} end),
-    meck:expect(snarl_org, get_, fun(?REALM, _) -> {ok, dummy} end),
+    meck:expect(snarl_org, get, fun(?REALM, _) -> {ok, dummy} end),
     meck:new(snarl_user, [passthrough]),
     meck:expect(snarl_user, revoke_prefix, fun(?REALM, _, _) -> ok end),
     meck:expect(snarl_user, leave, fun(?REALM, _, _) -> ok end),
     meck:expect(snarl_user, list, fun(?REALM) -> {ok, []} end),
-    meck:expect(snarl_user, get_, fun(?REALM, _) -> {ok, dummy} end),
+    meck:expect(snarl_user, get, fun(?REALM, _) -> {ok, dummy} end),
     meck:new(snarl_opt, [passthrough]),
     meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),
     ok.

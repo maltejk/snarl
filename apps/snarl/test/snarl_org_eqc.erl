@@ -69,7 +69,6 @@ command(S) ->
            {call, ?M, delete, [maybe_a_uuid(S)]},
            {call, ?M, wipe, [maybe_a_uuid(S)]},
            {call, ?M, get, [maybe_a_uuid(S)]},
-           {call, ?M, get_, [maybe_a_uuid(S)]},
            {call, ?M, lookup, [maybe_a_uuid(S)]},
            %{call, ?M, lookup_, [maybe_a_uuid(S)]},
            {call, ?M, raw, [maybe_a_uuid(S)]},
@@ -111,7 +110,6 @@ add(UUID, Org) ->
 handoff_delete_handin() ->
     ok.
 ?FWD(get).
-?FWD(get_).
 ?FWD(raw).
 
 lookup({N, _}) ->
@@ -236,13 +234,7 @@ postcondition(S, {call, _, lookup, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
 
 postcondition(S, {call, _, lookup, [{_, UUID}]}, {ok, Result}) ->
-    {ok, UUID} == jsxd:get(<<"uuid">>, Result) andalso has_uuid(S, UUID);
-
-postcondition(S, {call, _, get_, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, get_, [{_, UUID}]}, {ok, U}) ->
-    has_uuid(S, UUID) andalso metadata_match(S, UUID, U);
+    UUID == ft_org:uuid(Result) andalso has_uuid(S, UUID);
 
 postcondition(S, {call, _, raw, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
@@ -307,7 +299,7 @@ setup() ->
     meck:new(snarl_role, [passthrough]),
     meck:expect(snarl_role, revoke_prefix, fun(?REALM, _, _) -> ok end),
     meck:expect(snarl_role, list, fun(?REALM) -> {ok, []} end),
-    meck:expect(snarl_role, get_, fun(?REALM, _) -> {ok, dummy} end),
+    meck:expect(snarl_role, get, fun(?REALM, _) -> {ok, dummy} end),
 
     meck:new(snarl_opt, [passthrough]),
     meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),

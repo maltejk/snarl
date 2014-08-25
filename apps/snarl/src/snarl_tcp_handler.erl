@@ -17,7 +17,16 @@ init(Prot, []) ->
 %%% General Functions
 %%%===================================================================
 
--spec message(fifo:snarl_message(), term()) -> any().
+-type message() ::
+        fifo:snarl_message() |
+        fifo:snarl_user_message() |
+        fifo:snarl_org_message() |
+        fifo:snarl_role_message() |
+        fifo:snarl_token_message().
+
+-spec message(message(), #state{}) ->
+                     {noreply, #state{}} |
+                     {reply, term(), #state{}}.
 
 message(version, State) ->
     {reply, {ok, ?VERSION}, State};
@@ -28,9 +37,6 @@ message(version, State) ->
 
 message({org, list, Realm}, State) ->
     {reply, snarl_org:list(Realm), State};
-
-message({org, list, Realm, Requirements}, State) ->
-    message({org, list, Realm, Requirements, false}, State);
 
 message({org, list, Realm, Requirements, Full}, State) ->
     {reply, snarl_org:list(Realm, Requirements, Full), State};
@@ -72,15 +78,12 @@ message({org, trigger, execute, Realm, Org, Event, Payload}, State) ->
 message({user, list, Realm}, State) ->
     {reply, snarl_user:list(Realm), State};
 
-message({user, list, Realm, Requirements}, State) ->
-    message({user, list, Realm, Requirements, false}, State);
-
 message({user, list, Realm, Requirements, Full}, State) ->
     {reply, snarl_user:list(Realm, Requirements, Full), State};
 
 message({user, get, Realm, {token, Token}}, State) ->
     case snarl_token:get(Realm, Token) of
-        {ok, not_found} ->
+        not_found ->
             {reply, not_found, State};
         {ok, User} ->
             message({user, get, Realm, User}, State)
@@ -152,9 +155,9 @@ message({user, lookup, Realm, User}, State) when is_binary(User) ->
      snarl_user:lookup(Realm, User),
      State};
 
-message({user, cache, Realm, {token, Token}}, State) ->
+message({user, cache, Realm, {token, Token}}, State = #state{}) ->
     case snarl_token:get(Realm, Token) of
-        {ok, not_found} ->
+        not_found ->
             {reply, not_found, State};
         {ok, User} ->
             message({user, cache, Realm, User}, State)
@@ -213,7 +216,7 @@ message({user, auth, Realm, User, Pass, OTP}, State) when
 
 message({user, allowed, Realm, {token, Token}, Permission}, State) ->
     case snarl_token:get(Realm, Token) of
-        {ok, not_found} ->
+        not_found ->
             {reply, false, State};
         {ok, User} ->
             {reply,
@@ -299,9 +302,6 @@ message({user, org, select, Realm, User, Org}, State) when
 
 message({role, list, Realm}, State) ->
     {reply, snarl_role:list(Realm), State};
-
-message({role, list, Realm, Requirements}, State) ->
-    message({role, list, Realm, Requirements, false}, State);
 
 message({role, list, Realm, Requirements, Full}, State) ->
     {reply, snarl_role:list(Realm, Requirements, Full), State};

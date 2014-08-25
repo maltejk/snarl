@@ -4,7 +4,6 @@
 -include_lib("eqc/include/eqc.hrl").
 -include_lib("snarl/include/snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -compile(export_all).
 
@@ -66,9 +65,9 @@ start_mock_servers() ->
     os:cmd("mkdir eqc_vnode_data"),
     application:set_env(fifo_db, db_path, "eqc_vnode_data"),
     application:set_env(fifo_db, backend, fifo_db_leveldb),
-    ok = application:start(hanoidb),
-    ok = application:start(bitcask),
-    ok = application:start(eleveldb),
+    application:start(hanoidb),
+    application:start(bitcask),
+    application:start(eleveldb),
     application:start(syntax_tools),
     application:start(compiler),
     application:start(goldrush),
@@ -117,10 +116,8 @@ start_fake_read_fsm() ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E),
                         Res = case R of
-                                  {ok, ReqID, _, #ft_obj{val=V}} ->
-                                      {ok, V};
                                   {ok, ReqID, _, O} ->
-                                      O;
+                                      mk_reply(O);
                                   Err ->
                                       Err
                               end,
@@ -150,10 +147,8 @@ start_fake_write_fsm() ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E),
                         Res = case R of
-                                  {ok, ReqID, _, #ft_obj{val=V}} ->
-                                      {ok, V};
                                   {ok, ReqID, _, O} ->
-                                      O;
+                                      mk_reply(O);
                                   {ok, _} ->
                                       ok;
                                   Err ->
@@ -166,10 +161,8 @@ start_fake_write_fsm() ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E, Val),
                         Res = case R of
-                                  {ok, ReqID, _, #ft_obj{val=V}} ->
-                                      {ok, V};
                                   {ok, ReqID, _, O} ->
-                                      O;
+                                      mk_reply(O);
                                   {ok, _} ->
                                       ok;
                                   {ok, _, O} ->
@@ -203,7 +196,7 @@ start_fake_coverage(Pid) ->
                         snarl_full_coverage:start(A, B, {C, Realm, Req, Full});
                     (A, B, {C, Realm, Req, Full, false}) ->
                         {ok, R} = snarl_full_coverage:start(A, B, {C, Realm, Req, Full}),
-                        {ok, [U || #ft_obj{val = U} <- R]};
+                        {ok, [ft_obj:val(U) || U <- R]};
                     (_, O, {C, Realm, Req, Full}) ->
                         M = list_to_atom(atom_to_list(O) ++ "_vnode"),
                         Ref = make_ref(),
@@ -367,5 +360,13 @@ mock_vnode_loop(M, S) ->
         Er:Er1 ->
             io:format(user, "VNode crash: ~p:~p~n", [Er, Er1]),
             mock_vnode_loop(M, S)
+    end.
+
+mk_reply(O) ->
+    case ft_obj:is_a(O) of
+        true ->
+            {ok, ft_obj:val(O)};
+        _ ->
+            O
     end.
 -endif.

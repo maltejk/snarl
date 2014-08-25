@@ -14,10 +14,19 @@
           Mod, Fun, Args)).
 
 %% Public API
+-spec get(binary(), fifo:token()) ->
+                 not_found |
+                 {ok, fifo:user_id()}.
 
 get(Realm, Token) ->
-    ?FM(get, snarl_entity_read_fsm, start,
-        [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]).
+    R = ?FM(get, snarl_entity_read_fsm, start,
+            [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]),
+    case R of
+        {ok, not_found} ->
+            not_found;
+        _ ->
+            R
+    end.
 
 add(Realm, User) ->
     do_write(Realm, uuid:uuid4s(), add, User).

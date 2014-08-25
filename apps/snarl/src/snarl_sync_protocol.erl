@@ -48,7 +48,7 @@ handle_info({_OK, Socket, BinData}, State = #state{
             System:delete(Realm, UUID),
             {noreply, State};
         {write, Node, VNode, System, Realm, UUID, Op, Val} ->
-            NVS = {{remote, Node}, VNode, System, Realm},
+            NVS = {{remote, Node}, VNode, System},
             snarl_entity_write_fsm:write(NVS, {Realm, UUID}, Op, Val),
             {noreply, State}
     end;

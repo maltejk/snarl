@@ -2,7 +2,6 @@
 -behaviour(riak_core_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          repair/4,
@@ -137,9 +136,7 @@ handle_command({delete, {ReqID, _Coordinator}, {Realm, Token}}, _Sender, State) 
       }};
 
 handle_command({add, {ReqID, Coordinator}, {Realm, Token}, User}, _Sender, State) ->
-    VC0 = vclock:fresh(),
-    VC = vclock:increment(Coordinator, VC0),
-    TObject = #ft_obj{val=User, vclock=VC},
+    TObject = ft_obj:new(User, Coordinator),
     State1 = expire(State),
     Ts0 = dict:store({Realm, Token}, {now(), TObject}, State1#state.tokens),
 

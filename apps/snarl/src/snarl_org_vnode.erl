@@ -3,7 +3,6 @@
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([start_vnode/1,
          init/1,
@@ -70,7 +69,7 @@ hash_object(Key, Obj) ->
 
 aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_org:get_(Realm, Key).
+    snarl_org:get(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -160,9 +159,7 @@ handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, St
     Org0 = ft_org:new(ID),
     Org1 = ft_org:name(ID, Org, Org0),
     Org2 = ft_org:uuid(ID, UUID, Org1),
-    VC0 = vclock:fresh(),
-    VC = vclock:increment(Coordinator, VC0),
-    OrgObj = #ft_obj{val=Org2, vclock=VC},
+    OrgObj = ft_obj:new(Org2, Coordinator),
     snarl_vnode:put(Realm, UUID, OrgObj, State),
     {reply, {ok, ReqID}, State};
 

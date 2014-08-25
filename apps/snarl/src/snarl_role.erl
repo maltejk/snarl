@@ -1,12 +1,11 @@
 -module(snarl_role).
 
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          sync_repair/3,
          list/0, list/1, list/3, list_/1,
-         get/2, get_/2, raw/2,
+         get/2, raw/2,
          lookup/2, lookup_/2,
          add/2, delete/2,
          grant/3, revoke/3,
@@ -57,7 +56,7 @@ lookup(Realm, Role) ->
 -spec lookup_(Realm::binary(), Role::binary()) ->
                      not_found |
                      {error, timeout} |
-                     {ok, Role::#?ROLE{}}.
+                     {ok, Role::fifo:role()}.
 lookup_(Realm, Role) ->
     {ok, Res} =
         ?FM(lookup, snarl_coverage,start,
@@ -69,7 +68,7 @@ lookup_(Realm, Role) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            get_(Realm, UUID);
+            snarl_role:get(Realm, UUID);
         R ->
             R
     end.
@@ -79,18 +78,6 @@ lookup_(Realm, Role) ->
                  {error, timeout} |
                  {ok, Role::fifo:role()}.
 get(Realm, Role) ->
-    case get_(Realm, Role) of
-        {ok, RoleObj} ->
-            {ok, ft_role:to_json(RoleObj)};
-        R  ->
-            R
-    end.
-
--spec get_(Realm::binary(), Role::fifo:role_id()) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, Role::#?ROLE{}}.
-get_(Realm, Role) ->
     case ?FM(get, snarl_entity_read_fsm, start,
              [{snarl_role_vnode, snarl_role}, get, {Realm, Role}]) of
         {ok, not_found} ->
@@ -113,8 +100,8 @@ list() ->
         [snarl_role_vnode_master, snarl_role, list]).
 
 -spec list(Realm::binary()) -> {ok, [fifo:role_id()]} |
-                not_found |
-                {error, timeout}.
+                               not_found |
+                               {error, timeout}.
 
 list(Realm) ->
     ?FM(list, snarl_coverage, start,
