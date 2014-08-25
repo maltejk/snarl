@@ -3,7 +3,6 @@
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([start_vnode/1,
          init/1,
@@ -48,7 +47,7 @@
          passwd/4,
          join_org/4, leave_org/4, select_org/4,
          revoke_key/4,
-         set/4
+         set_metadata/4
         ]).
 
 -ignore_xref([
@@ -69,7 +68,7 @@
               revoke/4,
               revoke_key/4,
               revoke_prefix/4,
-              set/4,
+              set_metadata/4,
               handle_info/2,
               join_org/4, leave_org/4, select_org/4,
               start_vnode/1
@@ -92,7 +91,7 @@ hash_object(Key, Obj) ->
 
 aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_user:get_(Realm, Key).
+    snarl_user:get(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -159,9 +158,9 @@ remove_yubikey(Preflist, ReqID, {Realm, UUID}, KeyId) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, {Realm, UUID}, Attributes) ->
+set_metadata(Preflist, ReqID, {Realm, UUID}, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, {Realm, UUID}, Attributes},
+                                   {set_metadata, ReqID, {Realm, UUID}, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -246,9 +245,7 @@ handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, User}, _Sender, Sta
     User1 = ft_user:name(ID, User, User0),
     User2 = ft_user:uuid(ID, UUID, User1),
     User3 = ft_user:grant(ID, [<<"users">>, UUID, <<"...">>], User2),
-    VC0 = vclock:fresh(),
-    VC = vclock:increment(Coordinator, VC0),
-    UserObj = #ft_obj{val=User3, vclock=VC},
+    UserObj = ft_obj:new(User3, Coordinator),
     snarl_vnode:put(Realm, UUID, UserObj, State),
     {reply, {ok, ReqID}, State};
 

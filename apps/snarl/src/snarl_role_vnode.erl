@@ -3,7 +3,6 @@
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([start_vnode/1,
          init/1,
@@ -32,8 +31,7 @@
 
 %% Writes
 -export([add/4,
-         gc/4,
-         set/4,
+         set_metadata/4,
          import/4,
          delete/3,
          grant/4,
@@ -43,12 +41,11 @@
 
 -ignore_xref([
               start_vnode/1,
-              gc/4,
               get/3,
               add/4,
               delete/3,
               grant/4,
-              set/4,
+              set_metadata/4,
               import/4,
               repair/4, sync_repair/4,
               revoke/4,
@@ -72,7 +69,7 @@ hash_object(Key, Obj) ->
 
 aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_role:get_(Realm, Key).
+    snarl_role:get(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -108,21 +105,15 @@ sync_repair(Preflist, ReqID, UUID, Obj) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, UUID, Attributes) ->
+set_metadata(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, UUID, Attributes},
+                                   {set_metadata, ReqID, UUID, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
 import(Preflist, ReqID, UUID, Import) ->
     riak_core_vnode_master:command(Preflist,
                                    {import, ReqID, UUID, Import},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-gc(Preflist, ReqID, UUID, GCable) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {gc, ReqID, UUID, GCable},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -169,9 +160,7 @@ handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Role}, _Sender, S
     Role0 = ft_role:new(ID),
     Role1 = ft_role:name(ID, Role, Role0),
     Role2 = ft_role:uuid(ID, UUID, Role1),
-    VC0 = vclock:fresh(),
-    VC = vclock:increment(Coordinator, VC0),
-    RoleObj = #ft_obj{val=Role2, vclock=VC},
+    RoleObj = ft_obj:new(Role2, Coordinator),
     snarl_vnode:put(Realm, UUID, RoleObj, State),
     {reply, {ok, ReqID}, State};
 

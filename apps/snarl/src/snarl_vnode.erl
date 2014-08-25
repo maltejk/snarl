@@ -2,7 +2,6 @@
 
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([init/5,
          mk_pfx/2,
@@ -29,10 +28,7 @@
           Mod, Fun, Args)).
 
 hash_object(Key, Obj) ->
-    Obj1 = Obj,
-    Hash = term_to_binary(erlang:phash2({Key, Obj1})),
-    lager:debug("Hashing Key: ~p + ~p -> ~p", [Key, Obj1, Hash]),
-    Hash.
+    term_to_binary(erlang:phash2({Key, Obj})).
 
 mkid() ->
     mkid(node()).
@@ -129,12 +125,12 @@ fold(Prefix, Fun, Acc0, Sender, State=#vstate{db=DB}) ->
                 end,
     {async, {fold, AsyncWork, FinishFun}, Sender, State}.
 
-put(Realm, Key, Obj, State) ->
+put(Realm, Key, Obj, State) when is_binary(Realm) ->
     Bucket = mk_pfx(Realm, State),
     ?FM(fifo_db, put, [State#vstate.db, Bucket, Key, Obj]),
     snarl_sync_tree:update(State#vstate.service, {Realm, Key}, Obj),
     riak_core_aae_vnode:update_hashtree(
-      Realm, Key, ft_obj:vclock(Obj), State#vstate.hashtrees).
+      Realm, Key, vc_bin(ft_obj:vclock(Obj)), State#vstate.hashtrees).
 
 change(Realm, UUID, Action, Vals, {ReqID, Coordinator} = ID,
        State=#vstate{state=Mod}) ->
@@ -179,9 +175,6 @@ delete(Realm, State=#vstate{db=DB}) ->
     Trans = ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []]),
     ?FM(fifo_db, transact, [State#vstate.db, Trans]),
     {ok, State}.
-
-load_obj({_, A} = ID, Mod, Obj) ->
-    ft_obj:update(Mod:load(ID, ft_obj:val(Obj)), A, Obj).
 
 handle_coverage({wipe, Realm, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
     Bucket = mk_pfx(Realm, State),
@@ -271,19 +264,15 @@ handle_command({repair, {Realm, UUID}, _VClock, Obj}, _Sender,
     end,
     {noreply, State};
 
-handle_command({get, ReqID, {Realm, UUID}}, _Sender, State=#vstate{state=Mod}) ->
+handle_command({get, ReqID, {Realm, UUID}}, _Sender, State) ->
     Res = case get(Realm, UUID, State) of
-              {ok, O} ->
-                  V0 = ft_obj:val(O),
-                  ID = {ReqID, load},
-                  case Mod:load(ID, V0) of
-                      _V when _V =:= V0 ->
-                          O;
-                      Hx ->
-                          O0 = ft_obj:update(O),
-                          O1 = O0#ft_obj{val=Hx},
-                          snarl_vnode:put(Realm, UUID, O1, State),
-                          O1
+              {ok, R} ->
+                  case  load_obj(ReqID, State#vstate.state, R) of
+                      R1 when R =/= R1 ->
+                          snarl_vnode:put(Realm, UUID, R1, State),
+                          R1;
+                      R1 ->
+                          R1
                   end;
               not_found ->
                   not_found
@@ -303,26 +292,6 @@ handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender, State) -
       {Realm, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
 
-
-handle_command({set, {ReqID, Coordinator}=ID, {Realm, UUID}, Attributes}, _Sender,
-               State=#vstate{state=Mod, bucket=Bucket}) ->
-    case get(Realm, UUID, State) of
-        {ok, O} ->
-            H0 = ft_obj:val(O),
-            H1 = Mod:load(ID, H0),
-            H2 = lists:foldr(
-                   fun ({Attribute, Value}, H) ->
-                           Mod:set_metadata(ID, Attribute, Value, H)
-                   end, H1, Attributes),
-            Obj = ft_obj:update(H2, Coordinator, O),
-            snarl_vnode:put(Realm, UUID, Obj, State),
-            {reply, {ok, ReqID}, State};
-        R ->
-            lager:error("[~s] tried to write to a non existing uuid: ~p",
-                        [Bucket, R]),
-            {reply, {ok, ReqID, not_found}, State}
-    end;
-
 handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data}, _Sender,
                State=#vstate{state=Mod}) ->
     H1 = Mod:load(ID, Data),
@@ -333,9 +302,7 @@ handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data}, _Sender
             snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         _R ->
-            VC0 = vclock:fresh(),
-            VC = vclock:increment(Coordinator, VC0),
-            Obj = #ft_obj{val=H2, vclock=VC},
+            Obj = ft_obj:new(H2, Coordinator),
             snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State}
     end;
@@ -363,11 +330,11 @@ handle_command({hashtree_pid, Node}, _, State) ->
     end;
 
 handle_command({rehash, {Realm, UUID}}, _,
-               State=#vstate{hashtrees=HT}) ->
+               State=#vstate{hashtrees=HT}) when is_binary(Realm) ->
     case get(Realm, UUID, State) of
         {ok, Obj} ->
             riak_core_aae_vnode:update_hashtree(
-              Realm, UUID, ft_obj:vclock(Obj), HT);
+              Realm, UUID, vc_bin(ft_obj:vclock(Obj)), HT);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
             riak_core_index_hashtree:delete({Realm, UUID}, HT)
@@ -393,18 +360,14 @@ handle_command(Message, _Sender, State) ->
 
 handle_handoff_data(Data, State=#vstate{state=SM}) ->
     {{Realm, UUID}, O} = binary_to_term(Data),
-    Obj = ft_obj:update(O),
     ID = snarl_vnode:mkid(handoff),
-    V = SM:load(ID, ft_obj:val(Obj)),
+    Obj = load_obj(ID, SM, O),
     Obj1 = case snarl_vnode:get(Realm, UUID, State) of
                {ok, OldObj} ->
-                   V1 = SM:load(ID, ft_obj:val(OldObj)),
-                   #ft_obj{
-                      vclock = vclock:merge([ft_obj:vclock(Obj),
-                                             ft_obj:vclock(OldObj)]),
-                      val = SM:merge(V, V1)};
+                   OldObj1 = load_obj(ID, SM, OldObj),
+                   ft_obj:merge(snarl_entity_read_fsm, [OldObj1, Obj]);
                not_found ->
-                   Obj#ft_obj{val=V}
+                   Obj
            end,
     snarl_vnode:put(Realm, UUID, Obj1, State),
     {reply, ok, State}.
@@ -432,3 +395,16 @@ handle_info({'DOWN', _, _, _, _}, State) ->
     {ok, State};
 handle_info(_, State) ->
     {ok, State}.
+
+
+load_obj({T, ID}, Mod, Obj) ->
+    V = ft_obj:val(Obj),
+    case Mod:load({T-1, ID}, V) of
+        V1 when V1 /= V ->
+            ft_obj:update(V1, ID, Obj);
+        _ ->
+            ft_obj:update(Obj)
+    end.
+
+vc_bin(VClock) ->
+    term_to_binary(lists:sort(VClock)).

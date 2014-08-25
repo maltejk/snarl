@@ -4,7 +4,6 @@
 -module(snarl_entity_read_fsm).
 -behavior(gen_fsm).
 -include("snarl.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -include("snarl_dtrace.hrl").
 
@@ -75,7 +74,7 @@ start(VNodeInfo, Op, {Realm, Entity}, Val) ->
     start(VNodeInfo, Op, {Realm, Entity}, Val, false).
 
 start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
-    ReqID = snarl_vnode:mk_reqid(),
+    ReqID = snarl_vnode:mkid(),
     snarl_entity_read_fsm_sup:start_read_fsm(
       [ReqID, VNodeInfo, Op, self(), {Realm, Entity}, Val, Raw]
      ),
@@ -234,7 +233,7 @@ terminate(_Reason, _SN, _SD) ->
 %% @pure
 %%
 %% @doc Given a list of `Replies' return the merged value.
--spec merge([vnode_reply()]) -> ft_obj() | not_found.
+-spec merge([vnode_reply()]) -> fifo:obj() | not_found.
 merge(Replies) ->
     Objs = [Obj || {_,Obj} <- Replies],
     ft_obj:merge(snarl_entity_read_fsm, Objs).
@@ -242,10 +241,12 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: ft_user:user() | ft_user:role() ]) ->
-                       ft_user:user() | ft_user:role().
-%%-spec reconcile([A :: ft_user:user() | ft_user:role() ]) -> ft_user:user();
-%%               ([A :: ft_user:role()]) -> ft_user:role().
+-type entity_list() ::
+        [fifo:user()] |
+        [fifo:org()] |
+        [fifo:role()].
+-spec reconcile(entity_list()) ->
+                       fifo:user() | user:role() | fifo:org().
 
 reconcile([V | Vs]) ->
     case {ft_user:is_a(V),
@@ -291,7 +292,7 @@ different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
 %% @impure
 %%
 %% @doc Repair any vnodes that do not have the correct object.
--spec repair(atom(), string(), any_obj(), [vnode_reply()]) -> io.
+-spec repair(atom(), string(), fifo:obj(), [vnode_reply()]) -> io.
 repair(_, _, _, []) -> io;
 
 repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
@@ -314,12 +315,3 @@ repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
 -spec unique([A::any()]) -> [A::any()].
 unique(L) ->
     sets:to_list(sets:from_list(L)).
-
-%%stat_name(snarl_user_vnode) ->
-%%    "user";
-%%stat_name(snarl_role_vnode) ->
-%%    "role";
-%%stat_name(snarl_org_vnode) ->
-%%    "org";
-%%stat_name(snarl_token_vnode) ->
-%%    "token".

@@ -2,7 +2,6 @@
 -module(snarl_console).
 
 -include("snarl.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([
          db_keys/1,
@@ -22,12 +21,6 @@
          aae_status/1,
          staged_join/1,
          ringready/1]).
-
--export([export_user/1,
-         import_user/1,
-         export_role/1,
-         import_role/1
-        ]).
 
 -export([add_role/1,
          delete_role/1,
@@ -55,10 +48,6 @@
               delete_user/1,
               delete_role/1,
               remove/1,
-              export_user/1,
-              import_user/1,
-              export_role/1,
-              import_role/1,
               down/1,
               reip/1,
               aae_status/1,
@@ -200,7 +189,7 @@ list_user([RealmS]) ->
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_user:get(Realm, UUID),
                       io:format("~36s ~-15s~n",
-                                [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+                                [UUID, ft_user:name(User)])
               end, Users),
     ok.
 list_role([RealmS]) ->
@@ -211,7 +200,7 @@ list_role([RealmS]) ->
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_role:get(Realm, UUID),
                       io:format("~36s ~-15s~n",
-                                [UUID, jsxd:get(<<"name">>, <<"-">>, User)])
+                                [UUID, ft_role:name(User)])
               end, Users),
     ok.
 
@@ -234,67 +223,6 @@ add_user([RealmS, User]) ->
         duplicate ->
             io:format("User '~s' already exists.~n", [User]),
             error
-    end.
-
-export_user([RealmS, UUID]) ->
-    Realm = list_to_binary(RealmS),
-    case snarl_user:get(Realm, list_to_binary(UUID)) of
-        {ok, UserObj} ->
-            io:format("~s~n", [jsx:encode(jsxd:update(<<"password">>, fun base64:encode/1, UserObj))]),
-            ok;
-        _ ->
-            error
-    end.
-
-import_user([RealmS, File]) ->
-    case file:read_file(File) of
-        {error,enoent} ->
-            io:format("That file does not exist or is not an absolute path.~n"),
-            error;
-        {ok, B} ->
-            Realm = list_to_binary(RealmS),
-            JSON = jsx:decode(B),
-            JSX = jsxd:from_list(JSON),
-            UUID = case jsxd:get([<<"uuid">>], JSX) of
-                       {ok, U} ->
-                           U;
-                       undefined ->
-                           uuid:uuid4s()
-                   end,
-            As = jsxd:thread([{set, [<<"uuid">>], UUID},
-                              {update, [<<"password">>],  fun base64:decode/1}],
-                             JSX),
-            snarl_user:import(Realm, UUID, statebox:new(fun() -> As end))
-    end.
-
-
-export_role([RealmS, UUID]) ->
-    Realm = list_to_binary(RealmS),
-    case snarl_role:get(Realm, list_to_binary(UUID)) of
-        {ok, RoleObj} ->
-            io:format("~s~n", [jsx:encode(RoleObj)]),
-            ok;
-        _ ->
-            error
-    end.
-
-import_role([RealmS, File]) ->
-    case file:read_file(File) of
-        {error,enoent} ->
-            io:format("That file does not exist or is not an absolute path.~n"),
-            error;
-        {ok, B} ->
-            Realm = list_to_binary(RealmS),
-            JSON = jsx:decode(B),
-            JSX = jsxd:from_list(JSON),
-            UUID = case jsxd:get([<<"uuid">>], JSX) of
-                       {ok, U} ->
-                           U;
-                       undefined ->
-                           uuid:uuid4s()
-                   end,
-            As = jsxd:thread([{set, [<<"uuid">>], UUID}], JSX),
-            snarl_role:import(Realm, UUID, statebox:new(fun() -> As end))
     end.
 
 add_role([RealmS, Role]) ->

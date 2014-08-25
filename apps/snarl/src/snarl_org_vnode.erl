@@ -3,7 +3,6 @@
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
--include_lib("fifo_dt/include/ft.hrl").
 
 -export([start_vnode/1,
          init/1,
@@ -33,7 +32,7 @@
 %% Writes
 -export([
          add/4,
-         set/4,
+         set_metadata/4,
          import/4,
          delete/3,
          add_trigger/4, remove_trigger/4,
@@ -49,7 +48,7 @@
               delete/3,
               add_trigger/4, remove_trigger/4,
               remove_target/4,
-              set/4,
+              set_metadata/4,
               import/4,
               repair/4, sync_repair/4
              ]).
@@ -70,7 +69,7 @@ hash_object(Key, Obj) ->
 
 aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_org:get_(Realm, Key).
+    snarl_org:get(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -105,9 +104,9 @@ sync_repair(Preflist, ReqID, UUID, Obj) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, UUID, Attributes) ->
+set_metadata(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, UUID, Attributes},
+                                   {set_metadata, ReqID, UUID, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -160,9 +159,7 @@ handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, St
     Org0 = ft_org:new(ID),
     Org1 = ft_org:name(ID, Org, Org0),
     Org2 = ft_org:uuid(ID, UUID, Org1),
-    VC0 = vclock:fresh(),
-    VC = vclock:increment(Coordinator, VC0),
-    OrgObj = #ft_obj{val=Org2, vclock=VC},
+    OrgObj = ft_obj:new(Org2, Coordinator),
     snarl_vnode:put(Realm, UUID, OrgObj, State),
     {reply, {ok, ReqID}, State};
 
