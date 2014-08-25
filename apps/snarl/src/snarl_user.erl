@@ -18,8 +18,7 @@
          join_org/3, leave_org/3, select_org/3,
          grant/3, revoke/3, revoke_prefix/3,
          allowed/3,
-         set/3,
-         set/4,
+         set_metadata/3,
          import/3,
          cache/2,
          add_key/4, revoke_key/3, keys/2,
@@ -379,21 +378,13 @@ create(Realm, UUID, User) ->
             duplicate
     end.
 
--spec set(Realm::binary(), User::fifo:user_id(), Attirbute::fifo:key(),
-          Value::fifo:value()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
-set(Realm, User, Attribute, Value) ->
-    set(Realm, User, [{Attribute, Value}]).
-
--spec set(Realm::binary(), User::fifo:user_id(),
-          Attirbutes::fifo:attr_list()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
-set(Realm, User, Attributes) ->
-    do_write(Realm, User, set, Attributes).
+-spec set_metadata(Realm::binary(), User::fifo:user_id(),
+                   Attirbutes::fifo:attr_list()) ->
+                          not_found |
+                          {error, timeout} |
+                          ok.
+set_metadata(Realm, User, Attributes) ->
+    do_write(Realm, User, set_metadata, Attributes).
 
 -spec passwd(Realm::binary(), User::fifo:user_id(), Passwd::binary()) ->
                     not_found |

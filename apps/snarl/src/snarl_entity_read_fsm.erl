@@ -241,10 +241,12 @@ merge(Replies) ->
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--spec reconcile([A :: ft_user:user() | ft_user:role() ]) ->
-                       ft_user:user() | ft_user:role().
-%%-spec reconcile([A :: ft_user:user() | ft_user:role() ]) -> ft_user:user();
-%%               ([A :: ft_user:role()]) -> ft_user:role().
+-type entity_list() ::
+        [fifo:user()] |
+        [fifo:org()] |
+        [fifo:role()].
+-spec reconcile(entity_list()) ->
+                       fifo:user() | user:role() | fifo:org().
 
 reconcile([V | Vs]) ->
     case {ft_user:is_a(V),

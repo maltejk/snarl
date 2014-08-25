@@ -7,7 +7,7 @@
          get/2, raw/2, lookup/2,
          add/2,
          delete/2,
-         set/3, set/4,
+         set_metadata/3,
          create/3,
          import/3,
          trigger/4,
@@ -225,19 +225,12 @@ delete(Realm, Org) ->
     Res.
 
 
--spec set(Realm::binary(), Org::fifo:org_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
-set(Realm, Org, Attribute, Value) ->
-    set(Realm, Org, [{Attribute, Value}]).
-
--spec set(Realm::binary(), Org::fifo:org_id(), Attirbutes::fifo:attr_list()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
-set(Realm, Org, Attributes) ->
-    do_write(Realm, Org, set, Attributes).
+-spec set_metadata(Realm::binary(), Org::fifo:org_id(), Attirbutes::fifo:attr_list()) ->
+                          not_found |
+                          {error, timeout} |
+                          ok.
+set_metadata(Realm, Org, Attributes) ->
+    do_write(Realm, Org, set_metadata, Attributes).
 
 
 %%%===================================================================

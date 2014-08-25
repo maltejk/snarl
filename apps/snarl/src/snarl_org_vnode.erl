@@ -32,7 +32,7 @@
 %% Writes
 -export([
          add/4,
-         set/4,
+         set_metadata/4,
          import/4,
          delete/3,
          add_trigger/4, remove_trigger/4,
@@ -48,7 +48,7 @@
               delete/3,
               add_trigger/4, remove_trigger/4,
               remove_target/4,
-              set/4,
+              set_metadata/4,
               import/4,
               repair/4, sync_repair/4
              ]).
@@ -104,9 +104,9 @@ sync_repair(Preflist, ReqID, UUID, Obj) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, UUID, Attributes) ->
+set_metadata(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, UUID, Attributes},
+                                   {set_metadata, ReqID, UUID, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 

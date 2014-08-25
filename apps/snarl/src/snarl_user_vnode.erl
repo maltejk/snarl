@@ -47,7 +47,7 @@
          passwd/4,
          join_org/4, leave_org/4, select_org/4,
          revoke_key/4,
-         set/4
+         set_metadata/4
         ]).
 
 -ignore_xref([
@@ -68,7 +68,7 @@
               revoke/4,
               revoke_key/4,
               revoke_prefix/4,
-              set/4,
+              set_metadata/4,
               handle_info/2,
               join_org/4, leave_org/4, select_org/4,
               start_vnode/1
@@ -158,9 +158,9 @@ remove_yubikey(Preflist, ReqID, {Realm, UUID}, KeyId) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, {Realm, UUID}, Attributes) ->
+set_metadata(Preflist, ReqID, {Realm, UUID}, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, {Realm, UUID}, Attributes},
+                                   {set_metadata, ReqID, {Realm, UUID}, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 

@@ -9,7 +9,7 @@
          lookup/2, lookup_/2,
          add/2, delete/2,
          grant/3, revoke/3,
-         set/3, set/4,
+         set_metadata/3,
          create/3,
          revoke_prefix/3,
          import/3, wipe/2
@@ -199,21 +199,13 @@ revoke(Realm, Role, Permission) ->
 revoke_prefix(Realm, Role, Prefix) ->
     do_write(Realm, Role, revoke_prefix, Prefix).
 
--spec set(Realm::binary(), Role::fifo:role_id(), Attirbute::fifo:key(),
-          Value::fifo:value()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
-set(Realm, Role, Attribute, Value) ->
-    set(Realm, Role, [{Attribute, Value}]).
-
--spec set(Realm::binary(), Role::fifo:role_id(),
+-spec set_metadata(Realm::binary(), Role::fifo:role_id(),
           Attirbutes::fifo:attr_list()) ->
                  not_found |
                  {error, timeout} |
                  ok.
-set(Realm, Role, Attributes) ->
-    do_write(Realm, Role, set, Attributes).
+set_metadata(Realm, Role, Attributes) ->
+    do_write(Realm, Role, set_metadata, Attributes).
 
 %%%===================================================================
 %%% Internal Functions

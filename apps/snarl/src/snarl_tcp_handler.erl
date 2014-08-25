@@ -44,16 +44,10 @@ message({org, list, Realm, Requirements, Full}, State) ->
 message({org, get, Realm, Org}, State) ->
     {reply, snarl_org:get(Realm, Org), State};
 
-message({org, set, Realm, Org, Attribute, Value}, State) when
+message({org, set_metadata, Realm, Org, Attributes}, State) when
       is_binary(Org) ->
     {reply,
-     snarl_org:set(Realm, Org, Attribute, Value),
-     State};
-
-message({org, set, Realm, Org, Attributes}, State) when
-      is_binary(Org) ->
-    {reply,
-     snarl_org:set(Realm, Org, Attributes),
+     snarl_org:set_metadata(Realm, Org, Attributes),
      State};
 
 message({org, add, Realm, Org}, State) ->
@@ -138,16 +132,10 @@ message({user, yubikeys, remove, Realm, User, KeyId}, State) when
      snarl_user:remove_yubikey(Realm, User, KeyId),
      State};
 
-message({user, set, Realm, User, Attribute, Value}, State) when
+message({user, set_metadata, Realm, User, Attributes}, State) when
       is_binary(User) ->
     {reply,
-     snarl_user:set(Realm, User, Attribute, Value),
-     State};
-
-message({user, set, Realm, User, Attributes}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:set(Realm, User, Attributes),
+     snarl_user:set_metadata(Realm, User, Attributes),
      State};
 
 message({user, lookup, Realm, User}, State) when is_binary(User) ->
@@ -309,16 +297,10 @@ message({role, list, Realm, Requirements, Full}, State) ->
 message({role, get, Realm, Role}, State) ->
     {reply, snarl_role:get(Realm, Role), State};
 
-message({role, set, Realm, Role, Attribute, Value}, State) when
+message({role, set_metadata, Realm, Role, Attributes}, State) when
       is_binary(Role) ->
     {reply,
-     snarl_role:set(Realm, Role, Attribute, Value),
-     State};
-
-message({role, set, Realm, Role, Attributes}, State) when
-      is_binary(Role) ->
-    {reply,
-     snarl_role:set(Realm, Role, Attributes),
+     snarl_role:set_metadata(Realm, Role, Attributes),
      State};
 
 message({role, add, Realm, Role}, State) ->

@@ -62,13 +62,13 @@ stop(_State) ->
 init_folsom() ->
     DBMs = [fold_keys, fold, get, put, delete, transact],
     UserMs = [wipe, get, list, list_all, sync_repair, revoke_prefix, add_key,
-              revoke_key, add_yubikey, remove_yubikey, add, set, passwd, import,
+              revoke_key, add_yubikey, remove_yubikey, add, set_metadata, passwd, import,
               join, leave, join_org, select_org, leave_org, delete, grant,
               revoke, lookup, find_key],
     RoleMs = [wipe, lookup, get, list, list_all, sync_repair, import, add,
-              delete, grant, revoke, revoke_prefix, set],
+              delete, grant, revoke, revoke_prefix, set_metadata],
     OrgMs = [wipe, lookup, get, list, list_all, sync_repair, add_triger,
-             remove_target, remove_trigger, import, add, delete, set],
+             remove_target, remove_trigger, import, add, delete, set_metadata],
     TokenMs = [get, add, delete],
     [folsom_metrics:new_histogram(Name, slide, 60) ||
         Name <-

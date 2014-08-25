@@ -292,26 +292,6 @@ handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender, State) -
       {Realm, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
 
-
-handle_command({set, {ReqID, Coordinator}=ID, {Realm, UUID}, Attributes}, _Sender,
-               State=#vstate{state=Mod, bucket=Bucket}) ->
-    case get(Realm, UUID, State) of
-        {ok, O} ->
-            H0 = ft_obj:val(O),
-            H1 = Mod:load(ID, H0),
-            H2 = lists:foldr(
-                   fun ({Attribute, Value}, H) ->
-                           Mod:set_metadata(ID, Attribute, Value, H)
-                   end, H1, Attributes),
-            Obj = ft_obj:update(H2, Coordinator, O),
-            snarl_vnode:put(Realm, UUID, Obj, State),
-            {reply, {ok, ReqID}, State};
-        R ->
-            lager:error("[~s] tried to write to a non existing uuid: ~p",
-                        [Bucket, R]),
-            {reply, {ok, ReqID, not_found}, State}
-    end;
-
 handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data}, _Sender,
                State=#vstate{state=Mod}) ->
     H1 = Mod:load(ID, Data),

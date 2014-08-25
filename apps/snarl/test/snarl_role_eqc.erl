@@ -84,8 +84,7 @@ command(S) ->
            {call, ?M, revoke, [maybe_a_uuid(S), permission()]},
 
            %% Metadata
-           {call, ?M, set, [maybe_a_uuid(S), metadata_kvs()]},
-           {call, ?M, set, [maybe_a_uuid(S), non_blank_string(), metadata_value()]},
+           {call, ?M, set_metadata, [maybe_a_uuid(S), metadata_kvs()]},
 
            %% Meta command
            {call, ?M, handoff_handon, []}
@@ -131,9 +130,7 @@ lookup_({N, _}) ->
 ?FWD(wipe).
 
 
-?FWD2(set).
-?FWD3(set).
-
+?FWD2(set_metadata).
 
  next_state(S, duplicate, {call, _, add, [_, _Role]}) ->
     S#state{next_uuid=uuid:uuid4s()};
@@ -147,44 +144,39 @@ next_state(S, _V, {call, _, delete, [UUIDAndName]}) ->
 next_state(S, _V, {call, _, wipe, [UUIDAndName]}) ->
     S#state{added = lists:delete(UUIDAndName,  S#state.added)};
 
-next_state(S = #state{metadata=Ms}, _V,
-           {call, _, set, [{_, UUID}, K, delete]}) ->
-    case has_uuid(S, UUID) of
-        false ->
-            S;
-        true ->
-            case lists:keyfind(UUID, 1, Ms) of
-                {UUID, M} ->
-                    Ms1 = proplists:delete(UUID, Ms),
-                    S#state{metadata = [{UUID, orddict:erase(K, M)} | Ms1]};
-                _  ->
-                    S
-            end
-    end;
-
-next_state(S = #state{metadata=Ms}, _V,
-           {call, _, set, [{_, UUID}, K, V]}) ->
-    case has_uuid(S, UUID) of
-        false ->
-            S;
-        true ->
-            case lists:keyfind(UUID, 1, Ms) of
-                {UUID, M} ->
-                    Ms1 = proplists:delete(UUID, Ms),
-                    S#state{metadata = [{UUID, orddict:store(K, V, M)} | Ms1]};
-                _  ->
-                    S#state{metadata = [{UUID, [{K, V}]} | Ms]}
-            end
-    end;
-
-next_state(S, R,
-           {call, Mod, set, [UU, KVs]}) ->
+next_state(S, _R,
+           {call, _, set_metadata, [UU, KVs]}) ->
     lists:foldl(fun({K, V}, SAcc) ->
-                       next_state(SAcc, R, {call, Mod, set, [UU, K, V]})
+                        do_metadata(SAcc, UU, K, V)
                end, S, KVs);
 
 next_state(S, _V, _C) ->
     S.
+
+do_metadata(S = #state{metadata=Ms}, UUID, K, V) ->
+    case has_uuid(S, UUID) of
+        false ->
+            S;
+        true ->
+            case lists:keyfind(UUID, 1, Ms) of
+                {UUID, M} ->
+                    Ms1 = proplists:delete(UUID, Ms),
+                    Ms2 = case V of
+                              delete ->
+                                  [{UUID, orddict:erase(K, M)} | Ms1];
+                              _ ->
+                                  [{UUID, orddict:store(K, V, M)} | Ms1]
+                          end,
+                    S#state{metadata = Ms2};
+                _  ->
+                    case V of
+                        delete ->
+                            S;
+                        _ ->
+                            S#state{metadata = [{UUID, [{K, V}]} | Ms]}
+                    end
+            end
+    end.
 
 dynamic_precondition(S, {call,snarl_role_eqc, lookup_, [{Name, UUID}]}) ->
     dynamic_precondition(S, {call,snarl_role_eqc, lookup, [{Name, UUID}]});
@@ -222,16 +214,10 @@ postcondition(S, {call, _, revoke, [{_, UUID}, _]}, ok) ->
     has_uuid(S, UUID);
 
 %% Metadata
-postcondition(S, {call, _, set, [{_, UUID}, _, _]}, not_found) ->
+postcondition(S, {call, _, set_metadata, [{_, UUID}, _]}, not_found) ->
     not has_uuid(S, UUID);
 
-postcondition(S, {call, _, set, [{_, UUID}, _, _]}, ok) ->
-    has_uuid(S, UUID);
-
-postcondition(S, {call, _, set, [{_, UUID}, _]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, set, [{_, UUID}, _]}, ok) ->
+postcondition(S, {call, _, set_metadata, [{_, UUID}, _]}, ok) ->
     has_uuid(S, UUID);
 
 %% List
