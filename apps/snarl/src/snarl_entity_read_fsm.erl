@@ -201,12 +201,13 @@ wait_for_n(timeout, SD) ->
 finalize(timeout, SD=#state{
                         vnode=VNode,
                         replies=Replies,
+                        bucket=Realm,
                         entity=Entity}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
             lager:warning("[read] performing read repair on '~p'.", [Entity]),
-            repair(VNode, Entity, MObj, Replies),
+            repair(VNode, {Realm, Entity}, MObj, Replies),
             {stop, normal, SD};
         false ->
             {stop, normal, SD}
