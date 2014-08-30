@@ -9,12 +9,7 @@
 
 -ignore_xref([start_link/4]).
 
--record(state, {socket,
-                transport,
-                ok,
-                error,
-                closed}).
-
+-record(state, {socket, transport, ok, error, closed}).
 
 start_link(ListenerPid, Socket, Transport, Opts) ->
     proc_lib:start_link(?MODULE, init, [[ListenerPid, Socket, Transport, Opts]]).
@@ -42,19 +37,19 @@ handle_info({_OK, Socket, BinData}, State = #state{
             {ok, Tree} = snarl_sync_tree:get_tree(),
             Transport:send(Socket, term_to_binary({ok, Tree})),
             {noreply, State};
-        {raw, System, UUID} ->
-            Data = System:raw(UUID),
+        {raw, System, Realm, UUID} ->
+            Data = System:raw(Realm, UUID),
             Transport:send(Socket, term_to_binary(Data)),
             {noreply, State};
-        {repair, System, UUID, Obj} ->
-            System:sync_repair(UUID, Obj),
+        {repair, System, Realm, UUID, Obj} ->
+            System:sync_repair(Realm, UUID, Obj),
             {noreply, State};
-        {delete, System, UUID} ->
-            System:delete(UUID),
+        {delete, System, Realm, UUID} ->
+            System:delete(Realm, UUID),
             {noreply, State};
-        {write, Node, VNode, System, Bucket, Entity, Op, Val} ->
-            NVS = {{remote, Node}, VNode, System, Bucket},
-            snarl_entity_write_fsm:write(NVS, Entity, Op, Val),
+        {write, Node, VNode, System, Realm, UUID, Op, Val} ->
+            NVS = {{remote, Node}, VNode, System},
+            snarl_entity_write_fsm:write(NVS, {Realm, UUID}, Op, Val),
             {noreply, State}
     end;
 

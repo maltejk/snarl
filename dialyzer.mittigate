@@ -42,3 +42,5 @@
 ^snarl_org_state.erl:258: The call uuid:uuid5(UUID::any(),binary()) breaks the contract (NamespaceOrUuid::atom() | uuid_string() | uuid(),Name::string()) -> uuid()
 ^snarl_vnode.erl:101:
 ^snarl_vnode.erl:308:
+^eunit
+^meck

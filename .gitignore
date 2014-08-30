@@ -26,3 +26,6 @@ snarl_template.xml
 standalone.config
 .eqc-info
 current_counterexample.eqc
+.rebar
+*.log
+*.log.?

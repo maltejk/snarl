@@ -2,12 +2,12 @@
 
 USER=snarl
 GROUP=$USER
-DBID=3
+DBID=4
 BACKUP_FILE=/var/db/snarl/backup_$DBID.tar.gz
 
 case $2 in
     PRE-INSTALL)
-        if grep '^Image: base64 13.[234].*$' /etc/product
+        if grep '^Image: base64 1[43].[1234].*$' /etc/product
         then
             echo "Image version supported"
         else
@@ -60,20 +60,17 @@ case $2 in
             cp ${CONFFILE}.example ${CONFFILE}
             sed --in-place -e "s/127.0.0.1/${IP}/g" ${CONFFILE}
             md5sum ${CONFFILE} > ${CONFFILE}.md5
-        elif [ -f ${CONFFILE}.md5 ]
+        elif [ -f ${CONFFILE}.md5 ] && md5sum --quiet --strict -c ${CONFFILE}.md5 2&> /dev/null
         then
-            if md5sum --quiet --strict -c ${CONFFILE}.md5 2&> /dev/null
-            then
-                echo "The config was not adjusted we'll regenerate it."
-                cp ${CONFFILE}.example ${CONFFILE}
-                sed --in-place -e "s/127.0.0.1/${IP}/g" ${CONFFILE}
-                md5sum ${CONFFILE} > ${CONFFILE}.md5
-            fi
+            echo "The config was not adjusted we'll regenerate it."
+            cp ${CONFFILE}.example ${CONFFILE}
+            sed --in-place -e "s/127.0.0.1/${IP}/g" ${CONFFILE}
+            md5sum ${CONFFILE} > ${CONFFILE}.md5
         else
             mv ${CONFFILE} ${CONFFILE}.old
-            cat ${CONFFILE}.old | grep -v mdns.server | grep -v anti_entropy.max_open_files | grep -v db.dir | grep -v anti_entropy.write_buffer_size | grep -v platform_data_dir > ${CONFFILE}
-            echo anti_entropy.write_buffer_size_min = 4MB >> ${CONFFILE}
-            echo anti_entropy.write_buffer_size_max = 4MB >> ${CONFFILE}
+            cat ${CONFFILE}.old \
+                | sed 's/^[ ]*data_dir/platform_data_dir/' \
+                      > ${CONFFILE}
         fi
         ;;
 esac

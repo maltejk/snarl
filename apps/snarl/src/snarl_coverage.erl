@@ -11,11 +11,11 @@
          start/3
         ]).
 
+-ignore_xref([start/3]).
+
 -record(state, {replies, r, reqid, from}).
 
-
 start(VNodeMaster, NodeCheckService, Request) ->
-
     ReqID = mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, something_else},

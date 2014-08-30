@@ -27,7 +27,7 @@
               start_link/5,
               start_link/6,
               terminate/3,
-              waiting/2
+              waiting/2, write/3
              ]).
 
 %% req_id: The request id so the caller can verify the response.
@@ -62,48 +62,42 @@
 %%% API
 %%%===================================================================
 
-start_link({VNode, System, Bucket}, ReqID, From, Entity, Op) ->
-    start_link({node(), VNode, System, Bucket}, ReqID, From, Entity, Op);
+start_link({VNode, System}, ReqID, From, {Realm, Entity}, Op) ->
+    start_link({node(), VNode, System}, ReqID, From, {Realm, Entity}, Op);
 
-start_link({Node, VNode, System, Bucket}, ReqID, From, Entity, Op) ->
-    start_link({Node, VNode, System, Bucket}, ReqID, From, Entity, Op, undefined).
+start_link({Node, VNode, System}, ReqID, From, {Realm, Entity}, Op) ->
+    start_link({Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, undefined).
 
-start_link({VNode, System, Bucket}, ReqID, From, Entity, Op, Val) ->
-    start_link({node(), VNode, System, Bucket}, ReqID, From, Entity, Op, Val);
+start_link({VNode, System}, ReqID, From, {Realm, Entity}, Op, Val) ->
+    start_link({node(), VNode, System}, ReqID, From, {Realm, Entity}, Op, Val);
 
-start_link({Node, VNode, System, Bucket}, ReqID, From, Entity, Op, Val) ->
-    gen_fsm:start_link(?MODULE, [{Node, VNode, System, Bucket}, ReqID, From,
-                                 Entity, Op, Val], []).
+start_link({Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val) ->
+    gen_fsm:start_link(?MODULE, [{Node, VNode, System}, ReqID, From,
+                                 {Realm, Entity}, Op, Val], []).
 
-write({VNode, System}, User, Op) ->
-    write({node(), VNode, System}, User, Op);
+write({VNode, System}, {Realm, Entity}, Op) ->
+    write({node(), VNode, System}, {Realm, Entity}, Op);
 
-write({Node, VNode, System}, User, Op) ->
-    write({Node, VNode, System, list_to_binary(atom_to_list(System))}, User, Op);
+write({Node, VNode, System}, {Realm, Entity}, Op) ->
+    write({Node, VNode, System}, {Realm, Entity}, Op, undefined).
 
-write({Node, VNode, System, Bucket}, User, Op) ->
-    write({Node, VNode, System, Bucket}, User, Op, undefined).
+write({VNode, System}, {Realm, Entity}, Op, Val) ->
+    write({node(), VNode, System}, {Realm, Entity}, Op, Val);
 
-write({VNode, System}, User, Op, Val) ->
-    write({node(), VNode, System}, User, Op, Val);
-
-write({Node, VNode, System}, User, Op, Val) ->
-    write({Node, VNode, System, list_to_binary(atom_to_list(System))}, User, Op, Val);
-
-write({{remote, Node}, VNode, System, Bucket}, User, Op, Val) ->
+write({{remote, Node}, VNode, System}, {Realm, Entity}, Op, Val) ->
     lager:info("[sync-write:~p] executing sync write", [System]),
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System, Bucket}, ReqID, undefined, User, Op, Val]);
+    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, undefined, {Realm, Entity}, Op, Val]);
 
-write({Node, VNode, System, Bucket}, User, Op, Val) ->
+write({Node, VNode, System}, {Realm, Entity}, Op, Val) ->
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System, Bucket}, ReqID, self(), User, Op, Val]),
+    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, self(), {Realm, Entity}, Op, Val]),
     receive
         {ReqID, ok} ->
-            snarl_sync:sync_op(Node, VNode, System, Bucket, User, Op, Val),
+            snarl_sync:sync_op(Node, VNode, System, Realm, Entity, Op, Val),
             ok;
         {ReqID, ok, Result} ->
-            snarl_sync:sync_op(Node, VNode, System, Bucket, User, Op, Val),
+            snarl_sync:sync_op(Node, VNode, System, Realm, Entity, Op, Val),
             {ok, Result}
             %%;
             %%Other ->
@@ -118,11 +112,11 @@ write({Node, VNode, System, Bucket}, User, Op, Val) ->
 
 %% @doc Initialize the state data.
 
-init([{Node, VNode, System, Bucket}, ReqID, From, Entity, Op, Val]) ->
+init([{Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val]) ->
     {N, _R, W} = ?NRW(System),
     SD = #state{req_id=ReqID,
                 from=From,
-                bucket=Bucket,
+                bucket=Realm,
                 entity=Entity,
                 op=Op,
                 vnode=VNode,
@@ -136,12 +130,12 @@ init([{Node, VNode, System, Bucket}, ReqID, From, Entity, Op, Val]) ->
 
 %% @doc Prepare the write by calculating the _preference list_.
 prepare(timeout, SD0=#state{
-                        bucket=Bucket,
+                        bucket=Realm,
                         entity = Entity,
                         n = N,
                         system = System
                        }) ->
-    DocIdx = riak_core_util:chash_key({Bucket, Entity}),
+    DocIdx = riak_core_util:chash_key({Realm, Entity}),
     Preflist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Preflist},
     {next_state, execute, SD, 0}.
@@ -149,6 +143,7 @@ prepare(timeout, SD0=#state{
 %% @doc Execute the write request and then go into waiting state to
 %% verify it has meets consistency requirements.
 execute(timeout, SD0=#state{req_id=ReqID,
+                            bucket=Realm,
                             entity=Entity,
                             op=Op,
                             val=Val,
@@ -157,9 +152,9 @@ execute(timeout, SD0=#state{req_id=ReqID,
                             preflist=Preflist}) ->
     case Val of
         undefined ->
-            VNode:Op(Preflist, {ReqID, Cordinator}, Entity);
+            VNode:Op(Preflist, {ReqID, Cordinator}, {Realm, Entity});
         _ ->
-            VNode:Op(Preflist, {ReqID, Cordinator}, Entity, Val)
+            VNode:Op(Preflist, {ReqID, Cordinator}, {Realm, Entity}, Val)
     end,
     {next_state, waiting, SD0}.
 

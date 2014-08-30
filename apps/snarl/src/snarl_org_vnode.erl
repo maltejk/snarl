@@ -32,7 +32,7 @@
 %% Writes
 -export([
          add/4,
-         set/4,
+         set_metadata/4,
          import/4,
          delete/3,
          add_trigger/4, remove_trigger/4,
@@ -48,7 +48,7 @@
               delete/3,
               add_trigger/4, remove_trigger/4,
               remove_target/4,
-              set/4,
+              set_metadata/4,
               import/4,
               repair/4, sync_repair/4
              ]).
@@ -67,9 +67,9 @@ master() ->
 hash_object(Key, Obj) ->
     snarl_vnode:hash_object(Key, Obj).
 
-aae_repair(_, Key) ->
+aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_org:get_(Key).
+    snarl_org:get(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -104,9 +104,9 @@ sync_repair(Preflist, ReqID, UUID, Obj) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-set(Preflist, ReqID, UUID, Attributes) ->
+set_metadata(Preflist, ReqID, UUID, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set, ReqID, UUID, Attributes},
+                                   {set_metadata, ReqID, UUID, Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -149,28 +149,25 @@ remove_target(Preflist, ReqID, Org, Target) ->
 %%% VNode
 %%%===================================================================
 init([Part]) ->
-    snarl_vnode:init(Part, <<"org">>, ?SERVICE, ?MODULE, snarl_org_state).
+    snarl_vnode:init(Part, <<"org">>, ?SERVICE, ?MODULE, ft_org).
 
 %%%===================================================================
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator} = ID, UUID, Org}, _Sender, State) ->
-    Org0 = snarl_org_state:new(ID),
-    Org1 = snarl_org_state:name(ID, Org, Org0),
-    Org2 = snarl_org_state:uuid(ID, UUID, Org1),
-    VC0 = vclock:fresh(),
-    VC = vclock:increment(Coordinator, VC0),
-    OrgObj = #snarl_obj{val=Org2, vclock=VC},
-    snarl_vnode:put(UUID, OrgObj, State),
+handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, State) ->
+    Org0 = ft_org:new(ID),
+    Org1 = ft_org:name(ID, Org, Org0),
+    Org2 = ft_org:uuid(ID, UUID, Org1),
+    OrgObj = ft_obj:new(Org2, Coordinator),
+    snarl_vnode:put(Realm, UUID, OrgObj, State),
     {reply, {ok, ReqID}, State};
 
 handle_command(Message, Sender, State) ->
     snarl_vnode:handle_command(Message, Sender, State).
 
-handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
-    Acc = fifo_db:fold(State#vstate.db, <<"org">>, Fun, Acc0),
-    {reply, Acc, State};
+handle_handoff_command(?FOLD_REQ{} = FR, Sender, State) ->
+    handle_command(FR, Sender, State);
 
 handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
     handle_command(Req, Sender, State);
@@ -195,21 +192,7 @@ handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
 handle_handoff_data(Data, State) ->
-    {Org, #snarl_obj{val = Vin} = Obj} = binary_to_term(Data),
-    ID = snarl_vnode:mkid(handoff),
-    V = snarl_org_state:load(ID, Vin),
-    case fifo_db:get(State#vstate.db, <<"org">>, Org) of
-        {ok, #snarl_obj{val = V0}} ->
-            V1 = snarl_org_state:load(ID, V0),
-            OrgObj = Obj#snarl_obj{val = snarl_org_state:merge(V, V1)},
-            snarl_vnode:put(Org, OrgObj, State);
-        not_found ->
-            VC0 = vclock:fresh(),
-            VC = vclock:increment(node(), VC0),
-            OrgObj = #snarl_obj{val=V, vclock=VC},
-            snarl_vnode:put(Org, OrgObj, State)
-    end,
-    {reply, ok, State}.
+    snarl_vnode:handle_handoff_data(Data, State).
 
 encode_handoff_item(Org, Data) ->
     term_to_binary({Org, Data}).

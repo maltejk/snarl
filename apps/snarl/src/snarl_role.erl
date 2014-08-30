@@ -1,67 +1,66 @@
 -module(snarl_role).
--include("snarl.hrl").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
-         sync_repair/2,
-         ping/0,
-         list/0, list/2, list_/0,
-         get/1, get_/1, raw/1,
-         lookup/1, lookup_/1,
-         add/1, delete/1,
-         grant/2, revoke/2,
-         set/2, set/3,
-         create/2,
-         revoke_prefix/2,
-         import/2, wipe/1
+         sync_repair/3,
+         list/0, list/1, list/3, list_/1,
+         get/2, raw/2,
+         lookup/2, lookup_/2,
+         add/2, delete/2,
+         grant/3, revoke/3,
+         set_metadata/3,
+         create/3,
+         revoke_prefix/3,
+         import/3, wipe/2
         ]).
 
 -ignore_xref([
-              wipe/1,
-              list_/0,
-              ping/0, create/2, raw/1, sync_repair/2]).
+              wipe/2,
+              list_/1,
+              create/3, raw/2, sync_repair/3,
+              import/3, lookup/2
+             ]).
 
 -define(TIMEOUT, 5000).
 
+-define(FM(Met, Mod, Fun, Args),
+        folsom_metrics:histogram_timed_update(
+          {snarl, role, Met},
+          Mod, Fun, Args)).
+
 %% Public API
 
-wipe(UUID) ->
-    snarl_coverage:start(snarl_role_vnode_master, snarl_role,
-                         {wipe, UUID}).
+wipe(Realm, UUID) ->
+    ?FM(wipe, snarl_coverage, start,
+        [snarl_role_vnode_master, snarl_role, {wipe, Realm, UUID}]).
 
-sync_repair(UUID, Obj) ->
-    do_write(UUID, sync_repair, Obj).
+sync_repair(Realm, UUID, Obj) ->
+    do_write(Realm, UUID, sync_repair, Obj).
 
-%% @doc Pings a random vnode to make sure communication is functional
-ping() ->
-    DocIdx = riak_core_util:chash_key({<<"ping">>, term_to_binary(now())}),
-    PrefList = riak_core_apl:get_primary_apl(DocIdx, 1, snarl_role),
-    [{IndexNode, _Type}] = PrefList,
-    riak_core_vnode_master:sync_spawn_command(IndexNode, ping, snarl_role_vnode_master).
+import(Realm, Role, Data) ->
+    do_write(Realm, Role, import, Data).
 
-import(Role, Data) ->
-    do_write(Role, import, Data).
-
--spec lookup(Role::binary()) ->
+-spec lookup(Realm::binary(), Role::binary()) ->
                     not_found |
                     {error, timeout} |
                     {ok, Role::fifo:role()}.
-lookup(Role) ->
-    case lookup_(Role) of
+lookup(Realm, Role) ->
+    case lookup_(Realm, Role) of
         {ok, Obj} ->
-            {ok, snarl_role_state:to_json(Obj)};
+            {ok, ft_role:to_json(Obj)};
         R ->
             R
     end.
 
--spec lookup_(Role::binary()) ->
+-spec lookup_(Realm::binary(), Role::binary()) ->
                      not_found |
                      {error, timeout} |
-                     {ok, Role::#?ROLE{}}.
-lookup_(Role) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {lookup, Role}),
+                     {ok, Role::fifo:role()}.
+lookup_(Realm, Role) ->
+    {ok, Res} =
+        ?FM(lookup, snarl_coverage,start,
+            [snarl_role_vnode_master, snarl_role, {lookup, Realm, Role}]),
     R0 = lists:foldl(fun (not_found, Acc) ->
                              Acc;
                          (R, _) ->
@@ -69,60 +68,50 @@ lookup_(Role) ->
                      end, not_found, Res),
     case R0 of
         {ok, UUID} ->
-            snarl_role:get_(UUID);
+            snarl_role:get(Realm, UUID);
         R ->
             R
     end.
 
--spec get(Role::fifo:role_id()) ->
+-spec get(Realm::binary(), Role::fifo:role_id()) ->
                  not_found |
                  {error, timeout} |
                  {ok, Role::fifo:role()}.
-get(Role) ->
-    case get_(Role) of
-        {ok, RoleObj} ->
-            {ok, snarl_role_state:to_json(RoleObj)};
-        R  ->
-            R
-    end.
-
--spec get_(Role::fifo:role_id()) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, Role::#?ROLE{}}.
-get_(Role) ->
-    case snarl_entity_read_fsm:start(
-           {snarl_role_vnode, snarl_role},
-           get, Role
-          ) of
+get(Realm, Role) ->
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_role_vnode, snarl_role}, get, {Realm, Role}]) of
         {ok, not_found} ->
             not_found;
         R ->
             R
     end.
 
-raw(Role) ->
-    case snarl_entity_read_fsm:start({snarl_role_vnode, snarl_role}, get,
-                                     Role, undefined, true) of
+raw(Realm, Role) ->
+    case ?FM(get, snarl_entity_read_fsm, start,
+             [{snarl_role_vnode, snarl_role}, get, {Realm, Role}, undefined, true]) of
         {ok, not_found} ->
             not_found;
         R ->
             R
     end.
-
--spec list() -> {ok, [fifo:role_id()]} |
-                not_found |
-                {error, timeout}.
 
 list() ->
-    snarl_coverage:start(
-      snarl_role_vnode_master, snarl_role,
-      list).
+    ?FM(list_all, snarl_coverage, start,
+        [snarl_role_vnode_master, snarl_role, list]).
 
-list_() ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {list, [], true, true}),
+-spec list(Realm::binary()) -> {ok, [fifo:role_id()]} |
+                               not_found |
+                               {error, timeout}.
+
+list(Realm) ->
+    ?FM(list, snarl_coverage, start,
+        [snarl_role_vnode_master, snarl_role, {list, Realm}]).
+
+list_(Realm) ->
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_role_vnode_master, snarl_role,
+             {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
@@ -131,110 +120,101 @@ list_() ->
 %% @doc Lists all vm's and fiters by a given matcher set.
 %% @end
 %%--------------------------------------------------------------------
--spec list([fifo:matcher()], boolean()) -> {error, timeout} | {ok, [fifo:uuid()]}.
+-spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
+                  {error, timeout} | {ok, [fifo:uuid()]}.
 
-list(Requirements, true) ->
-    {ok, Res} = snarl_full_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {list, Requirements, true}),
-    Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)};
-
-list(Requirements, false) ->
-    {ok, Res} = snarl_coverage:start(
-                  snarl_role_vnode_master, snarl_role,
-                  {list, Requirements}),
+list(Realm, Requirements, Full)
+  when Full == true orelse Full == false ->
+    {ok, Res} =
+        ?FM(list, snarl_full_coverage, start,
+            [snarl_role_vnode_master, snarl_role,
+             {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),
     {ok,  lists:sort(Res1)}.
 
--spec add(Role::binary()) ->
+-spec add(Realm::binary(), Role::binary()) ->
                  {ok, UUID::fifo:role_id()} |
                  douplicate |
                  {error, timeout}.
 
-add(Role) ->
-    UUID = list_to_binary(uuid:to_string(uuid:uuid4())),
-    create(UUID, Role).
+add(Realm, Role) ->
+    UUID = uuid:uuid4s(),
+    create(Realm, UUID, Role).
 
-create(UUID, Role) ->
-    case snarl_role:lookup_(Role) of
+create(Realm, UUID, Role) ->
+    case snarl_role:lookup_(Realm, Role) of
         not_found ->
-            ok = do_write(UUID, add, Role),
+            ok = do_write(Realm, UUID, add, Role),
             {ok, UUID};
         {ok, _RoleObj} ->
             duplicate
     end.
 
--spec delete(Role::fifo:role_id()) ->
+-spec delete(Realm::binary(), Role::fifo:role_id()) ->
                     ok |
                     not_found|
                     {error, timeout}.
 
-delete(Role) ->
-    Res = do_write(Role, delete),
+delete(Realm, Role) ->
+    Res = do_write(Realm, Role, delete),
     spawn(
       fun () ->
               Prefix = [<<"roles">>, Role],
-              {ok, Users} = snarl_user:list(),
+              {ok, Users} = snarl_user:list(Realm),
               [begin
-                   snarl_user:leave(U, Role),
-                   snarl_user:revoke_prefix(U, Prefix)
+                   snarl_user:leave(Realm, U, Role),
+                   snarl_user:revoke_prefix(Realm, U, Prefix)
                end
                || U <- Users],
-              {ok, Roles} = list(),
-              [revoke_prefix(R, Prefix) || R <- Roles],
-              {ok, Orgs} = snarl_org:list(),
-              [snarl_org:remove_target(O, Role) || O <- Orgs]
+              {ok, Roles} = snarl_role:list(Realm),
+              [revoke_prefix(Realm, R, Prefix) || R <- Roles],
+              {ok, Orgs} = snarl_org:list(Realm),
+              [snarl_org:remove_target(Realm, O, Role) || O <- Orgs]
       end),
     Res.
 
--spec grant(Role::fifo:role_id(), fifo:permission()) ->
+-spec grant(Realm::binary(), Role::fifo:role_id(), fifo:permission()) ->
                    ok |
                    not_found|
                    {error, timeout}.
 
-grant(Role, Permission) ->
-    do_write(Role, grant, Permission).
+grant(Realm, Role, Permission) ->
+    do_write(Realm, Role, grant, Permission).
 
--spec revoke(Role::fifo:role_id(), fifo:permission()) ->
+-spec revoke(Realm::binary(),
+             Role::fifo:role_id(), fifo:permission()) ->
                     ok |
                     not_found|
                     {error, timeout}.
 
-revoke(Role, Permission) ->
-    do_write(Role, revoke, Permission).
+revoke(Realm, Role, Permission) ->
+    do_write(Realm, Role, revoke, Permission).
 
--spec revoke_prefix(Role::fifo:role_id(), fifo:permission()) ->
+-spec revoke_prefix(Realm::binary(),
+                    Role::fifo:role_id(), fifo:permission()) ->
                            ok |
                            not_found|
                            {error, timeout}.
 
-revoke_prefix(Role, Prefix) ->
-    do_write(Role, revoke_prefix, Prefix).
+revoke_prefix(Realm, Role, Prefix) ->
+    do_write(Realm, Role, revoke_prefix, Prefix).
 
--spec set(Role::fifo:role_id(), Attirbute::fifo:key(), Value::fifo:value()) ->
+-spec set_metadata(Realm::binary(), Role::fifo:role_id(),
+          Attirbutes::fifo:attr_list()) ->
                  not_found |
                  {error, timeout} |
                  ok.
-set(Role, Attribute, Value) ->
-    set(Role, [{Attribute, Value}]).
-
--spec set(Role::fifo:role_id(), Attirbutes::fifo:attr_list()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
-set(Role, Attributes) ->
-    do_write(Role, set, Attributes).
-
+set_metadata(Realm, Role, Attributes) ->
+    do_write(Realm, Role, set_metadata, Attributes).
 
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
 
-do_write(Role, Op) ->
-    snarl_entity_write_fsm:write(
-      {node(), snarl_role_vnode, snarl_role}, Role, Op).
+do_write(Realm, Role, Op) ->
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_role_vnode, snarl_role}, {Realm, Role}, Op]).
 
-do_write(Role, Op, Val) ->
-    snarl_entity_write_fsm:write(
-      {node(), snarl_role_vnode, snarl_role}, Role, Op, Val).
+do_write(Realm, Role, Op, Val) ->
+    ?FM(Op, snarl_entity_write_fsm, write,
+        [{snarl_role_vnode, snarl_role}, {Realm, Role}, Op, Val]).

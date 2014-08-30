@@ -11,12 +11,17 @@
          start/3
         ]).
 
+-ignore_xref([start/3]).
+
 -record(state, {replies, r, reqid, from, reqs, raw = false}).
 
-start(VNodeMaster, NodeCheckService, {list, Requirements, true}) ->
-    start(VNodeMaster, NodeCheckService, {list, Requirements, true, false});
+start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, Full}) ->
+    start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, Full, false});
 
-start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
+start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, false, _}) ->
+    snarl_coverage:start(VNodeMaster, NodeCheckService, {list, Realm, Requirements});
+
+start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true, _}) ->
     ReqID = mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, Requirements},
@@ -31,7 +36,7 @@ start(VNodeMaster, NodeCheckService, Request = {list, Requirements, true, _}) ->
     end.
 
 %% The first is the vnode service used
-init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Requirements, Full, Raw}}) ->
+init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Realm, Requirements, Full, Raw}}) ->
     {NVal, R, _W} = ?NRW(NodeCheckService),
     %% all - full coverage; allup - partial coverage
     VNodeSelector = allup,
@@ -42,7 +47,7 @@ init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Requirem
     State = #state{replies = dict:new(), r = R,
                    from = From, reqid = ReqID,
                    reqs = Requirements, raw = Raw},
-    Request = {Cmd, Requirements, Full},
+    Request = {Cmd, Realm, Requirements, Full},
     {Request, VNodeSelector, NVal, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
@@ -94,10 +99,10 @@ raw_merge([{Score, V} | R]) ->
     raw_merge(R, Score, [V]).
 
 raw_merge([], recalculate, Vs) ->
-    {0, snarl_obj:merge(snarl_entity_read_fsm, Vs)};
+    {0, ft_obj:merge(snarl_entity_read_fsm, Vs)};
 
 raw_merge([], Score, Vs) ->
-    {Score, snarl_obj:merge(snarl_entity_read_fsm, Vs)};
+    {Score, ft_obj:merge(snarl_entity_read_fsm, Vs)};
 
 
 raw_merge([{Score, V} | R], Score, Vs) ->
@@ -124,11 +129,5 @@ merge([{_Score1, V} | R], _Score2, Vs) when _Score1 =/= _Score2->
 
 
 merge_obj(Vs) ->
-    case snarl_obj:merge(snarl_entity_read_fsm, Vs) of
-        #snarl_obj{val = V = #?USER{}} ->
-            snarl_user_state:to_json(V);
-        #snarl_obj{val = V = #?ORG{}} ->
-            snarl_org_state:to_json(V);
-        #snarl_obj{val = V = #?ROLE{}} ->
-            snarl_role_state:to_json(V)
-    end.
+    O = ft_obj:merge(snarl_entity_read_fsm, Vs),
+    ft_obj:val(O).

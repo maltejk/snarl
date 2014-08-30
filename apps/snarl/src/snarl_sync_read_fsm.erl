@@ -38,6 +38,7 @@
 %%--------------------------------------------------------------------
 update(_System, _Vsn, [], _From) ->
     ok;
+
 update(System, Vsn, List, From) ->
     snarl_sync_read_sup:start_child(System, Vsn, List, From).
 
@@ -75,7 +76,7 @@ init([System, Vsn, List, From]) ->
 %% @private
 %% @doc
 %% There should be one instance of this function for each possible
-%% state name. Whenever a gen_fsm receives an event sent using
+%% state name. Whenever a gen_fsm receives an event sent usingsna
 %% gen_fsm:send_event/2, the instance of this function with the same
 %% name as the current state name StateName is called to handle
 %% the event. It is also called if a timeout occurs.
@@ -86,10 +87,10 @@ init([System, Vsn, List, From]) ->
 %%                   {stop, Reason, NewState}
 %% @end
 %%--------------------------------------------------------------------
-read(_Event, State=#state{list=[E|R], system=Sys, version=Vsn,
+read(_Event, State=#state{list=[{Realm, E}|R], system=Sys, version=Vsn,
                           from=F, delay=D}) ->
     lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, E]),
-    case Sys:raw(E) of
+    case Sys:raw(Realm, E) of
         {ok, O} ->
             lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, E]),
             snarl_sync_tree:insert(F, Sys, Vsn, E, snarl_sync:hash(E, O));
@@ -98,9 +99,10 @@ read(_Event, State=#state{list=[E|R], system=Sys, version=Vsn,
             snarl_sync_tree:delete(F, Sys, E);
         Err ->
             lager:error("[sync] Error ~p(~p): ~p", [Sys, Vsn, Err]),
-            ok
+            []
     end,
     {next_state, read, State#state{list=R}, D};
+
 read(_Event, State=#state{system=Sys, from=F, version=Vsn, list=[]}) ->
     snarl_sync_tree:done(F, Sys, Vsn),
     {stop, normal, State}.
