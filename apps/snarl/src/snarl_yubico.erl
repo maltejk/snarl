@@ -21,5 +21,7 @@ verify(OTP) ->
 
 ensure_str(B) when is_binary(B) ->
 	binary_to_list(B);
+ensure_str(I) when is_integer(I) ->
+	integer_to_list(I);
 ensure_str(L) when is_list(L) ->
 	L.
