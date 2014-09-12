@@ -8,6 +8,7 @@
          is_empty/1,
          delete/1,
          delete/2,
+         change/6,
          get/3,
          put/4,
          fold/5,
@@ -142,7 +143,10 @@ change(Realm, UUID, Action, Vals, {ReqID, Coordinator} = ID,
                      [Val] ->
                          Mod:Action(ID, Val, H1);
                      [Val1, Val2] ->
-                         Mod:Action(ID, Val1, Val2, H1)
+                         Mod:Action(ID, Val1, Val2, H1);
+                     Vals when is_list(Vals) ->
+                         Args = [ID | Vals] ++ [H1],
+                         erlang:apply(Mod, Action, Args)
                  end,
             Obj = ft_obj:update(H2, Coordinator, O),
             snarl_vnode:put(Realm, UUID, Obj, State),

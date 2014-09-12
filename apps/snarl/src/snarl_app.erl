@@ -68,7 +68,8 @@ init_folsom() ->
     RoleMs = [wipe, lookup, get, list, list_all, sync_repair, import, add,
               delete, grant, revoke, revoke_prefix, set_metadata],
     OrgMs = [wipe, lookup, get, list, list_all, sync_repair, add_trigger,
-             remove_target, remove_trigger, import, add, delete, set_metadata],
+             remove_target, remove_trigger, import, add, delete, set_metadata,
+             resource_action],
     TokenMs = [get, add, delete],
     [folsom_metrics:new_histogram(Name, slide, 60) ||
         Name <-

@@ -40,4 +40,3 @@ opts() ->
         [{"inital_role", binary}, {"inital_org", binary}]}]},
      {"yubico",
       [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].
-

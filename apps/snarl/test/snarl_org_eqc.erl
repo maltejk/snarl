@@ -1,5 +1,8 @@
 -module(snarl_org_eqc).
 
+
+%% sync:stop(), c('apps/snarl/test/snarl_org_eqc', [{d, 'TEST'}, {d, 'EQC'}]), sync:start().
+
 -ifdef(TEST).
 -ifdef(EQC).
 
@@ -35,7 +38,7 @@
 
 -compile(export_all).
 
--record(state, {added = [], next_uuid=uuid:uuid4s(), metadata=[]}).
+-record(state, {added = [], next_uuid=uuid:uuid4s(), metadata=[], resources = []}).
 
 maybe_a_uuid(#state{added = Added}) ->
     ?SUCHTHAT(
@@ -45,6 +48,16 @@ maybe_a_uuid(#state{added = Added}) ->
                          lists:keyfind(N, 1, Added) == false),
             oneof([{E, non_blank_string()} | Added])),
        U /= duplicate).
+
+maybe_a_resource(#state{resources = Rs}, UUID) ->
+    ?LET(Existing,
+         case lists:keyfind(UUID, 1, Rs) of
+             {UUID, Res} ->
+                 oneof([R || {R, _} <- Res]);
+             _ ->
+                 non_blank_string()
+         end,
+         oneof([Existing, non_blank_string()])).
 
 initial_state() ->
     random:seed(now()),
@@ -63,6 +76,13 @@ prop_compare_to_model() ->
 cleanup() ->
     delete().
 
+resource_actions() ->
+    oneof([create, destroy, change]).
+
+name() ->
+    oneof([a, b, c, d, e, f, g]).
+
+
 command(S) ->
     oneof([
            {call, ?M, add, [S#state.next_uuid, non_blank_string()]},
@@ -78,6 +98,11 @@ command(S) ->
            {call, ?O, list, [?REALM, [], bool()]},
            {call, ?O, list_, [?REALM]},
 
+           ?LET(UUID, maybe_a_uuid(S),
+                {call, ?M, resource_action,
+                 [UUID, maybe_a_resource(S, UUID), choose(0, 10000),
+                  resource_actions(),list({name(), non_blank_string()})]}),
+
            %% Metadata
            {call, ?M, set_metadata, [maybe_a_uuid(S), metadata_kvs()]},
 
@@ -91,7 +116,7 @@ handoff_handon() ->
     handon(Data).
 
 %% Normal auth takes a name.
-auth({_, N}, P) ->
+auth({N, _}, P) ->
     ?O:auth(?REALM, N, P, <<>>).
 
 add(UUID, Org) ->
@@ -106,8 +131,13 @@ add(UUID, Org) ->
     meck:unload(uuid),
     R.
 
+
+resource_action({_, UUID}, Res, Timee, Action, Opts) ->
+    ?O:resource_action(?REALM, UUID, Res, Timee, Action, Opts).
+
 handoff_delete_handin() ->
     ok.
+
 ?FWD(get).
 ?FWD(raw).
 
@@ -190,6 +220,12 @@ postcondition(S, {call, _, set_metadata, [{_, UUID}, _]}, not_found) ->
     not has_uuid(S, UUID);
 
 postcondition(S, {call, _, set_metadata, [{_, UUID}, _]}, ok) ->
+    has_uuid(S, UUID);
+
+postcondition(S, {call, _, resource_action, [{_, UUID} | _]}, not_found) ->
+    not has_uuid(S, UUID);
+
+postcondition(S, {call, _, resource_action, [{_, UUID} | _]}, ok) ->
     has_uuid(S, UUID);
 
 %% List
