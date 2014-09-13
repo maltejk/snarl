@@ -13,6 +13,7 @@
          trigger/4,
          add_trigger/3, remove_trigger/3,
          remove_target/3,
+         resource_action/6,
          wipe/2
         ]).
 
@@ -62,6 +63,9 @@ trigger(Realm, Org, Event, Payload) ->
         R  ->
             R
     end.
+
+resource_action(Realm, Org, Resource, TimeStamp, Action, Opts) ->
+    do_write(Realm, Org,  resource_action, {Resource, TimeStamp, Action, Opts}).
 
 do_events(Realm, [{Event, Template}|Ts], Event, Payload, N) ->
     do_event(Realm, Template, Payload),
@@ -131,9 +135,9 @@ lookup(Realm, OrgName) ->
     end.
 
 -spec get(Realm::binary(), Org::fifo:org_id()) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, Org::fifo:org()}.
+                 not_found |
+                 {error, timeout} |
+                 {ok, Org::fifo:org()}.
 get(Realm, Org) ->
     case ?FM(get, snarl_entity_read_fsm, start,
              [{snarl_org_vnode, snarl_org}, get, {Realm, Org}]) of

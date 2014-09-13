@@ -50,6 +50,14 @@ message({org, set_metadata, Realm, Org, Attributes}, State) when
      snarl_org:set_metadata(Realm, Org, Attributes),
      State};
 
+message({org, resource_action, Realm, Org, Resource, TimeStamp, Action, Opts},
+        State) when
+      is_binary(Realm), is_binary(Org), is_atom(Action), is_list(Opts),
+      is_integer(TimeStamp), TimeStamp > 0 ->
+    {reply,
+     snarl_org:resource_action(Realm, Org, Resource, TimeStamp, Action, Opts),
+     State};
+
 message({org, add, Realm, Org}, State) ->
     {reply, snarl_org:add(Realm, Org), State};
 

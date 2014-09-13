@@ -35,6 +35,7 @@
          set_metadata/4,
          import/4,
          delete/3,
+         resource_action/4,
          add_trigger/4, remove_trigger/4,
          remove_target/4,
          repair/4, sync_repair/4
@@ -46,6 +47,7 @@
               get/3,
               add/4,
               delete/3,
+              resource_action/4,
               add_trigger/4, remove_trigger/4,
               remove_target/4,
               set_metadata/4,
@@ -110,6 +112,12 @@ set_metadata(Preflist, ReqID, UUID, Attributes) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
+resource_action(Preflist, ReqID, UUID, {Resource, TimeStamp, Action, Opts}) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {resource_action, ReqID, UUID, Resource, TimeStamp, Action, Opts},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
 import(Preflist, ReqID, UUID, Import) ->
     riak_core_vnode_master:command(Preflist,
                                    {import, ReqID, UUID, Import},
@@ -162,6 +170,11 @@ handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, St
     OrgObj = ft_obj:new(Org2, Coordinator),
     snarl_vnode:put(Realm, UUID, OrgObj, State),
     {reply, {ok, ReqID}, State};
+
+handle_command({resource_action, ID, {Realm, UUID},
+                Resource, TimeStamp, Action, Opts}, _Sender, State) ->
+    snarl_vnode:change(Realm, UUID, resource_action, [Resource, TimeStamp, Action, Opts],
+                       ID, State);
 
 handle_command(Message, Sender, State) ->
     snarl_vnode:handle_command(Message, Sender, State).
