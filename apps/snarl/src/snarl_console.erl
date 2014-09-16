@@ -547,10 +547,10 @@ ringready([]) ->
 
 config(["show"]) ->
     io:format("Defaults~n  User Section~n"),
-    print_config(defaults, users),
+    fifo_console:print_config(defaults, users),
     io:format("~n"
               "Yubikey~n"),
-    print_config(yubico, api),
+    fifo_console:print_config(yubico, api),
     ok;
 
 config(["set", Ks, V]) ->
@@ -570,8 +570,16 @@ config(["set" | R]) ->
         _ ->
             io:format("Setting changed~n", []),
             ok
-    end.
+    end;
 
+config(["unset", Ks]) ->
+    Ks1 = [binary_to_list(K) || K <- re:split(Ks, "\\.")],
+    config(["unset" | Ks1]);
+
+config(["unset" | Ks]) ->
+    snarl_opt:unset(Ks),
+    io:format("Setting changed~n", []),
+    ok.
 
 status([]) ->
     case riak_core_status:transfers() of
@@ -644,68 +652,6 @@ format_timestamp(_Now, undefined) ->
     "--";
 format_timestamp(Now, TS) ->
     riak_core_format:human_time_fmt("~.1f", timer:now_diff(Now, TS)).
-
-print_config(Prefix, SubPrefix) ->
-    Fmt = [{"Key", 20}, {"Value", 50}],
-    hdr(Fmt),
-    PrintFn = fun({K, [V|_]}, _) ->
-                      fields(Fmt, [key(Prefix, SubPrefix, K), V])
-              end,
-    riak_core_metadata:fold(PrintFn, ok, {Prefix, SubPrefix}).
-
-key(Prefix, SubPrefix, Key) ->
-    io_lib:format("~p.~p.~p", [Prefix, SubPrefix, Key]).
-
-hdr(F) ->
-    hdr_lines(lists:reverse(F), {"~n", [], "~n", []}).
-
-
-%% hdr_lines([{N, n} | R], {Fmt, Vars, FmtLs, VarLs}) ->
-%%     %% there is a space that matters here ---------v
-%%     hdr_lines(R, {
-%%                 "~20s " ++ Fmt,
-%%                 [N | Vars],
-%%                 "~20c " ++ FmtLs,
-%%                 [$- | VarLs]});
-
-hdr_lines([{N, S}|R], {Fmt, Vars, FmtLs, VarLs}) ->
-    %% there is a space that matters here ---------v
-    hdr_lines(R, {
-                [$~ | integer_to_list(S) ++ [$s, $\  | Fmt]],
-                [N | Vars],
-                [$~ | integer_to_list(S) ++ [$c, $\  | FmtLs]],
-                [$- | VarLs]});
-
-hdr_lines([], {Fmt, Vars, FmtL, VarLs}) ->
-    io:format(Fmt, Vars),
-    io:format(FmtL, VarLs).
-
-
-fields(F, Vs) ->
-    fields(lists:reverse(F),
-           lists:reverse(Vs),
-           {"~n", []}).
-
-%% fields([{_, n}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
-%%                                      orelse is_binary(V) ->
-%%     fields(R, Vs, {"~s " ++ Fmt, [V | Vars]});
-
-%% fields([{_, n}|R], [V | Vs], {Fmt, Vars}) ->
-%%     fields(R, Vs, {"~p " ++ Fmt, [V | Vars]});
-
-fields([{_, S}|R], [V | Vs], {Fmt, Vars}) when is_list(V)
-                                               orelse is_binary(V) ->
-    %% there is a space that matters here ------------v
-    fields(R, Vs, {[$~ | integer_to_list(S) ++ [$s, $\  | Fmt]], [V | Vars]});
-
-
-fields([{_, S}|R], [V | Vs], {Fmt, Vars}) ->
-    %% there is a space that matters here ------------v
-    fields(R, Vs, {[$~ | integer_to_list(S) ++ [$p, $\  | Fmt]], [V | Vars]});
-
-fields([], [], {Fmt, Vars}) ->
-    io:format(Fmt, Vars).
-
 
 do_update(RealmS, MainMod, StateMod) ->
     Realm = list_to_binary(RealmS),
