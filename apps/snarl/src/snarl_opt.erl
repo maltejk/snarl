@@ -4,7 +4,7 @@
 -ignore_xref([update/0]).
 
 get(Prefix, SubPrefix, Key, EnvKey, Dflt) ->
-    fifo_opt:get(opts(), Prefix, SubPrefix, Key, {sniffle, EnvKey}, Dflt).
+    fifo_opt:get(opts(), Prefix, SubPrefix, Key, {snarl, EnvKey}, Dflt).
 
 set(Ks, Val) ->
     fifo_opt:set(opts(), Ks, Val).
