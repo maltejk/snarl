@@ -70,6 +70,7 @@ case $2 in
             mv ${CONFFILE} ${CONFFILE}.old
             cat ${CONFFILE}.old \
                 | sed 's/^[ ]*data_dir/platform_data_dir/' \
+                | sed -e '/status.include_count/d' \
                       > ${CONFFILE}
         fi
         ;;
