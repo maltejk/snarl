@@ -8,6 +8,7 @@
          list_/1,
          list/3,
          auth/4,
+         reindex/2,
          find_key/2,
          get/2, raw/2,
          lookup_/2, lookup/2,
@@ -33,7 +34,8 @@
               wipe/2,
               join_org/3, leave_org/3, select_org/3,
               lookup_/2, list_/1,
-              raw/2, sync_repair/3
+              raw/2, sync_repair/3,
+              reindex/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -42,6 +44,20 @@
         folsom_metrics:histogram_timed_update(
           {snarl, user, Met},
           Mod, Fun, Args)).
+
+-define(NAME_2i, {snarl_user, name}).
+-define(KEY_2i, {snarl_user, key}).
+
+reindex(Realm, UUID) ->
+    case ?MODULE:get(Realm, UUID) of
+        {ok, O} ->
+            snarl_2i:add(Realm, ?NAME_2i, ft_user:name(O), UUID),
+            [snarl_2i:add(Realm, ?KEY_2i, key_to_id(K), UUID) ||
+                {_, K} <- ft_user:keys(O)],
+            ok;
+        E ->
+            E
+    end.
 
 %% Public API
 wipe(Realm, UUID) ->
@@ -58,16 +74,7 @@ sync_repair(Realm, UUID, Obj) ->
 find_key(Realm, KeyID) ->
     folsom_metrics:histogram_timed_update(
       {snarl, user, find_key},
-      fun() ->
-              {ok, Res} = snarl_coverage:start(
-                            snarl_user_vnode_master, snarl_user,
-                            {find_key, Realm, KeyID}),
-              lists:foldl(fun (not_found, Acc) ->
-                                  Acc;
-                              (R, _) ->
-                                  {ok, R}
-                          end, not_found, Res)
-      end).
+      snarl_2i, get, [Realm, ?KEY_2i, KeyID]).
 
 -spec auth(Realm::binary(), User::binary(), Passwd::binary(),
            OTP::binary()|basic) ->
@@ -147,15 +154,7 @@ lookup_(Realm, User) ->
     folsom_metrics:histogram_timed_update(
       {snarl, user, lookup},
       fun() ->
-              {ok, Res} = snarl_coverage:start(
-                            snarl_user_vnode_master, snarl_user,
-                            {lookup, Realm, User}),
-              R0 = lists:foldl(fun (not_found, Acc) ->
-                                       Acc;
-                                   (R, _) ->
-                                       {ok, R}
-                               end, not_found, Res),
-              case R0 of
+              case snarl_2i:get(Realm, ?NAME_2i, User) of
                   {ok, UUID} ->
                       snarl_user:get(Realm, UUID);
                   R ->
@@ -187,10 +186,34 @@ allowed(Realm, User, Permission) ->
     end.
 
 add_key(Realm, User, KeyID, Key) ->
-    do_write(Realm, User, add_key, {KeyID, Key}).
+    SSHID = key_to_id(Key),
+    case snarl_2i:get(Realm, ?KEY_2i, SSHID) of
+        {ok, _} ->
+            {error, duplicate};
+        _ ->
+            case do_write(Realm, User, add_key, {KeyID, Key}) of
+                ok ->
+                    snarl_2i:add(Realm, ?KEY_2i, SSHID, User),
+                    ok;
+                E ->
+                    E
+            end
+    end.
 
 revoke_key(Realm, User, KeyID) ->
-    do_write(Realm, User, revoke_key, KeyID).
+    case ?MODULE:get(Realm, User) of
+        {ok, U} ->
+            Ks = ft_user:keys(U),
+            case jsxd:get(KeyID, Ks) of
+                {ok, Key} ->
+                    snarl_2i:delete(Realm, ?KEY_2i, key_to_id(Key)),
+                    do_write(Realm, User, revoke_key, KeyID);
+                _ ->
+                    ok
+            end;
+        E ->
+            E
+    end.
 
 keys(Realm, User) ->
     case snarl_user:get(Realm, User) of
@@ -373,6 +396,7 @@ create(Realm, UUID, User) ->
     case lookup_(Realm, User) of
         not_found ->
             ok = do_write(Realm, UUID, add, User),
+            snarl_2i:add(Realm, ?NAME_2i, User, UUID),
             {ok, UUID};
         {ok, _UserObj} ->
             duplicate
@@ -479,7 +503,15 @@ leave_org(Realm, User, Org) ->
                     {error, timeout} |
                     ok.
 delete(Realm, User) ->
-    Res = do_write(Realm, User, delete),
+    case ?MODULE:get(Realm, User) of
+        {ok, O} ->
+            snarl_2i:delete(Realm, ?NAME_2i, ft_user:name(O)),
+            [snarl_2i:delete(Realm, ?KEY_2i, key_to_id(K)) ||
+                {_, K} <- ft_user:keys(O)],
+            ok;
+        E ->
+            E
+    end,
     spawn(
       fun () ->
               Prefix = [<<"users">>, User],
@@ -490,7 +522,7 @@ delete(Realm, User) ->
               {ok, Orgs} = snarl_org:list(Realm),
               [snarl_org:remove_target(Realm, O, User) || O <- Orgs]
       end),
-    Res.
+    do_write(Realm, User, delete).
 
 -spec grant(Realm::binary(), User::fifo:user_id(),
             Permission::fifo:permission()) ->
@@ -586,4 +618,17 @@ hash(Hash, Salt, Passwd) ->
 -else.
 hash(sha512, Salt, Passwd) ->
     crypto:sha512([Salt, Passwd]).
+-endif.
+
+
+-ifndef(old_hash).
+key_to_id(Key) ->
+    [_, ID0, _] = re:split(Key, " "),
+    ID1 = base64:decode(ID0),
+    crypto:hash(md5,ID1).
+-else.
+key_to_id(Key) ->
+    [_, ID0, _] = re:split(Key, " "),
+    ID1 = base64:decode(ID0),
+    crypto:md5(ID1).
 -endif.

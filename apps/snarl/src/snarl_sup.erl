@@ -40,9 +40,14 @@ init(_Args) ->
                   {riak_core_vnode_master, start_link, [snarl_org_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
+    S2iVMaster = {snarl_s2i_vnode_master,
+                  {riak_core_vnode_master, start_link, [snarl_s2i_vnode]},
+                  permanent, 5000, worker, [riak_core_vnode_master]},
+
     CoverageFSMs = {snarl_entity_coverage_fsm_sup,
                     {snarl_entity_coverage_fsm_sup, start_link, []},
-                    permanent, infinity, supervisor, [snarl_entity_coverage_fsm_sup]},
+                    permanent, infinity, supervisor,
+                    [snarl_entity_coverage_fsm_sup]},
 
     ReadFSMs = {snarl_entity_read_fsm_sup,
                 {snarl_entity_read_fsm_sup, start_link, []},
@@ -68,9 +73,17 @@ init(_Args) ->
           [snarl_org, snarl_org_vnode]},
          permanent, 30000, worker, [riak_core_entropy_manager]},
 
-    VNodeMasters = [RoleVMaster, UserVMaster, TokenVMaster, OrgVMaster],
+    EntropyManagerS2i =
+        {snarl_s2i_entropy_manager,
+         {riak_core_entropy_manager, start_link,
+          [snarl_s2i, snarl_s2i_vnode]},
+         permanent, 30000, worker, [riak_core_entropy_manager]},
+
+    VNodeMasters = [RoleVMaster, UserVMaster, TokenVMaster, OrgVMaster,
+                    S2iVMaster],
     FSMs = [ReadFSMs, WriteFSMs, CoverageFSMs],
-    AAE = [EntropyManagerUser, EntropyManagerRole, EntropyManagerOrg],
+    AAE = [EntropyManagerUser, EntropyManagerRole, EntropyManagerOrg,
+           EntropyManagerS2i],
     AdditionalServices =
         [{snarl_sync_sup, {snarl_sync_sup, start_link, []},
           permanent, 5000, supervisor, []},
