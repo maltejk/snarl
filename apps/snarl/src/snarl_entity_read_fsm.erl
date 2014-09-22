@@ -93,14 +93,13 @@ start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
 
 init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) ->
     ?DT_READ_ENTRY(Entity, Op),
-    {N, R, _W} = ?NRW(System),
     SD = #state{raw=Raw,
                 bucket=Realm,
                 req_id=ReqId,
                 from=From,
                 op=Op,
-                n=N,
-                r=R,
+                n= ?N,
+                r= ?R,
                 val=Val,
                 start=now(),
                 vnode=VNode,

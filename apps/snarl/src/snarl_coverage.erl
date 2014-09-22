@@ -31,8 +31,9 @@ start(VNodeMaster, NodeCheckService, Request) ->
 
 %% The first is the vnode service used
 init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
-    {NVal, R, _W} = ?NRW(NodeCheckService),
     %% all - full coverage; allup - partial coverage
+    R = ?R,
+    NVal = ?N,
     VNodeSelector = allup,
     %% Same as R value here, TODO: Make this dynamic
     PrimaryVNodeCoverage = R,
