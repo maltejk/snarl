@@ -12,14 +12,16 @@
          set_metadata/3,
          create/3,
          revoke_prefix/3,
-         import/3, wipe/2
+         import/3, wipe/2,
+         reindex/2
         ]).
 
 -ignore_xref([
               wipe/2,
               list_/1,
               create/3, raw/2, sync_repair/3,
-              import/3, lookup/2
+              import/3, lookup/2,
+              reindex/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -30,6 +32,17 @@
           Mod, Fun, Args)).
 
 %% Public API
+
+-define(NAME_2i, {?MODULE, name}).
+
+reindex(Realm, UUID) ->
+    case ?MODULE:get(Realm, UUID) of
+        {ok, O} ->
+            snarl_2i:add(Realm, ?NAME_2i, ft_role:name(O), UUID),
+            ok;
+        E ->
+            E
+    end.
 
 wipe(Realm, UUID) ->
     ?FM(wipe, snarl_coverage, start,
@@ -58,20 +71,16 @@ lookup(Realm, Role) ->
                      {error, timeout} |
                      {ok, Role::fifo:role()}.
 lookup_(Realm, Role) ->
-    {ok, Res} =
-        ?FM(lookup, snarl_coverage,start,
-            [snarl_role_vnode_master, snarl_role, {lookup, Realm, Role}]),
-    R0 = lists:foldl(fun (not_found, Acc) ->
-                             Acc;
-                         (R, _) ->
-                             {ok, R}
-                     end, not_found, Res),
-    case R0 of
-        {ok, UUID} ->
-            snarl_role:get(Realm, UUID);
-        R ->
-            R
-    end.
+    folsom_metrics:histogram_timed_update(
+      {snarl, role, lookup},
+      fun() ->
+              case snarl_2i:get(Realm, ?NAME_2i, Role) of
+                  {ok, UUID} ->
+                      ?MODULE:get(Realm, UUID);
+                  R ->
+                      R
+              end
+      end).
 
 -spec get(Realm::binary(), Role::fifo:role_id()) ->
                  not_found |
@@ -145,6 +154,7 @@ create(Realm, UUID, Role) ->
     case snarl_role:lookup_(Realm, Role) of
         not_found ->
             ok = do_write(Realm, UUID, add, Role),
+            snarl_2i:add(Realm, ?NAME_2i, Role, UUID),
             {ok, UUID};
         {ok, _RoleObj} ->
             duplicate
@@ -156,7 +166,13 @@ create(Realm, UUID, Role) ->
                     {error, timeout}.
 
 delete(Realm, Role) ->
-    Res = do_write(Realm, Role, delete),
+    case ?MODULE:get(Realm, Role) of
+        {ok, O} ->
+            snarl_2i:delete(Realm, ?NAME_2i, ft_role:name(O)),
+            ok;
+        E ->
+            E
+    end,
     spawn(
       fun () ->
               Prefix = [<<"roles">>, Role],
@@ -171,7 +187,7 @@ delete(Realm, Role) ->
               {ok, Orgs} = snarl_org:list(Realm),
               [snarl_org:remove_target(Realm, O, Role) || O <- Orgs]
       end),
-    Res.
+    do_write(Realm, Role, delete).
 
 -spec grant(Realm::binary(), Role::fifo:role_id(), fifo:permission()) ->
                    ok |
@@ -200,10 +216,10 @@ revoke_prefix(Realm, Role, Prefix) ->
     do_write(Realm, Role, revoke_prefix, Prefix).
 
 -spec set_metadata(Realm::binary(), Role::fifo:role_id(),
-          Attirbutes::fifo:attr_list()) ->
-                 not_found |
-                 {error, timeout} |
-                 ok.
+                   Attirbutes::fifo:attr_list()) ->
+                          not_found |
+                          {error, timeout} |
+                          ok.
 set_metadata(Realm, Role, Attributes) ->
     do_write(Realm, Role, set_metadata, Attributes).
 

@@ -14,6 +14,7 @@
          add_trigger/3, remove_trigger/3,
          remove_target/3,
          resource_action/6,
+         reindex/2,
          wipe/2
         ]).
 
@@ -25,7 +26,8 @@
               list_/1,
               raw/2,
               sync_repair/3,
-              wipe/2
+              wipe/2,
+              reindex/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -37,6 +39,18 @@
 
 -type template() :: [binary()|placeholder].
 %% Public API
+
+
+-define(NAME_2i, {?MODULE, name}).
+
+reindex(Realm, UUID) ->
+    case ?MODULE:get(Realm, UUID) of
+        {ok, O} ->
+            snarl_2i:add(Realm, ?NAME_2i, ft_org:name(O), UUID),
+            ok;
+        E ->
+            E
+    end.
 
 wipe(Realm, UUID) ->
     ?FM(wipe, snarl_coverage, start,
@@ -55,7 +69,7 @@ remove_trigger(Realm, Org, Trigger) ->
     do_write(Realm, Org, remove_trigger, Trigger).
 
 trigger(Realm, Org, Event, Payload) ->
-    case snarl_org:get(Realm, Org) of
+    case ?MODULE:get(Realm, Org) of
         {ok, OrgObj} ->
             Triggers = [T || {_, T} <- ft_org:triggers(OrgObj)],
             Executed = do_events(Realm, Triggers, Event, Payload, 0),
@@ -119,20 +133,16 @@ import(Realm, Org, Data) ->
                     {ok, Org::fifo:org()}.
 
 lookup(Realm, OrgName) ->
-    {ok, Res} =
-        ?FM(lookup, snarl_coverage, start,
-            [snarl_org_vnode_master, snarl_org, {lookup, Realm, OrgName}]),
-    R0 = lists:foldl(fun (not_found, Acc) ->
-                             Acc;
-                         (R, _) ->
-                             {ok, R}
-                     end, not_found, Res),
-    case R0 of
-        {ok, UUID} ->
-            snarl_org:get(Realm, UUID);
-        R ->
-            R
-    end.
+    folsom_metrics:histogram_timed_update(
+      {snarl, role, lookup},
+      fun() ->
+              case snarl_2i:get(Realm, ?NAME_2i, OrgName) of
+                  {ok, UUID} ->
+                      ?MODULE:get(Realm, UUID);
+                  R ->
+                      R
+              end
+      end).
 
 -spec get(Realm::binary(), Org::fifo:org_id()) ->
                  not_found |
@@ -198,9 +208,10 @@ add(Realm, Org) ->
     create(Realm, UUID, Org).
 
 create(Realm, UUID, Org) ->
-    case snarl_org:lookup(Realm, Org) of
+    case ?MODULE:lookup(Realm, Org) of
         not_found ->
             ok = do_write(Realm, UUID, add, Org),
+            snarl_2i:add(Realm, ?NAME_2i, Org, UUID),
             {ok, UUID};
         {ok, _OrgObj} ->
             duplicate
@@ -212,7 +223,13 @@ create(Realm, UUID, Org) ->
                     {error, timeout}.
 
 delete(Realm, Org) ->
-    Res = do_write(Realm, Org, delete),
+    case ?MODULE:get(Realm, Org) of
+        {ok, O} ->
+            snarl_2i:delete(Realm, ?NAME_2i, ft_org:name(O)),
+            ok;
+        E ->
+            E
+    end,
     spawn(
       fun () ->
               Prefix = [<<"orgs">>, Org],
@@ -223,10 +240,11 @@ delete(Realm, Org) ->
                end || U <- Users],
               {ok, Roles} = snarl_role:list(Realm),
               [snarl_role:revoke_prefix(Realm, R, Prefix) || R <- Roles],
-              {ok, Orgs} = snarl_org:list(Realm),
-              [snarl_org:remove_target(Realm, O, Org) || O <- Orgs]
+              {ok, Orgs} = ?MODULE:list(Realm),
+              [?MODULE:remove_target(Realm, O, Org) || O <- Orgs]
       end),
-    Res.
+    do_write(Realm, Org, delete).
+
 
 
 -spec set_metadata(Realm::binary(), Org::fifo:org_id(), Attirbutes::fifo:attr_list()) ->
