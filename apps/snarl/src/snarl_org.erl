@@ -46,7 +46,7 @@
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
         {ok, O} ->
-            snarl_2i:add(Realm, ?NAME_2i, ft_role:name(O), UUID),
+            snarl_2i:add(Realm, ?NAME_2i, ft_org:name(O), UUID),
             ok;
         E ->
             E
