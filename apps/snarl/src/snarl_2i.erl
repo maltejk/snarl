@@ -113,7 +113,7 @@ list(Realm, Requirements, Full)
                  {error, timeout}.
 
 add(Realm, Type, Key, Target) ->
-    lager:info("[2i] Adding 2i key ~p-~p -> ~s", [Type, Key, Target]),
+    lager:info("[2i] Adding 2i key ~s/~p-~s -> ~s", [Realm, Type, Key, Target]),
     TK = term_to_binary({Type, Key}),
     Res = case snarl_2i:get(Realm, TK) of
               not_found ->
