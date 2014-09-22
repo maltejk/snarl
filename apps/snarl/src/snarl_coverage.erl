@@ -25,11 +25,7 @@ start(VNodeMaster, NodeCheckService, Request) ->
             ok;
         {ok, Result} ->
             {ok, Result}
-            %%;
-            %%Else ->
-            %%lager:error("Unknown coverage reply: ~p", [Else]),
-            %%{error, unknown_reply}
-    after 10000 ->
+       after 10000 ->
             {error, timeout}
     end.
 

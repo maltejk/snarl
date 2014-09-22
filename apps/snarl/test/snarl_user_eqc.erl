@@ -23,6 +23,8 @@
 -define(EQC_SETUP, true).
 -define(EQC_EUNIT_TIMEUT, 1200).
 
+-define(KEY, <<"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDZyw2HsD2TBPpBcCJLge4Eu1N9IXHx0S9APSdC4GEre3h4huNT9LUA78oOB1LDIyqmwbHy5yqVVBht4awmcveaSsBIDEPBrU+ZrSeibg3ikQxBYA+7IG8gwvEqxI9EdbnF6eqstfiUIaLsLuUY2E2b2DGIohy/NIw0tccchLR0kHUGz4yjmMZg78X9ux2VqFhlTfj3xDsagxFjo90FQkrO32SLULFS9fG5Ki8vsvhfkhhtgct74i894lj4DRThqmvgygODXcyvi/wtixaqKqcn+Y1JCr5AsvXvYmWQzdRh9Rv77j0mleo0xqosqXIH1HqsM4CJmdYGCPU7JB6k0j/H testkey@testbox">>).
+
 -import(snarl_test_helper,
         [id/0, permission/0, maybe_oneof/1, cleanup_mock_servers/0,
          mock_vnode/2, start_mock_servers/0, metadata_value/0, metadata_kvs/0,
@@ -53,6 +55,8 @@ maybe_a_password(#state{passwords = Pws}) ->
     maybe_oneof(Pws).
 
 initial_state() ->
+    catch ets:delete(s2i),
+    ets:new(s2i, [named_table, public, ordered_set]),
     random:seed(now()),
     #state{}.
 
@@ -121,7 +125,7 @@ command(S) ->
            {call, ?M, select_org, [maybe_a_uuid(S), maybe_org(S)]},
 
            %% SSH key related commands
-           {call, ?M, add_key, [maybe_a_uuid(S), non_blank_string(), non_blank_string()]},
+           {call, ?M, add_key, [maybe_a_uuid(S), non_blank_string(), ?KEY]},
            {call, ?M, revoke_key, [maybe_a_uuid(S), maybe_key(S)]},
            {call, ?M, keys, [maybe_a_uuid(S)]},
            {call, ?U, find_key, [?REALM, maybe_keyid(S)]},
@@ -393,6 +397,9 @@ postcondition(S, {call, _, add_key, [{_, UUID}, _, _]}, not_found) ->
 postcondition(S, {call, _, add_key, [{_, UUID}, _, _]}, ok) ->
     has_uuid(S, UUID);
 
+postcondition(S, {call, _, add_key, [{_, _}, _, _]}, {error,duplicate}) ->
+    all_keys(S) /= [];
+
 postcondition(S, {call, _, revoke_key, [{_, UUID}, _]}, not_found) ->
     not has_uuid(S, UUID);
 
@@ -577,6 +584,9 @@ known_keys(#state{keys=Ks}, UUID) ->
         _ ->
             []
     end.
+
+all_keys(#state{keys=Ks}) ->
+    lists:flatten([K || {_, K} <- Ks]).
 
 
 known_orgs(#state{orgs=Os}, UUID) ->

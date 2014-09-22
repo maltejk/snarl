@@ -3,7 +3,7 @@
 -behaviour(application).
 
 %% Application callbacks
--export([start/2, stop/1, init_folsom/0]).
+-export([start/2, stop/1, init_folsom/0, reindex/0]).
 
 -ignore_xref([init_folsom/0]).
 
@@ -28,6 +28,7 @@ start(_StartType, _StartArgs) ->
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
             ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
             ?SRV_WITH_AAE(snarl_org_vnode, snarl_org),
+            ?SRV_WITH_AAE(snarl_2i_vnode, snarl_2i),
 
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),
             ok = riak_core_node_watcher:service_up(snarl_token, self()),
@@ -50,6 +51,7 @@ start(_StartType, _StartArgs) ->
                     ok
             end,
             timer:apply_after(2000, snarl_opt, update, []),
+            spawn(?MODULE, reindex, []),
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}
@@ -69,6 +71,7 @@ init_folsom() ->
               delete, grant, revoke, revoke_prefix, set_metadata],
     OrgMs = [wipe, lookup, get, list, list_all, sync_repair, add_trigger,
              remove_target, remove_trigger, import, add, delete, set_metadata],
+    S2i = [list, get, add, delete],
     TokenMs = [get, add, delete],
     [folsom_metrics:new_histogram(Name, slide, 60) ||
         Name <-
@@ -76,5 +79,38 @@ init_folsom() ->
             [{snarl, user, M} || M <- UserMs] ++
             [{snarl, role, M} || M <- RoleMs] ++
             [{snarl, org, M} || M <- OrgMs] ++
+            [{snarl, s2i, M} || M <- S2i] ++
             [{snarl, token, M} || M <- TokenMs]
     ].
+
+reindex() ->
+    lager:info("[reindex] Starting reindex, giving the cluste 5s for the "
+               "cluster to start up."),
+    timer:sleep(5000),
+    Now = now(),
+    lager:info("[reindex] Gathering elements to reindex..."),
+    {ok, Users} = snarl_user:list(),
+    Users1 = [{snarl_user, U} || U <- Users],
+    {ok, Orgs} = snarl_org:list(),
+    Orgs1 = [{snarl_org, O} || O <- Orgs],
+    {ok, Roles} = snarl_role:list(),
+    Roles1 = [{snarl_role, R} || R <- Roles],
+    All = Users1 ++ Orgs1 ++ Roles1,
+    Cnt = length(All),
+    lager:info("[reindex] A total of ~p elements are going to be reindexed...",
+               [Cnt]),
+    lists:foldl(fun do_index/2, {0, 0, Cnt}, All),
+    lager:info("[reindex] Reindex completed after ~.2fms...",
+               [timer:now_diff(now(), Now)/1000]).
+
+do_index({Mod, {Realm, UUID}}, {P, Cnt, Max}) ->
+    timer:sleep(100),
+    Mod:reindex(Realm, UUID),
+    Cnt1 = Cnt + 1,
+    case trunc((Cnt1 / Max) * 10) of
+        P1 when P1 > P ->
+            lager:info("[reindex] ~p% (~p)", [P1*10, Cnt1]),
+            {P1, Cnt1, Max};
+        _ ->
+            {P, Cnt1, Max}
+    end.

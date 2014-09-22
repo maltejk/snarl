@@ -72,15 +72,32 @@ start_mock_servers() ->
     application:start(compiler),
     application:start(goldrush),
     application:start(lager),
-    ok = application:start(folsom),
+    application:start(folsom),
     snarl_app:init_folsom(),
-    ok = application:start(fifo_db),
+    application:start(fifo_db),
+    meck:new(snarl_2i, [passthrough]),
+    ets:new(s2i, [named_table, public, ordered_set]),
+    meck:expect(snarl_2i, get, fun(_, T, K) ->
+                                       case ets:lookup(s2i, {T, K}) of
+                                           [] ->
+                                               not_found;
+                                           [{_, not_found}] ->
+                                               not_found;
+                                           [{_, R}] ->
+                                               {ok, R}
+                                       end
+                               end),
+    meck:expect(snarl_2i, add, fun(_, T, K, V) ->
+                                       ets:insert(s2i, {{T, K}, V}),
+                                       ok
+                               end),
     start_fake_read_fsm(),
     start_fake_write_fsm().
 
 cleanup_mock_servers() ->
     catch eqc_vnode ! stop,
-
+    catch meck:unload(snarl_2i),
+    catch ets:delete(s2i),
     stop_fake_read_fsm(),
     stop_fake_write_fsm(),
     application:stop(fifo_db),
