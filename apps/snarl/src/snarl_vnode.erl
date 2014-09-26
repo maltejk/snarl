@@ -235,7 +235,7 @@ handle_coverage(Req, _KeySpaces, _Sender, State) ->
 
 handle_command({sync_repair, {ReqID, _}, {Realm, UUID}, Obj}, _Sender,
                %% VNode equals the control module
-               State=#vstate{state=Mod, vnode=VN}) ->
+               State=#vstate{state=Mod}) ->
     case get(Realm, UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
@@ -250,12 +250,12 @@ handle_command({sync_repair, {ReqID, _}, {Realm, UUID}, Obj}, _Sender,
             lager:error("[~s] Read repair failed, data was updated too recent.",
                         [State#vstate.bucket])
     end,
-    spawn(VN, reindex, [Realm, UUID]),
+    spawn(State#vstate.service, reindex, [Realm, UUID]),
     {reply, {ok, ReqID}, State};
 
 handle_command({repair, {Realm, UUID}, _VClock, Obj}, _Sender,
                %% VNode equals the control module
-               State=#vstate{state=Mod, vnode=VN}) ->
+               State=#vstate{state=Mod}) ->
     case get(Realm, UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
@@ -268,7 +268,7 @@ handle_command({repair, {Realm, UUID}, _VClock, Obj}, _Sender,
             lager:error("[~s] Read repair failed, data was updated too recent.",
                         [State#vstate.bucket])
     end,
-    spawn(VN, reindex, [Realm, UUID]),
+    spawn(State#vstate.service, reindex, [Realm, UUID]),
     {noreply, State};
 
 handle_command({get, ReqID, {Realm, UUID}}, _Sender, State) ->
