@@ -328,28 +328,16 @@ message({role, revoke, Realm, Role, Permission}, State) ->
 message({role, revoke_prefix, Realm, Role, Prefix}, State) ->
     {reply, snarl_role:revoke_prefix(Realm, Role, Prefix), State};
 
-message({cloud, status, Realm}, State) ->
+message({cloud, status}, State) ->
     {reply,
-     status(Realm),
+     status(),
      State};
 
 message(Message, State) ->
     lager:warning("Unsuppored TCP message: ~p", [Message]),
     {noreply, State}.
 
-status(Realm) ->
-    {Us, Gs, Os} = case application:get_env(snarl, status_include_count) of
-                       {ok, ture} ->
-                           {ok, UsX} = snarl_user:list(Realm),
-                           {ok, GsX} = snarl_role:list(Realm),
-                           {ok, OsX} = snarl_org:list(Realm),
-                           {UsX, GsX, OsX};
-                       _ ->
-                           {[], [], []}
-                   end,
-    Resources = [{<<"users">>, length(Us)},
-                 {<<"roles">>, length(Gs)},
-                 {<<"orgs">>, length(Os)}],
+status() ->
     Warnings = case riak_core_status:transfers() of
                    {[], []} ->
                        [];
@@ -372,7 +360,7 @@ status(Realm) ->
                                                       [length(L)])}]),
                        [W | server_errors(S)]
                end,
-    {ok, {ordsets:from_list(Resources), ordsets:from_list(Warnings)}}.
+    {ok, {[], ordsets:from_list(Warnings)}}.
 
 
 server_errors(Servers) ->

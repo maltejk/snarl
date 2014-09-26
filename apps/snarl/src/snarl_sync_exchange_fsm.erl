@@ -125,7 +125,7 @@ sync_diff(_, State = #state{
                                     Merged = ft_obj:merge(snarl_entity_read_fsm, Objs),
                                     NVS = {{remote, node()}, vnode(Sys), Sys},
                                     snarl_entity_write_fsm:write(NVS, {Realm, UUID}, sync_repair, Merged),
-                                    Msg = write(Sys, UUID, sync_repair, Merged),
+                                    Msg = write(Sys, Realm, UUID, sync_repair, Merged),
                                     case gen_tcp:send(Socket, Msg) of
                                         ok ->
                                             {next_state, sync_get, State#state{diff=R}, 0};
@@ -151,9 +151,9 @@ sync_diff(_, State = #state{diff=[]}) ->
 sync_get(_, State = #state{
                        socket=Socket,
                        timeout=Timeout,
-                       get=[{Sys, UUID}|R]}) ->
-    lager:debug("[sync-exchange] Get: ~p", [{Sys, UUID}]),
-    case gen_tcp:send(Socket, term_to_binary({raw, Sys, UUID})) of
+                       get=[{Sys, {Realm, UUID}}|R]}) ->
+    lager:debug("[sync-exchange] Get: ~p", [{Sys, {Realm, UUID}}]),
+    case gen_tcp:send(Socket, term_to_binary({raw, Sys, Realm, UUID})) of
         ok ->
             case gen_tcp:recv(Socket, 0, Timeout) of
                 {error, E} ->
@@ -164,9 +164,9 @@ sync_get(_, State = #state{
                     case binary_to_term(Bin) of
                         {ok, Obj} ->
                             lager:debug("[sync-exchange] repairing(~p): ~p", [NVS, Obj]),
-                            snarl_entity_write_fsm:write(NVS, UUID, sync_repair, Obj);
+                            snarl_entity_write_fsm:write(NVS, {Realm, UUID}, sync_repair, Obj);
                         not_found ->
-                            snarl_entity_write_fsm:write(NVS, UUID, delete, undefined)
+                            snarl_entity_write_fsm:write(NVS, {Realm, UUID}, delete, undefined)
                     end,
                     {next_state, sync_get, State#state{get=R}, 0}
             end;
@@ -181,8 +181,8 @@ sync_get(_, State = #state{get=[]}) ->
 sync_push(_, State = #state{
                         socket=Socket,
                         push=[{Sys, {Realm, UUID}}|R]}) ->
-    lager:debug("[sync-exchange] Push: ~p", [{Sys, UUID}]),
-    Msg  = case Sys:raw(UUID) of
+    lager:debug("[sync-exchange] Push: ~p", [{Sys, {Realm, UUID}}]),
+    Msg  = case Sys:raw(Realm, UUID) of
                {ok, Obj} ->
                    write(Sys, Realm, UUID, sync_repair, Obj);
                not_found ->

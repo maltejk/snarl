@@ -118,7 +118,7 @@ handle_cast({done, Sys, Version}, State = #state{tree = Tree}) ->
     Tree1 = [E || E = {{S, _}, {V, _}} <- Tree, V >= Version orelse S =/= Sys],
     {noreply, State#state{tree=Tree1}};
 handle_cast({insert, Sys, Vsn, ID, Hash}, State) ->
-    lager:debug("[sync] Insert: ~p(~p) <- ~s(~s)", [Sys, Vsn, ID, Hash]),
+    lager:debug("[sync] Insert: ~p(~p) <- ~p(~s)", [Sys, Vsn, ID, Hash]),
     {noreply, update_tree(Sys, ID, Hash, Vsn, State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
