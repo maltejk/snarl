@@ -214,9 +214,11 @@ handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
 handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
     handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
 
-handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
-    FoldFn = fun(K, V, Acc) ->
-                     [{0, {K, V}} | Acc]
+handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket, state=SM}) ->
+    ID = mkid(),
+    FoldFn = fun(K, O, Acc) ->
+                     O1 = ft_obj:update(SM:load(ID, ft_obj:val(O)), node(), O),
+                     [{0, {K, O1}} | Acc]
              end,
     fold(Bucket, FoldFn, [], Sender, State);
 
