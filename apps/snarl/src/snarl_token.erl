@@ -5,8 +5,14 @@
 -export([
          get/2,
          add/2,
-         delete/2
+         delete/2,
+         reindex/2
         ]).
+
+-ignore_xref([
+              reindex/2
+             ]).
+
 
 -define(FM(Met, Mod, Fun, Args),
         folsom_metrics:histogram_timed_update(
@@ -17,6 +23,8 @@
 -spec get(binary(), fifo:token()) ->
                  not_found |
                  {ok, fifo:user_id()}.
+
+reindex(_, _) -> ok.
 
 get(Realm, Token) ->
     R = ?FM(get, snarl_entity_read_fsm, start,
