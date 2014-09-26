@@ -1,4 +1,4 @@
-% @doc Interface for snarl-admin commands.
+%% @doc Interface for snarl-admin commands.
 -module(snarl_console).
 
 -include("snarl.hrl").
@@ -712,10 +712,11 @@ do_update(RealmS, MainMod, StateMod) ->
     {ok, US} = MainMod:list_(undefined),
     io:format("  Entries found: ~p~n", [length(US)]),
     io:format("  Grabbing UUIDs"),
+    ID = snarl_vnode:mkid(),
     US1 = [begin
                io:format("."),
                U1 = ft_obj:update(U),
-               {StateMod:uuid(ft_obj:val(U1)), U1}
+               {StateMod:uuid(StateMod:load(ID, ft_obj:val(U1))), U1}
            end|| U <- US],
     io:format(" done.~n"),
 
