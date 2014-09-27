@@ -40,8 +40,8 @@ init(_Args) ->
                   {riak_core_vnode_master, start_link, [snarl_org_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
-    S2iVMaster = {snarl_s2i_vnode_master,
-                  {riak_core_vnode_master, start_link, [snarl_s2i_vnode]},
+    S2iVMaster = {snarl_2i_vnode_master,
+                  {riak_core_vnode_master, start_link, [snarl_2i_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
     CoverageFSMs = {snarl_entity_coverage_fsm_sup,

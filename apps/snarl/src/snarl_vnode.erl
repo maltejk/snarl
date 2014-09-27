@@ -214,9 +214,11 @@ handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
 handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
     handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
 
-handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket}) ->
-    FoldFn = fun(K, V, Acc) ->
-                     [{0, {K, V}} | Acc]
+handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket, state=SM}) ->
+    ID = mkid(),
+    FoldFn = fun(K, O, Acc) ->
+                     O1 = ft_obj:update(SM:load(ID, ft_obj:val(O)), node(), O),
+                     [{0, {K, O1}} | Acc]
              end,
     fold(Bucket, FoldFn, [], Sender, State);
 
@@ -236,7 +238,7 @@ handle_coverage(Req, _KeySpaces, _Sender, State) ->
 
 handle_command({sync_repair, {ReqID, _}, {Realm, UUID}, Obj}, _Sender,
                %% VNode equals the control module
-               State=#vstate{state=Mod, vnode=VN}) ->
+               State=#vstate{state=Mod}) ->
     case get(Realm, UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
@@ -251,12 +253,12 @@ handle_command({sync_repair, {ReqID, _}, {Realm, UUID}, Obj}, _Sender,
             lager:error("[~s] Read repair failed, data was updated too recent.",
                         [State#vstate.bucket])
     end,
-    spawn(VN, reindex, [Realm, UUID]),
+    spawn(State#vstate.service, reindex, [Realm, UUID]),
     {reply, {ok, ReqID}, State};
 
 handle_command({repair, {Realm, UUID}, _VClock, Obj}, _Sender,
                %% VNode equals the control module
-               State=#vstate{state=Mod, vnode=VN}) ->
+               State=#vstate{state=Mod}) ->
     case get(Realm, UUID, State) of
         {ok, Old} ->
             ID = snarl_vnode:mkid(),
@@ -269,7 +271,7 @@ handle_command({repair, {Realm, UUID}, _VClock, Obj}, _Sender,
             lager:error("[~s] Read repair failed, data was updated too recent.",
                         [State#vstate.bucket])
     end,
-    spawn(VN, reindex, [Realm, UUID]),
+    spawn(State#vstate.service, reindex, [Realm, UUID]),
     {noreply, State};
 
 handle_command({get, ReqID, {Realm, UUID}}, _Sender, State) ->
@@ -349,12 +351,22 @@ handle_command({rehash, {Realm, UUID}}, _,
     end,
     {noreply, State};
 
-handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender, State) ->
+handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
+               State=#vstate{db=DB}) ->
     Bucket = mk_bkt(State),
     FoldFn = fun(<<_RS:8/integer, Realm:_RS/binary, K/binary>>, V, O) ->
                      Fun({Realm, K}, V, O)
              end,
-    fold(Bucket, FoldFn, Acc0, Sender, State);
+    AsyncWork = fun() ->
+                        ?FM(fifo_db, fold, [DB, Bucket, FoldFn, Acc0])
+                end,
+    FinishFun = fun(Acc) ->
+                        riak_core_vnode:reply(Sender, Acc)
+                end,
+    {async, {fold, AsyncWork, FinishFun}, Sender, State};
+
+
+
 
 handle_command({Action, ID, {Realm, UUID}, Param1, Param2}, _Sender, State) ->
     change(Realm, UUID, Action, [Param1, Param2], ID, State);

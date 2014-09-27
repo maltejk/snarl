@@ -7,14 +7,14 @@
          list/0, list/1, list/3, list_/1,
          get/2, get/3, raw/2, raw/3,
          add/4, delete/3,
-         wipe/3
+         wipe/3, reindex/2
         ]).
 
 -ignore_xref([
               wipe/3, raw/3,
               list/0, list/1, list/3, list_/1,
               create/3, raw/2, sync_repair/3,
-              import/3, lookup/2
+              import/3, lookup/2, reindex/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -25,6 +25,8 @@
           Mod, Fun, Args)).
 
 %% Public API
+
+reindex(_, _) -> ok.
 
 wipe(Realm, Type, Key) ->
     TK = term_to_binary({Type, Key}),
