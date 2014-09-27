@@ -143,7 +143,7 @@ command(S) ->
           ]).
 
 handoff_handon() ->
-    {ok, Data} = handoff(),
+    Data = handoff(),
     delete(),
     handon(Data).
 

@@ -348,12 +348,22 @@ handle_command({rehash, {Realm, UUID}}, _,
     end,
     {noreply, State};
 
-handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender, State) ->
+handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
+               State=#vstate{db=DB}) ->
     Bucket = mk_bkt(State),
     FoldFn = fun(<<_RS:8/integer, Realm:_RS/binary, K/binary>>, V, O) ->
                      Fun({Realm, K}, V, O)
              end,
-    fold(Bucket, FoldFn, Acc0, Sender, State);
+    AsyncWork = fun() ->
+                        ?FM(fifo_db, fold, [DB, Bucket, FoldFn, Acc0])
+                end,
+    FinishFun = fun(Acc) ->
+                        riak_core_vnode:reply(Sender, Acc)
+                end,
+    {async, {fold, AsyncWork, FinishFun}, Sender, State};
+
+
+
 
 handle_command({Action, ID, {Realm, UUID}, Param1, Param2}, _Sender, State) ->
     change(Realm, UUID, Action, [Param1, Param2], ID, State);
