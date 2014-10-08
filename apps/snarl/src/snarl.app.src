@@ -11,6 +11,7 @@
      folsom_ddb,
      mdns_server_lib,
      lager,
+     lager_watchdog,
      libsnarlmatch,
      jsx,
      snmp,
