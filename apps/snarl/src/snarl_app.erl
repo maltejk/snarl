@@ -2,6 +2,8 @@
 
 -behaviour(application).
 
+-include("snarl_version.hrl").
+
 %% Application callbacks
 -export([start/2, stop/1, init_folsom/0, reindex/0]).
 
@@ -50,6 +52,7 @@ start(_StartType, _StartArgs) ->
                 _ ->
                     ok
             end,
+            lager_watchdog_srv:set_version(?VERSION),
             timer:apply_after(2000, snarl_opt, update, []),
             spawn(?MODULE, reindex, []),
             {ok, Pid};
