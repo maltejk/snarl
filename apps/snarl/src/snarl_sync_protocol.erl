@@ -1,71 +1,46 @@
 -module(snarl_sync_protocol).
 
--behaviour(gen_server).
 -behaviour(ranch_protocol).
 
--export([start_link/4,
-         init/1, handle_call/3, handle_cast/2, handle_info/2,
-         terminate/2, code_change/3]).
+-export([start_link/4, init/4]).
 
--ignore_xref([start_link/4]).
+%-ignore_xref([start_link/4]).
 
--record(state, {socket, transport, ok, error, closed}).
+-record(state, {socket, transport,
+                %% Timeout for a connection is 30s w/o a message
+                timeout = 30000}).
 
-start_link(ListenerPid, Socket, Transport, Opts) ->
-    proc_lib:start_link(?MODULE, init, [[ListenerPid, Socket, Transport, Opts]]).
+start_link(Ref, Socket, Transport, Opts) ->
+    Pid = spawn_link(?MODULE, init, [Ref, Socket, Transport, Opts]),
+    {ok, Pid}.
 
-init([ListenerPid, Socket, Transport, _Opts = []]) ->
-    ok = proc_lib:init_ack({ok, self()}),
-    ok = ranch:accept_ack(ListenerPid),
+init(Ref, Socket, Transport, _Opts = []) ->
+    ok = ranch:accept_ack(Ref),
     ok = Transport:setopts(Socket, [{active, true}, {packet,4}]),
-    {OK, Closed, Error} = Transport:messages(),
-    gen_server:enter_loop(?MODULE, [], #state{
-                                          ok = OK,
-                                          closed = Closed,
-                                          error = Error,
-                                          socket = Socket,
-                                          transport = Transport}).
+    loop(#state{socket = Socket, transport = Transport}).
 
-handle_info({_OK, Socket, BinData}, State = #state{
-                                               transport = Transport,
-                                               ok = _OK}) ->
-    case binary_to_term(BinData) of
-        ping ->
-            Transport:send(Socket, term_to_binary(pong)),
-            {noreply, State};
-        get_tree ->
-            {ok, Tree} = snarl_sync_tree:get_tree(),
-            Transport:send(Socket, term_to_binary({ok, Tree})),
-            {noreply, State};
-        {raw, System, Realm, UUID} ->
-            Data = System:raw(Realm, UUID),
-            Transport:send(Socket, term_to_binary(Data)),
-            {noreply, State};
-        {repair, System, Realm, UUID, Obj} ->
-            System:sync_repair(Realm, UUID, Obj),
-            {noreply, State};
-        {delete, System, Realm, UUID} ->
-            System:delete(Realm, UUID),
-            {noreply, State};
-        {write, Node, VNode, System, Realm, UUID, Op, Val} ->
-            NVS = {{remote, Node}, VNode, System},
-            snarl_entity_write_fsm:write(NVS, {Realm, UUID}, Op, Val),
-            {noreply, State}
-    end;
-
-handle_info(Info, State) ->
-    lager:warning("[mdns server] Unknown message: ~p ",
-                  [Info]),
-    {noreply, State}.
-
-handle_call(_Request, _From, State) ->
-    {reply, {error, unknwon}, State}.
-
-handle_cast(_Msg, State) ->
-    {noreply, State}.
-
-terminate(_Reason, _State) ->
-    ok.
-
-code_change(_OldVsn, State, _Extra) ->
-    {ok, State}.
+loop(State = #state{transport = Transport, socket = Socket, timeout = Timeout}) ->
+    case Transport:recv(Socket, 0, Timeout) of
+        {ok, BinData} ->
+            case binary_to_term(BinData) of
+                ping ->
+                    Transport:send(Socket, term_to_binary(pong));
+                get_tree ->
+                    {ok, Tree} = snarl_sync_tree:get_tree(),
+                    Transport:send(Socket, term_to_binary({ok, Tree}));
+                {raw, System, Realm, UUID} ->
+                    Data = System:raw(Realm, UUID),
+                    Transport:send(Socket, term_to_binary(Data));
+                {repair, System, Realm, UUID, Obj} ->
+                    System:sync_repair(Realm, UUID, Obj);
+                {delete, System, Realm, UUID} ->
+                    System:delete(Realm, UUID);
+                {write, Node, VNode, System, Realm, UUID, Op, Val} ->
+                    NVS = {{remote, Node}, VNode, System},
+                    snarl_entity_write_fsm:write(NVS, {Realm, UUID}, Op, Val)
+            end,
+            loop(State);
+        E ->
+            lager:warning("[sync] Closing connection with error: ~p", [E]),
+            Transport:close(Socket)
+    end.
