@@ -16,7 +16,7 @@ start_link(Ref, Socket, Transport, Opts) ->
 
 init(Ref, Socket, Transport, _Opts = []) ->
     ok = ranch:accept_ack(Ref),
-    ok = Transport:setopts(Socket, [{active, true}, {packet,4}]),
+    ok = Transport:setopts(Socket, [{active, false}, {packet,4}]),
     loop(#state{socket = Socket, transport = Transport}).
 
 loop(State = #state{transport = Transport, socket = Socket, timeout = Timeout}) ->
