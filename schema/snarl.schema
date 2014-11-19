@@ -169,6 +169,13 @@
 }.
 
 {translation,
+ "riak_ensemble.data_root",
+ fun(Conf) ->
+         cuttlefish:conf_get("platform_data_dir", Conf)
+ end
+}.
+
+{translation,
  "hanoidb.data_root",
  fun(Conf) ->
          cuttlefish:conf_get("platform_data_dir", Conf)
