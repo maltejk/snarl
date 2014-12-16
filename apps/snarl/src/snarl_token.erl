@@ -31,15 +31,25 @@ get(Realm, Token) ->
             [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]),
     case R of
         {ok, not_found} ->
+            lager:debug("[token:~s] ~s not found.", [Realm, Token]),
             not_found;
         _ ->
+            lager:debug("[token:~s] ~s found.", [Realm, Token]),
             R
     end.
 
 add(Realm, User) ->
-    do_write(Realm, uuid:uuid4s(), add, User).
+    case do_write(Realm, uuid:uuid4s(), add, User) of
+        {ok, Token} ->
+            lager:debug("[token:~s/~s] New token ~s.", [Realm, User, Token]),
+            {ok, Token};
+        E ->
+            lager:debug("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
+            E
+    end.
 
 delete(Realm, Token) ->
+    lager:debug("[token:~s] deleted token ~s.", [Realm, Token]),
     do_write(Realm, Token, delete).
 
 %%%===================================================================
