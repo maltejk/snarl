@@ -1,6 +1,5 @@
 %% -*- erlang -*-
 
-
 %% @doc This section deals with Yubikey support a API key and
 %% client ID can be obtained from:
 %% https://upgrade.yubico.com/getapikey/
@@ -32,7 +31,6 @@
 
 %% @doc Specifies weather syncronisation is enabled on this node
 %% or not, valid values are 'on' and 'off'.
-
 {mapping, "sync", "snarl.sync", [
   {datatype, {enum, [on, off, debug]}},
   {default, off}
@@ -174,21 +172,6 @@
          cuttlefish:conf_get("platform_data_dir", Conf)
  end
 }.
-
-{translation,
- "hanoidb.data_root",
- fun(Conf) ->
-         cuttlefish:conf_get("platform_data_dir", Conf)
- end
-}.
-
-{translation,
- "bitcask.data_root",
- fun(Conf) ->
-         cuttlefish:conf_get("platform_data_dir", Conf)
- end
-}.
-
 
 %% @doc The mDNS domain this installation is part of
 {mapping, "domain", "mdns_server_lib.domain",
