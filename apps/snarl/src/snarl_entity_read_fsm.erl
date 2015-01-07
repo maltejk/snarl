@@ -55,9 +55,9 @@
                 size,
                 timeout=?DEFAULT_TIMEOUT,
                 val,
-                vnode,
+                vnode :: atom(),
                 bucket,
-                system,
+                system :: atom(),
                 replies=[]}).
 
 %%%===================================================================
@@ -91,7 +91,9 @@ start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
 %%% States
 %%%===================================================================
 
-init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) ->
+init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) when
+      is_atom(VNode),
+      is_atom(System) ->
     ?DT_READ_ENTRY(Entity, Op),
     SD = #state{raw=Raw,
                 bucket=Realm,
@@ -107,7 +109,9 @@ init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) ->
                 entity=Entity},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System}, Op, From, {Realm, Entity}]) ->
+init([ReqId, {VNode, System}, Op, From, {Realm, Entity}]) when
+      is_atom(VNode),
+      is_atom(System) ->
     ?DT_READ_ENTRY(Entity, Op),
     SD = #state{req_id=ReqId,
                 bucket=Realm,
@@ -292,7 +296,7 @@ different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
 %% @impure
 %%
 %% @doc Repair any vnodes that do not have the correct object.
--spec repair(atom(), string(), fifo:obj(), [vnode_reply()]) -> io.
+-spec repair(atom(), {binary(), binary()}, fifo:obj(), [vnode_reply()]) -> io.
 repair(_, _, _, []) -> io;
 
 repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
