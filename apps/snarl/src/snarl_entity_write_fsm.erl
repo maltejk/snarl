@@ -85,7 +85,7 @@ write({VNode, System}, {Realm, Entity}, Op, Val) ->
     write({node(), VNode, System}, {Realm, Entity}, Op, Val);
 
 write({{remote, Node}, VNode, System}, {Realm, Entity}, Op, Val) ->
-    lager:info("[sync-write:~p] executing sync write", [System]),
+    lager:debug("[sync-write:~p] executing sync write", [System]),
     ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, undefined, {Realm, Entity}, Op, Val]);
 
@@ -113,7 +113,6 @@ write({Node, VNode, System}, {Realm, Entity}, Op, Val) ->
 %% @doc Initialize the state data.
 
 init([{Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val]) ->
-    {N, _R, W} = ?NRW(System),
     SD = #state{req_id=ReqID,
                 from=From,
                 bucket=Realm,
@@ -121,8 +120,8 @@ init([{Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val]) ->
                 op=Op,
                 vnode=VNode,
                 start=now(),
-                w = W,
-                n = N,
+                w = ?W,
+                n = ?N,
                 system=System,
                 cordinator=Node,
                 val=Val},
@@ -162,7 +161,7 @@ execute(timeout, SD0=#state{req_id=ReqID,
 waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    lager:info("Write(~p) ok", [NumW]),
+    lager:debug("Write(~p) ok", [NumW]),
     if
         NumW =:= W ->
             case From of
@@ -179,7 +178,7 @@ waiting({ok, ReqID, Reply},
         SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    lager:info("Write(~p) reply: ~p", [NumW, Reply]),
+    lager:debug("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= W ->
             if

@@ -2,6 +2,8 @@
 
 -behaviour(application).
 
+-include("snarl_version.hrl").
+
 %% Application callbacks
 -export([start/2, stop/1, init_folsom/0, reindex/0]).
 
@@ -25,6 +27,7 @@ start(_StartType, _StartArgs) ->
     init_folsom(),
     case snarl_sup:start_link() of
         {ok, Pid} ->
+            lager_watchdog_srv:set_version(?VERSION),
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
             ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
             ?SRV_WITH_AAE(snarl_org_vnode, snarl_org),
@@ -70,7 +73,8 @@ init_folsom() ->
     RoleMs = [wipe, lookup, get, list, list_all, sync_repair, import, add,
               delete, grant, revoke, revoke_prefix, set_metadata],
     OrgMs = [wipe, lookup, get, list, list_all, sync_repair, add_trigger,
-             remove_target, remove_trigger, import, add, delete, set_metadata],
+             remove_target, remove_trigger, import, add, delete, set_metadata,
+             resource_action],
     S2i = [list, get, add, delete],
     TokenMs = [get, add, delete],
     [folsom_metrics:new_histogram(Name, slide, 60) ||

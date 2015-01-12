@@ -141,7 +141,7 @@ start_fake_read_fsm() ->
                         Res
                 end),
     meck:expect(snarl_entity_read_fsm, start,
-                fun({M, _}, C, E, _, true) ->
+                fun({M, _}, C, E, _, _Raw) ->
                         ReqID = id(),
                         R = M:C(dummy, ReqID, E),
                         Res = case R of

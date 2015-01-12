@@ -217,9 +217,16 @@ expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State)
     State;
 
 expire(#state{tokens = Tokens, timeout = Timeout} = State) ->
-    Tokens1 = dict:filter(fun(_K, {Timer, _V}) ->
-                                  timer:now_diff(Timer, now()) =< Timeout
-                          end, Tokens),
+    Tokens1 = dict:filter(
+                fun({Realm, Token}, {Timer, _V}) ->
+                        case timer:now_diff(Timer, now()) =< Timeout of
+                            false ->
+                                lager:debug("[token:~s] Expiering: ~s", [Realm, Token]),
+                                false;
+                            true ->
+                                true
+                        end
+                end, Tokens),
     State#state{
       access_cnt = 0,
       tokens = Tokens1,

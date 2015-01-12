@@ -1,6 +1,6 @@
 -module(snarl_opt).
 
--export([get/5, set/2, update/0]).
+-export([get/5, set/2, unset/1, update/0]).
 -ignore_xref([update/0]).
 
 get(Prefix, SubPrefix, Key, EnvKey, Dflt) ->
@@ -9,6 +9,8 @@ get(Prefix, SubPrefix, Key, EnvKey, Dflt) ->
 set(Ks, Val) ->
     fifo_opt:set(opts(), Ks, Val).
 
+unset(Ks) ->
+    fifo_opt:unset(opts(), Ks).
 
 update() ->
     Opts =
@@ -40,4 +42,3 @@ opts() ->
         [{"inital_role", binary}, {"inital_org", binary}]}]},
      {"yubico",
       [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].
-

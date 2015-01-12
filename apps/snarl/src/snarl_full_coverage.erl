@@ -37,7 +37,8 @@ start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true
 
 %% The first is the vnode service used
 init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Realm, Requirements, Full, Raw}}) ->
-    {NVal, R, _W} = ?NRW(NodeCheckService),
+    NVal = ?N,
+    R = ?R,
     %% all - full coverage; allup - partial coverage
     VNodeSelector = allup,
     %% Same as R value here, TODO: Make this dynamic
