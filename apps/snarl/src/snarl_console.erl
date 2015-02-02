@@ -238,9 +238,9 @@ add_role([RealmS, Role]) ->
 
 join_role([RealmS, User, Role]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_user:lookup_(Realm, list_to_binary(User)) of
+    case snarl_user:lookup(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_role:lookup_(Realm, list_to_binary(Role)) of
+            case snarl_role:lookup(Realm, list_to_binary(Role)) of
                 {ok, RoleObj} ->
                     ok = snarl_user:join(Realm,
                                          ft_user:uuid(UserObj),
@@ -258,9 +258,9 @@ join_role([RealmS, User, Role]) ->
 
 leave_role([RealmS, User, Role]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_user:lookup_(Realm, list_to_binary(User)) of
+    case snarl_user:lookup(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
-            case snarl_role:lookup_(Realm, list_to_binary(Role)) of
+            case snarl_role:lookup(Realm, list_to_binary(Role)) of
                 {ok, RoleObj} ->
                     ok = snarl_user:leave(Realm,
                                           ft_user:uuid(UserObj),
@@ -278,7 +278,7 @@ leave_role([RealmS, User, Role]) ->
 
 passwd([RealmS, User, Pass]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_user:lookup_(Realm, list_to_binary(User)) of
+    case snarl_user:lookup(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
             case snarl_user:passwd(Realm,
                                    ft_user:uuid(UserObj),
@@ -297,7 +297,7 @@ passwd([RealmS, User, Pass]) ->
 
 grant_role([RealmS, Role | P]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_role:lookup_(Realm, list_to_binary(Role)) of
+    case snarl_role:lookup(Realm, list_to_binary(Role)) of
         {ok, RoleObj} ->
             case snarl_role:grant(Realm, ft_role:uuid(RoleObj),
                                   build_permission(P)) of
@@ -315,7 +315,7 @@ grant_role([RealmS, Role | P]) ->
 
 grant_user([RealmS, User | P ]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_user:lookup_(Realm, list_to_binary(User)) of
+    case snarl_user:lookup(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
             case snarl_user:grant(Realm,
                                   ft_user:uuid(UserObj),
@@ -334,7 +334,7 @@ grant_user([RealmS, User | P ]) ->
 
 revoke_user([RealmS, User | P ]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_user:lookup_(Realm, list_to_binary(User)) of
+    case snarl_user:lookup(Realm, list_to_binary(User)) of
         {ok, UserObj} ->
             case snarl_user:revoke(Realm,
                                    ft_user:uuid(UserObj),
@@ -353,7 +353,7 @@ revoke_user([RealmS, User | P ]) ->
 
 revoke_role([RealmS, Role | P]) ->
     Realm = list_to_binary(RealmS),
-    case snarl_role:lookup_(Realm, list_to_binary(Role)) of
+    case snarl_role:lookup(Realm, list_to_binary(Role)) of
         {ok, RoleObj} ->
             case snarl_role:revoke(Realm,
                                    ft_role:uuid(RoleObj),
