@@ -97,6 +97,12 @@ message({user, get, Realm, User}, State) when
      snarl_user:get(Realm, User),
      State};
 
+message({user, token, Realm, User}, State) when
+    is_binary(User) ->
+    {reply,
+     snarl_token:add(Realm, User),
+     State};
+
 message({user, keys, find, Realm, KeyID}, State) when
       is_binary(KeyID) ->
     {reply,
