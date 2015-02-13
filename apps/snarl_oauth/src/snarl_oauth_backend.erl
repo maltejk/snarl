@@ -125,7 +125,7 @@ resolve_access_token(AccessToken, AppContext) ->
     case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_TOKEN_TABLE, AccessToken}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
-        not_founed ->
+        not_found ->
             {error, notfound}
     end.
 
@@ -149,7 +149,7 @@ resolve_refresh_token(RefreshToken, AppContext) ->
     case snarl_token:get(AppContext#oauth_state.realm, {?REFRESH_TOKEN_TABLE, RefreshToken}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
-        not_founed ->
+        not_found ->
             {error, notfound}
     end.
 
