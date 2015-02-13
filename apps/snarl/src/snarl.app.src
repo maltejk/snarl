@@ -17,6 +17,7 @@
      snmp,
      crypto,
      bcrypt,
+     snarl_oauth,
      uuid
      ]},
   {mod, {snarl_app, []}},
