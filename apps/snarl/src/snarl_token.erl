@@ -4,13 +4,13 @@
 
 -export([
          get/2,
-         add/2,
+         add/2, add/3,
          delete/2,
          reindex/2
         ]).
 
 -ignore_xref([
-              reindex/2
+              reindex/2, add/3
              ]).
 
 
@@ -38,15 +38,20 @@ get(Realm, Token) ->
             R
     end.
 
+
 add(Realm, User) ->
-    case do_write(Realm, uuid:uuid4s(), add, User) of
+    add(Realm, uuid:uuid4s(), User).
+
+add(Realm, Token, User) ->
+    case do_write(Realm, Token, add, User) of
         {ok, Token} ->
-            lager:debug("[token:~s/~s] New token ~s.", [Realm, User, Token]),
+            lager:debug("[token:~s/~s] New token ~p.", [Realm, User, Token]),
             {ok, Token};
         E ->
             lager:debug("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
             E
     end.
+
 
 delete(Realm, Token) ->
     lager:debug("[token:~s] deleted token ~s.", [Realm, Token]),

@@ -4,6 +4,8 @@
 
 -include("snarl_version.hrl").
 
+-include_lib("snarl_oauth/include/snarl_oauth.hrl").
+
 -export([init/2, message/2]).
 
 -ignore_xref([init/2, message/2]).
@@ -333,6 +335,164 @@ message({role, revoke, Realm, Role, Permission}, State) ->
 
 message({role, revoke_prefix, Realm, Role, Prefix}, State) ->
     {reply, snarl_role:revoke_prefix(Realm, Role, Prefix), State};
+
+
+%%%===================================================================
+%%% OAuth2 Functions
+%%%===================================================================
+
+%%-export([authorize_password/3]).
+message(
+  {oauth2, authorize_password_otp, Realm, User, Password, OTP, Scope}, State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_password({User, Password, OTP}, Scope, Ctx),
+     State};
+%%-export([authorize_password/4]).
+message(
+  {oauth2, authorize_password_otp, Realm, User, Password, OTP, Client, Scope}, State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_password({User, Password, OTP}, Client, Scope, Ctx),
+     State};
+
+%%-export([authorize_password/5]).
+message(
+  {oauth2, authorize_password_otp, Realm, User, Password, OTP, Client, RedirUri, Scope},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_password({User, Password, OTP}, Client, RedirUri, Scope, Ctx),
+     State};
+
+%%-export([authorize_password/3]).
+message(
+  {oauth2, authorize_password, Realm, User, Password, Scope}, State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_password({User, Password}, Scope, Ctx),
+     State};
+%%-export([authorize_password/4]).
+message(
+  {oauth2, authorize_password, Realm, User, Password, Client, Scope}, State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_password({User, Password}, Client, Scope, Ctx),
+     State};
+
+%%-export([authorize_password/5]).
+message(
+  {oauth2, authorize_password, Realm, User, Password, Client, RedirUri, Scope},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_password({User, Password}, Client, RedirUri, Scope, Ctx),
+     State};
+
+%% -export([authorize_client_credentials/3]).
+message(
+  {oauth2, authorize_client_credentials, Realm, Client, Secret, Scope},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_client_credentials({Client, Secret}, Scope, Ctx),
+     State};
+
+%% -export([authorize_code_grant/4]).
+message(
+  {oauth2, authorize_code_grant, Realm, Client, Code, RedirUri},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_code_grant(Client, Code, RedirUri, Ctx),
+     State};
+
+%% -export([authorize_code_request/5]).
+message(
+  {oauth2, authorize_code_request, Realm, User, Pass, Client, RedirUri, Scope},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_code_request({User, Pass}, Client, RedirUri, Scope, Ctx),
+     State};
+
+%% -export([authorize_code_request/5]).
+message(
+  {oauth2, authorize_code_request_otp, Realm, User, Pass, Otp, Client, RedirUri, Scope},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:authorize_code_request({User, Pass, Otp}, Client, RedirUri, Scope, Ctx),
+     State};
+
+
+%% -export([issue_code/2]).
+message(
+  {oauth2, issue_code, Realm, Auth},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:issue_code(Auth, Ctx),
+     State};
+
+%% -export([issue_token/2]).
+message(
+  {oauth2, issue_token, Realm, Auth},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:issue_token(Auth, Ctx),
+     State};
+
+%% -export([issue_token_and_refresh/2]).
+message(
+  {oauth2, issue_token_and_refresh, Realm, Auth},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:issue_token_and_refresh(Auth, Ctx),
+     State};
+
+%% -export([verify_access_token/2]).
+message(
+  {oauth2, verify_access_token, Realm, Token},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:verify_access_token(Token, Ctx),
+     State};
+
+%% -export([verify_access_code/2]).
+message(
+  {oauth2, verify_access_code, Realm, AccessCode},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:verify_access_code(AccessCode, Ctx),
+     State};
+
+%% -export([verify_access_code/3]).
+message(
+  {oauth2, verify_access_code, Realm, AccessCode, Client},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:verify_access_code(AccessCode, Client, Ctx),
+     State};
+
+%% -export([refresh_access_token/4]).
+message(
+  {oauth2, refresh_access_token, Realm, Client, RefreshToken, Scope},
+  State) ->
+    Ctx = #oauth_state{realm = Realm},
+    {reply,
+     oauth2:refresh_access_token(Client, RefreshToken, Scope, Ctx),
+     State};
+
+
+%%%===================================================================
+%%% Internal
+%%%===================================================================
 
 message({cloud, status}, State) ->
     {reply,

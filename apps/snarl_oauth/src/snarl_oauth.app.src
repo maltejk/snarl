@@ -1,0 +1,13 @@
+{application, snarl_oauth,
+ [
+  {description, ""},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  oauth2,
+                  stdlib
+                 ]},
+  {mod, { snarl_oauth_app, []}},
+  {env, []}
+ ]}.
