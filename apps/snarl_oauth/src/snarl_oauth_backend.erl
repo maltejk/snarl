@@ -82,7 +82,7 @@ authenticate_user({Username, Password, OTP}, AppContext) ->
         %%{ok, #resowner{password = _WrongPassword}} ->
         %%    {error, badpass};
         not_found ->
-            not_found
+            {error, notfound}
     end.
 
 authenticate_client({ClientId, ClientSecret}, AppContext) ->
@@ -93,7 +93,7 @@ authenticate_client({ClientId, ClientSecret}, AppContext) ->
         %%{ok, #resowner{password = _WrongPassword}} ->
         %%    {error, badpass};
         not_found ->
-            not_found
+            {error, notfound}
     end.
 
 %% Is this a Authrorization Code?
@@ -108,7 +108,7 @@ resolve_access_code(AccessCode, AppContext) ->
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
-            not_found
+            {error, notfound}
     end.
 
 %% @doc Revokes an access code AccessCode, so that it cannot be used again.
@@ -126,7 +126,7 @@ resolve_access_token(AccessToken, AppContext) ->
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
-            not_found
+            {error, notfound}
     end.
 
 %% Not implemented yet.
@@ -150,7 +150,7 @@ resolve_refresh_token(RefreshToken, AppContext) ->
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
-            not_found
+            {error, notfound}
     end.
 
 revoke_refresh_token(RefreshToken, AppContext) ->
@@ -162,7 +162,7 @@ get_client_identity(ClientId, AppContext) ->
         {ok, Client} ->
             {ok, {AppContext, ft_user:uuid(Client)}};
         not_found ->
-            not_found
+            {error, notfound}
     end.
 
 verify_redirection_uri(_Client, undefined, AppContext) ->
@@ -292,7 +292,7 @@ permissions_to_scope1([E| R]) ->
 %%get(Table, Key) ->
 %%    case ets:lookup(Table, Key) of
 %%        [] ->
-%%            not_found;
+%%            {error, notfound};
 %%        [{_Key, Value}] ->
 %%            {ok, Value}
 %%    end.
