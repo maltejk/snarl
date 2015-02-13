@@ -181,9 +181,14 @@ verify_redirection_uri(ClientUUID, Uri, AppContext) ->
             {error, baduri}
     end.
 
-verify_client_scope(ClientID, Scope, AppContext) ->
-    {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, <<"client:", ClientID/binary>>),
-    verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext).
+verify_client_scope({Client, _Secret}, Scope, AppContext) ->
+    case snarl_user:lookup(AppContext#oauth_state.realm, <<"client:", Client/binary>>) of
+        {ok, ClientID} ->
+            {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, ft_user:uuid(ClientID)),
+            verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext);
+        _E ->
+            {error, badscope}
+    end.
 
 verify_resowner_scope(UserID, Scope, AppContext) ->
     {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, UserID),
