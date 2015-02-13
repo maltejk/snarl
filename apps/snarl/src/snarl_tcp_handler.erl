@@ -400,11 +400,11 @@ message(
 
 %% -export([authorize_code_grant/4]).
 message(
-  {oauth2, authorize_code_grant, Realm, Client, Code, RedirUri},
+  {oauth2, authorize_code_grant, Realm, Client, Secret, Code, RedirUri},
   State) ->
     Ctx = #oauth_state{realm = Realm},
     {reply,
-     oauth2:authorize_code_grant(Client, Code, RedirUri, Ctx),
+     oauth2:authorize_code_grant({Client, Secret}, Code, RedirUri, Ctx),
      State};
 
 %% -export([authorize_code_request/5]).
@@ -482,11 +482,11 @@ message(
 
 %% -export([refresh_access_token/4]).
 message(
-  {oauth2, refresh_access_token, Realm, Client, RefreshToken, Scope},
+  {oauth2, refresh_access_token, Realm, Client, Secret, RefreshToken, Scope},
   State) ->
     Ctx = #oauth_state{realm = Realm},
     {reply,
-     oauth2:refresh_access_token(Client, RefreshToken, Scope, Ctx),
+     oauth2:refresh_access_token({Client, Secret}, RefreshToken, Scope, Ctx),
      State};
 
 

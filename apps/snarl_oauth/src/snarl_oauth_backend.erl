@@ -103,7 +103,6 @@ associate_access_code(AccessCode, Context, AppContext) ->
     {ok, AppContext}.
 
 resolve_access_code(AccessCode, AppContext) ->
-    io:format("resolve_access_code(~p, ~p).~n", [AccessCode, AppContext]),
     %% case get(?ACCESS_CODE_TABLE, AccessCode) of
     case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}) of
         {ok, Context} -> %% Was Grant
