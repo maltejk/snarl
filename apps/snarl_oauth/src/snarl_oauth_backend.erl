@@ -70,6 +70,9 @@
 %%%===================================================================
 %%% OAuth2 backend functions
 %%%===================================================================
+authenticate_user({UserID}, AppContext) ->
+    {ok, {AppContext, UserID}};
+
 authenticate_user({Username, Password}, AppContext) ->
     authenticate_user({Username, Password, <<>>}, AppContext);
 
@@ -85,6 +88,8 @@ authenticate_user({Username, Password, OTP}, AppContext) ->
             {error, notfound}
     end.
 
+authenticate_client({UserID}, AppContext) ->
+    {ok, {AppContext, UserID}};
 authenticate_client({ClientId, ClientSecret}, AppContext) ->
     case snarl_user:auth(AppContext#oauth_state.realm, <<"client:", ClientId/binary>>, ClientSecret, <<>>) of
         %%case get(?CLIENT_TABLE, ClientId) of
