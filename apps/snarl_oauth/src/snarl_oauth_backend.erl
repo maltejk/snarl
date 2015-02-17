@@ -186,18 +186,27 @@ verify_redirection_uri(ClientUUID, Uri, AppContext) ->
             {error, baduri}
     end.
 
-verify_client_scope({Client, _Secret}, Scope, AppContext) ->
-    case snarl_user:lookup(AppContext#oauth_state.realm, <<"client:", Client/binary>>) of
-        {ok, ClientID} ->
-            {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, ft_user:uuid(ClientID)),
-            verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext);
-        _E ->
-            {error, badscope}
-    end.
+verify_client_scope(_Client, Scope, AppContext) ->
+    %% TODO: Do we need to look at what the scope of the client should be?
+    RealmScope = [S || {S, _, _} <-
+                           snarl_oauth:scope(AppContext#oauth_state.realm)],
+    verify_scope(RealmScope, Scope, AppContext).
+%%verify_client_scope({Client, _Secret}, Scope, AppContext) ->
+    %% case snarl_user:lookup(AppContext#oauth_state.realm, <<"client:", Client/binary>>) of
+    %%     {ok, ClientID} ->
 
-verify_resowner_scope(UserID, Scope, AppContext) ->
-    {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, UserID),
-    verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext).
+    %%     _E ->
+    %%         {error, badscope}
+    %% end.
+
+verify_resowner_scope(_UserID, Scope, AppContext) ->
+    RealmScope = [S || {S, _, _} <-
+                           snarl_oauth:scope(AppContext#oauth_state.realm)],
+    verify_scope(RealmScope, Scope, AppContext).
+
+%% verify_resowner_scope(UserID, Scope, AppContext) ->
+%%     {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, UserID),
+%%     verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext).
 
 verify_scope(RegisteredScope, undefined, AppContext) ->
     {ok, {AppContext, RegisteredScope}};
@@ -214,22 +223,22 @@ verify_scope(RegisteredScope, Scope, AppContext) ->
             {error, badscope}
     end.
 
-permissions_to_scope([])->
-    <<>>;
-permissions_to_scope(Perm)->
-    <<".", Res/binary>> = permissions_to_scope1(Perm),
-    Res.
+%% permissions_to_scope([])->
+%%     <<>>;
+%% permissions_to_scope(Perm)->
+%%     <<".", Res/binary>> = permissions_to_scope1(Perm),
+%%     Res.
 
-permissions_to_scope1([<<"...">>| _]) ->
-    <<".*">>;
-permissions_to_scope1([<<"_">>| _]) ->
-    <<".*">>;
-permissions_to_scope1([<<>>]) ->
-    <<>>;
-permissions_to_scope1([]) ->
-    <<>>;
-permissions_to_scope1([E| R]) ->
-    <<".", E/binary, (permissions_to_scope1(R))/binary>>.
+%% permissions_to_scope1([<<"...">>| _]) ->
+%%     <<".*">>;
+%% permissions_to_scope1([<<"_">>| _]) ->
+%%     <<".*">>;
+%% permissions_to_scope1([<<>>]) ->
+%%     <<>>;
+%% permissions_to_scope1([]) ->
+%%     <<>>;
+%% permissions_to_scope1([E| R]) ->
+%%     <<".", E/binary, (permissions_to_scope1(R))/binary>>.
 
 %%%===================================================================
 %%% API

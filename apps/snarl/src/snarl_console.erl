@@ -37,6 +37,12 @@
          revoke_user/1,
          passwd/1]).
 
+-export([scope_list/1,
+         scope_del/1,
+         scope_grant/1,
+         scope_revoke/1,
+         scope_add/1]).
+
 -ignore_xref([
               db_keys/1,
               db_get/1,
@@ -65,7 +71,12 @@
               revoke_role/1,
               passwd/1,
               config/1,
-              status/1
+              status/1,
+              scope_list/1,
+              scope_del/1,
+              scope_add/1,
+              scope_grant/1,
+              scope_revoke/1
              ]).
 
 db_update([]) ->
@@ -681,3 +692,82 @@ do_update(RealmS, MainMod, StateMod) ->
     io:format(" done.~n"),
     io:format("Update complete.~n"),
     ok.
+
+scope_list([RealmS]) ->
+    Realm = list_to_binary(RealmS),
+    io:format("Registered scopes:~n"),
+    io:format("~-25s ~-30s  ~s~n", ["Scope", "Description", "Permissions"]),
+    [
+     io:format("~-25s ~-30s  ~s~n", [Scope, Desc, fmt_perms(Perms)])
+     || {Scope, Desc, Perms} <- snarl_oauth:scope(Realm)
+    ],
+    ok.
+
+scope_add([RealmS, ScopeS | DescS]) ->
+    Realm = list_to_binary(RealmS),
+    Scope = list_to_binary(ScopeS),
+    Desc  = list_to_binary(string:join(DescS, " ")),
+
+    case find_scope(Realm, Scope) of
+        [] ->
+            io:format("Add ~s ~s '~s'.~n", [Realm, Scope, Desc]),
+            snarl_oauth:add_scope(Realm, Scope, Desc),
+            ok;
+        _ ->
+            io:format("Scope ~s already defined in realm ~s.~n",
+                      [Scope, Realm]),
+            error
+    end.
+
+scope_del([RealmS, ScopeS]) ->
+    Realm = list_to_binary(RealmS),
+    Scope = list_to_binary(ScopeS),
+    case find_scope(Realm, Scope) of
+        [] ->
+            io:format("Scope ~s nor defined in realm ~s.~n", [Scope, Realm]),
+            ok;
+        _ ->
+            io:format("Deleting sope ~s in realm ~s.~n", [Realm, Scope]),
+            snarl_oauth:delete_scope(Realm, Scope),
+            ok
+    end.
+
+scope_grant([RealmS, ScopeS | PermS]) ->
+    Realm = list_to_binary(RealmS),
+    Scope = list_to_binary(ScopeS),
+    Perm = [list_to_binary(P) || P <- PermS],
+    case snarl_oauth:add_permission(Realm, Scope, Perm) of
+        {error, not_found} ->
+            io:format("Scope ~s nor defined in realm ~s.~n", [Scope, Realm]),
+            ok;
+        _ ->
+            io:format("Permission added to sope ~s in realm ~s.~n",
+                      [Realm, Scope]),
+            ok
+    end.
+
+scope_revoke([RealmS, ScopeS | PermS]) ->
+    Realm = list_to_binary(RealmS),
+    Scope = list_to_binary(ScopeS),
+    Perm = [list_to_binary(P) || P <- PermS],
+    case snarl_oauth:remove_permission(Realm, Scope, Perm) of
+        {error, not_found} ->
+            io:format("Scope ~s nor defined in realm ~s.~n", [Scope, Realm]),
+            ok;
+        _ ->
+            io:format("Permission added to sope ~s in realm ~s.~n",
+                      [Realm, Scope]),
+            ok
+    end.
+
+fmt_perms(Perms) ->
+    L1 = [fmt_perm(P) || P <- Perms],
+    string:join(L1, ", ").
+
+fmt_perm(Perm) ->
+    L1 = [binary_to_list(P) || P <- Perm],
+    string:join(L1, "->").
+
+
+find_scope(Realm, Scope) ->
+    [S || S = {Name, _, _} <- snarl_oauth:scope(Realm), Name =:= Scope].

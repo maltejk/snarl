@@ -314,7 +314,32 @@ case "$1" in
                 ;;
         esac
         ;;
+    scope)
+        shift
+        case "$1" in
+            list)
+                shift
+                run snarl_console scope_list $@
+                ;;
+            add)
+                shift
+                run snarl_console scope_add $@
+                ;;
+            delete)
+                shift
+                run snarl_console scope_del $@
+                ;;
+            grant)
+                shift
+                run snarl_console scope_grant $@
+                ;;
+            revoke)
+                shift
+                run snarl_console scope_revoke $@
+                ;;
 
+        esac
+        ;;
     *)
         echo "Usage: $SCRIPT { join | leave | reip | ringready | remove |"
         echo "                 services | wait-for-service | member_status |"
