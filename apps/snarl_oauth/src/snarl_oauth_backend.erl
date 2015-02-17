@@ -104,12 +104,15 @@ authenticate_client({ClientId, ClientSecret}, AppContext) ->
 %% Is this a Authrorization Code?
 associate_access_code(AccessCode, Context, AppContext) ->
     %% put(?ACCESS_CODE_TABLE, AccessCode, Context),
-    snarl_token:add(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}, Context),
+    snarl_token:add(AppContext#oauth_state.realm,
+                    {?ACCESS_CODE_TABLE, AccessCode},
+                    oauth2_config:expiry_time(code_grant),
+                    Context),
     {ok, AppContext}.
 
 resolve_access_code(AccessCode, AppContext) ->
     %% case get(?ACCESS_CODE_TABLE, AccessCode) of
-    case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}) of
+    case snarl_token:get(AppContext#oauth_state.realm,{?ACCESS_CODE_TABLE, AccessCode}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
@@ -122,7 +125,10 @@ revoke_access_code(AccessCode, AppContext) ->
         {ok, AppContext}.
 
 associate_access_token(AccessToken, Context, AppContext) ->
-    snarl_token:add(AppContext#oauth_state.realm, {?ACCESS_TOKEN_TABLE, AccessToken}, Context),
+    snarl_token:add(AppContext#oauth_state.realm,
+                    {?ACCESS_TOKEN_TABLE, AccessToken},
+                    oauth2_config:expiry_time(expiery_time), %% TODO: is this a grant
+                    Context),
     {ok, AppContext}.
 
 resolve_access_token(AccessToken, AppContext) ->
@@ -145,7 +151,10 @@ revoke_access_token(AccessToken, AppContext) ->
 %%
 %% It can be used to get a new access token.
 associate_refresh_token(RefreshToken, Context, AppContext) ->
-    snarl_token:add(AppContext#oauth_state.realm, {?REFRESH_TOKEN_TABLE, RefreshToken}, Context),
+    snarl_token:add(AppContext#oauth_state.realm,
+                    {?REFRESH_TOKEN_TABLE, RefreshToken},
+                    oauth2_config:expiry_time(refresh_token),
+                    Context),
     %% put(?REFRESH_TOKEN_TABLE, RefreshToken, Context),
     {ok, AppContext}.
 
