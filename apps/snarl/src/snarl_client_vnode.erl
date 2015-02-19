@@ -43,7 +43,7 @@
          delete/3,
          grant/4, revoke/4, revoke_prefix/4,
          join/4, leave/4,
-         passwd/4,
+         secret/4,
          set_metadata/4
         ]).
 
@@ -58,7 +58,7 @@
               grant/4,
               join/4,
               leave/4,
-              passwd/4,
+              secret/4,
               repair/4,
               revoke/4,
               revoke_prefix/4,
@@ -151,9 +151,9 @@ delete(Preflist, ReqID, E) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-passwd(Preflist, ReqID, {Realm, UUID}, Val) ->
+secret(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {password, ReqID, {Realm, UUID}, Val},
+                                   {secret, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 

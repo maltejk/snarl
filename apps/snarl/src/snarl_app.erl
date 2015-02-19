@@ -72,7 +72,7 @@ init_folsom() ->
               passwd, import, join, leave, join_org, select_org, leave_org,
               delete, grant, revoke, lookup, find_key],
     ClientMs = [wipe, get, list, list_all, sync_repair, revoke_prefix, add_uri,
-                remove_uri, add, set_metadata, passwd, import, join, leave,
+                remove_uri, add, set_metadata, secret, import, join, leave,
                 delete, grant, revoke, lookup_key, lookup],
     RoleMs = [wipe, lookup, get, list, list_all, sync_repair, import, add,
               delete, grant, revoke, revoke_prefix, set_metadata],

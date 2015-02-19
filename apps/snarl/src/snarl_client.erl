@@ -14,7 +14,7 @@
          lookup/2,
          add/2, add/3,
          delete/2,
-         passwd/3,
+         secret/3,
          join/3, leave/3,
          grant/3, revoke/3, revoke_prefix/3,
          allowed/3,
@@ -56,15 +56,15 @@ wipe(Realm, UUID) ->
 sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
 
--spec auth(Realm::binary(), Client::binary(), Passwd::binary()) ->
+-spec auth(Realm::binary(), Client::binary(), Secret::binary()) ->
                   not_found |
                   {error, timeout} |
                   {ok, Client::fifo:client_id()}.
 
-auth(Realm, Client, Passwd) ->
+auth(Realm, Client, Secret) ->
     case snarl_client:get(Realm, Client) of
         {ok, ClientR} ->
-            case check_pw(ClientR, Passwd) of
+            case check_pw(ClientR, Secret) of
                 true ->
                     {ok, ft_client:uuid(ClientR)};
                 _ ->
@@ -260,22 +260,22 @@ create(Realm, UUID, Client) ->
 set_metadata(Realm, Client, Attributes) ->
     do_write(Realm, Client, set_metadata, Attributes).
 
--spec passwd(Realm::binary(), Client::fifo:client_id(), Passwd::binary()) ->
+-spec secret(Realm::binary(), Client::fifo:client_id(), Secret::binary()) ->
                     not_found |
                     {error, timeout} |
                     ok.
-passwd(Realm, Client, Passwd) ->
+secret(Realm, Client, Secret) ->
     H = case application:get_env(snarl, hash_fun) of
             {ok, sha512} ->
                 Salt = crypto:rand_bytes(64),
-                Hash = hash(sha512, Salt, Passwd),
+                Hash = hash(sha512, Salt, Secret),
                 {Salt, Hash};
             _ ->
                 {ok, Salt} = bcrypt:gen_salt(),
-                {ok, Hash} = bcrypt:hashpw(Passwd, Salt),
+                {ok, Hash} = bcrypt:hashpw(Secret, Salt),
                 {bcrypt, list_to_binary(Hash)}
         end,
-    do_write(Realm, Client, passwd, H).
+    do_write(Realm, Client, secret, H).
 
 
 name(Realm, Client, Name) ->
@@ -389,32 +389,32 @@ test_client(Realm, ClientObj, Permission) ->
             test_roles(Realm, Permission, ft_client:roles(ClientObj))
     end.
 
-check_pw(ClientR, Passwd) ->
+check_pw(ClientR, Secret) ->
     case ft_client:secret(ClientR) of
         {bcrypt, Hash} ->
             HashS = binary_to_list(Hash),
-            case bcrypt:hashpw(Passwd, Hash) of
+            case bcrypt:hashpw(Secret, Hash) of
                 {ok, HashS} ->
                     true;
                 _ ->
                     false
             end;
         {S, H} ->
-            case hash(sha512, S, Passwd) of
+            case hash(sha512, S, Secret) of
                 H ->
                     true;
                 _ ->
                     false
             end;
-        %% Unset passwords are always false
+        %% Unset secrets are always false
         <<>> ->
             false
     end.
 
 -ifndef(old_hash).
-hash(Hash, Salt, Passwd) ->
-    crypto:hash(Hash, [Salt, Passwd]).
+hash(Hash, Salt, Secret) ->
+    crypto:hash(Hash, [Salt, Secret]).
 -else.
-hash(sha512, Salt, Passwd) ->
-    crypto:sha512([Salt, Passwd]).
+hash(sha512, Salt, Secret) ->
+    crypto:sha512([Salt, Secret]).
 -endif.

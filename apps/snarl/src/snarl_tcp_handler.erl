@@ -353,10 +353,10 @@ message({client, add, Realm, Creator, Client}, State) when
       is_binary(Client) ->
     {reply, snarl_client:add(Realm, Creator, Client), State};
 
-message({client, auth, Realm, Client, Pass}, State) when
+message({client, auth, Realm, Client, Secret}, State) when
       is_binary(Client),
-      is_binary(Pass) ->
-    {reply, snarl_client:auth(Realm, Client, Pass), State};
+      is_binary(Secret) ->
+    {reply, snarl_client:auth(Realm, Client, Secret), State};
 
 message({client, allowed, Realm, {token, Token}, Permission}, State) ->
     case snarl_token:get(Realm, Token) of
@@ -374,10 +374,10 @@ message({client, delete, Realm, Client}, State) when
       is_binary(Client) ->
     {reply, snarl_client:delete(Realm, Client), State};
 
-message({client, passwd, Realm, Client, Pass}, State) when
+message({client, secret, Realm, Client, Secret}, State) when
       is_binary(Client),
-      is_binary(Pass) ->
-    {reply, snarl_client:passwd(Realm, Client, Pass), State};
+      is_binary(Secret) ->
+    {reply, snarl_client:secret(Realm, Client, Secret), State};
 
 message({client, join, Realm, Client, Role}, State) when
       is_binary(Client),
