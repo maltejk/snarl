@@ -442,6 +442,11 @@ message({role, revoke_prefix, Realm, Role, Prefix}, State) ->
 %%% OAuth2 Functions
 %%%===================================================================
 
+message({oauth2, scope, Realm}, State) ->
+    {reply,
+     snarl_oauth:scope(Realm),
+     State};
+
 %%-export([authorize_password/3]).
 message(
   {oauth2, authorize_password, Realm, User, Scope}, State) ->
