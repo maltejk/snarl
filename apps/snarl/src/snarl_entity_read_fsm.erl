@@ -254,13 +254,16 @@ merge(Replies) ->
 
 reconcile([V | Vs]) ->
     case {ft_user:is_a(V),
+          ft_client:is_a(V),
           ft_role:is_a(V),
           ft_org:is_a(V)} of
-        {true, _, _} ->
+        {true, _, _, _} ->
             reconcile_user(Vs, V);
-        {_, true, _} ->
+        {_, true, _, _} ->
+            reconcile_client(Vs, V);
+        {_, _, true, _} ->
             reconcile_role(Vs, V);
-        {_, _, true} ->
+        {_, _, _, true} ->
             reconcile_org(Vs, V);
         _ ->
             V
@@ -274,6 +277,11 @@ reconcile_role(_, Acc) ->
 reconcile_user([U | R], Acc) ->
     reconcile_user(R, ft_user:merge(Acc, U));
 reconcile_user(_, Acc) ->
+    Acc.
+
+reconcile_client([U | R], Acc) ->
+    reconcile_client(R, ft_client:merge(Acc, U));
+reconcile_client(_, Acc) ->
     Acc.
 
 reconcile_org([U | R], Acc) ->

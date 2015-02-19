@@ -300,6 +300,107 @@ message({user, org, select, Realm, User, Org}, State) when
       is_binary(Org) ->
     {reply, snarl_user:select_org(Realm, User, Org), State};
 
+
+%%%===================================================================
+%%% Client Functions
+%%%===================================================================
+
+message({client, list, Realm}, State) ->
+    {reply, snarl_client:list(Realm), State};
+
+message({client, list, Realm, Requirements, Full}, State) ->
+    {reply, snarl_client:list(Realm, Requirements, Full), State};
+
+message({client, get, Realm, Client}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:get(Realm, Client), State};
+
+
+message({client, name, Realm, Client, Name}, State) when
+      is_binary(Client),
+      is_binary(Name) ->
+    {reply, snarl_client:name(Realm, Client, Name), State};
+
+
+message({client, token, Realm, Client}, State) when
+    is_binary(Client) ->
+    {reply, snarl_token:add(Realm, Client), State};
+
+message({client, uris, get, Realm, Client}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:uris(Realm, Client), State};
+
+message({client, uris, add, Realm, Client, OTP}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:add_uri(Realm, Client, OTP), State};
+
+message({client, uris, remove, Realm, Client, KeyId}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:remove_uri(Realm, Client, KeyId), State};
+
+message({client, set_metadata, Realm, Client, Attributes}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:set_metadata(Realm, Client, Attributes), State};
+
+message({client, lookup, Realm, Client}, State) when is_binary(Client) ->
+    {reply, snarl_client:lookup(Realm, Client), State};
+
+message({client, add, Realm, Client}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:add(Realm, Client), State};
+
+message({client, add, Realm, Creator, Client}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:add(Realm, Creator, Client), State};
+
+message({client, auth, Realm, Client, Pass}, State) when
+      is_binary(Client),
+      is_binary(Pass) ->
+    {reply, snarl_client:auth(Realm, Client, Pass), State};
+
+message({client, allowed, Realm, {token, Token}, Permission}, State) ->
+    case snarl_token:get(Realm, Token) of
+        not_found ->
+            {reply, false, State};
+        {ok, Client} ->
+            {reply, snarl_client:allowed(Realm, Client, Permission), State}
+    end;
+
+message({client, allowed, Realm, Client, Permission}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:allowed(Realm, Client, Permission), State};
+
+message({client, delete, Realm, Client}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:delete(Realm, Client), State};
+
+message({client, passwd, Realm, Client, Pass}, State) when
+      is_binary(Client),
+      is_binary(Pass) ->
+    {reply, snarl_client:passwd(Realm, Client, Pass), State};
+
+message({client, join, Realm, Client, Role}, State) when
+      is_binary(Client),
+      is_binary(Role) ->
+    {reply, snarl_client:join(Realm, Client, Role), State};
+
+message({client, leave, Realm, Client, Role}, State) when
+      is_binary(Client),
+      is_binary(Role) ->
+    {reply, snarl_client:leave(Realm, Client, Role), State};
+
+message({client, grant, Realm, Client, Permission}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:grant(Realm, Client, Permission), State};
+
+message({client, revoke, Realm, Client, Permission}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:revoke(Realm, Client, Permission), State};
+
+message({client, revoke_prefix, Realm, Client, Prefix}, State) when
+      is_binary(Client) ->
+    {reply, snarl_client:revoke_prefix(Realm, Client, Prefix), State};
+
 %%%===================================================================
 %%% Role Functions
 %%%===================================================================

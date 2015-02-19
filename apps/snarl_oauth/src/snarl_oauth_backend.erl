@@ -35,32 +35,7 @@
 -define(ACCESS_CODE_TABLE, access_codes).
 -define(ACCESS_TOKEN_TABLE, access_tokens).
 -define(REFRESH_TOKEN_TABLE, refresh_tokens).
--define(USER_TABLE, users).
--define(CLIENT_TABLE, clients).
 -define(REQUEST_TABLE, requests).
-
-
--define(TABLES, [?ACCESS_CODE_TABLE,
-                 ?ACCESS_TOKEN_TABLE,
-                 ?REFRESH_TOKEN_TABLE,
-                 ?USER_TABLE,
-                 ?CLIENT_TABLE,
-                 ?REQUEST_TABLE]).
-
-%% -record(client, {
-%%           client_id     :: binary(),
-%%           client_secret :: binary(),
-%%           redirect_uri  :: binary(),
-%%           scope         :: [binary()]
-%%          }).
-
-%%-type client() :: #client{}.
-
-%% -record(resowner, {
-%%           username  :: binary(),
-%%           password  :: binary(),
-%%           scope     :: scope()
-%%          }).
 
 %%-type grantctx() :: oauth2:context().
 %%-type appctx()   :: oauth2:appctx().
@@ -90,8 +65,9 @@ authenticate_user({Username, Password, OTP}, AppContext) ->
 
 authenticate_client({UserID}, AppContext) ->
     {ok, {AppContext, UserID}};
-authenticate_client({ClientId, ClientSecret}, AppContext) ->
-    case snarl_user:auth(AppContext#oauth_state.realm, <<"client:", ClientId/binary>>, ClientSecret, <<>>) of
+authenticate_client({ClientId, ClientSecret},
+                    AppContext = #oauth_state{realm = Realm}) ->
+    case snarl_client:auth(Realm, ClientId, ClientSecret) of
         %%case get(?CLIENT_TABLE, ClientId) of
         {ok, UserID} -> %#resowner{password = Password} = Identity} ->
             {ok, {AppContext, UserID}};
@@ -172,9 +148,9 @@ revoke_refresh_token(RefreshToken, AppContext) ->
     {ok, AppContext}.
 
 get_client_identity(ClientId, AppContext) ->
-    case snarl_user:lookup(AppContext#oauth_state.realm, <<"client:", ClientId/binary>>) of
+    case snarl_client:lookup(AppContext#oauth_state.realm, ClientId) of
         {ok, Client} ->
-            {ok, {AppContext, ft_user:uuid(Client)}};
+            {ok, {AppContext, ft_client:uuid(Client)}};
         not_found ->
             {error, notfound}
     end.
@@ -184,15 +160,12 @@ verify_redirection_uri(_Client, undefined, AppContext) ->
 verify_redirection_uri(_Client, <<>>, AppContext) ->
     {ok, AppContext};
 verify_redirection_uri(ClientUUID, Uri, AppContext) ->
-    {ok, Client} = snarl_user:get(AppContext#oauth_state.realm, ClientUUID),
-    Metadata = ft_user:metadata(Client),
-    case jsxd:get([<<"oauth2">>, <<"redirection_uri">>], Metadata) of
-        {ok, <<>>} ->
+    {ok, Client} = snarl_client:get(AppContext#oauth_state.realm, ClientUUID),
+    case lists:member(Uri, ft_client:uris(Client)) of
+        false ->
             {error, baduri};
-        {ok, Uri} ->
-            {ok, AppContext};
-        _ ->
-            {error, baduri}
+        true ->
+            {ok, AppContext}
     end.
 
 verify_client_scope(_Client, Scope, AppContext) ->
@@ -252,76 +225,3 @@ verify_scope(RegisteredScope, Scope, AppContext) ->
 %%%===================================================================
 %%% API
 %%%===================================================================
-
-%% -spec add_client(Id, Secret, RedirectURI, Scope) -> ok when
-%%       Id          :: binary(),
-%%       Secret      :: binary(),
-%%       RedirectURI :: binary(),
-%%       Scope       :: [binary()].
-%% add_client(Id, Secret, RedirectURI, Scope) ->
-%%     put(?CLIENT_TABLE, Id, #client{client_id = Id,
-%%                                    client_secret = Secret,
-%%                                    redirect_uri = RedirectURI,
-%%                                    scope = Scope
-%%                                   }),
-%%     ok.
-
-%% -spec add_resowner(Username, Password) -> ok when
-%%       Username :: binary(),
-%%       Password :: binary().
-%% add_resowner(Username, Password) ->
-%%     add_resowner(Username, Password, []),
-%%     ok.
-
-%% -spec add_resowner(Username, Password, Scope) -> ok when
-%%       Username  :: binary(),
-%%       Password  :: binary(),
-%%       Scope     :: [binary()].
-%% add_resowner(Username, Password, Scope) ->
-%%     put(?USER_TABLE, Username, #resowner{username = Username,
-%%                                          password = Password, scope = Scope}),
-%%     ok.
-
-
-%% -spec create() -> ok.
-%% create() ->
-%%     lists:foreach(fun(Table) ->
-%%                           ets:new(Table, [named_table, public])
-%%                   end,
-%%                   ?TABLES),
-%%     ok.
-
-%% -spec delete() -> ok.
-%% delete() ->
-%%     lists:foreach(fun ets:delete/1, ?TABLES),
-%%     ok.
-
-%% -spec delete_resowner(Username) -> ok when
-%%       Username :: binary().
-%% delete_resowner(Username) ->
-%%     delete(?USER_TABLE, Username),
-%%     ok.
-
-%% -spec delete_client(Id) -> ok when
-%%       Id :: binary().
-%% delete_client(Id) ->
-%%     delete(?CLIENT_TABLE, Id),
-%%     ok.
-
-%%%===================================================================
-%%% Internal functions
-%%%===================================================================
-
-%%get(Table, Key) ->
-%%    case ets:lookup(Table, Key) of
-%%        [] ->
-%%            {error, notfound};
-%%        [{_Key, Value}] ->
-%%            {ok, Value}
-%%    end.
-
-%%put(Table, Key, Value) ->
-%%    ets:insert(Table, {Key, Value}).
-
-%%delete(Table, Key) ->
-%%    ets:delete(Table, Key).
