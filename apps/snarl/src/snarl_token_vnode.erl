@@ -254,15 +254,17 @@ expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State)
   when Cycle < Cnt ->
     State;
 
-expire(#state{tokens = Tokens} = State) ->
+expire(#state{tokens = Tokens, db = DBRef} = State) ->
     T0 = bitcask_time:tstamp(),
     Tokens1 = dict:filter(
-                fun({Realm, Token}, {Exp, _V}) ->
-                        case T0 =< Exp of
-                            false ->
+                fun({Realm, Token}, Obj) ->
+                        case ft_obj:val(Obj) of
+                            {Exp, _} when T0 =< Exp ->
                                 lager:debug("[token:~s] Expiering: ~s", [Realm, Token]),
+                                Key = term_to_binary({Realm, Token}),
+                                bitcask:delete(DBRef, Key),
                                 false;
-                            true ->
+                            _ ->
                                 true
                         end
                 end, Tokens),
