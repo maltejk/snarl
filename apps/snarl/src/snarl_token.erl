@@ -4,13 +4,13 @@
 
 -export([
          get/2,
-         add/2,
+         add/2, add/4,
          delete/2,
          reindex/2
         ]).
 
 -ignore_xref([
-              reindex/2
+              reindex/2, add/4
              ]).
 
 
@@ -33,20 +33,25 @@ get(Realm, Token) ->
         {ok, not_found} ->
             lager:debug("[token:~s] ~s not found.", [Realm, Token]),
             not_found;
-        _ ->
+        {ok, {_Exp, Value}} ->
             lager:debug("[token:~s] ~s found.", [Realm, Token]),
-            R
+            {ok, Value}
     end.
 
+
 add(Realm, User) ->
-    case do_write(Realm, uuid:uuid4s(), add, User) of
+    add(Realm, oauth2_token:generate('x-snarl-token'), default, User).
+
+add(Realm, Token, Timeout, User) ->
+    case do_write(Realm, Token, add, {Timeout, User}) of
         {ok, Token} ->
-            lager:debug("[token:~s/~s] New token ~s.", [Realm, User, Token]),
+            lager:debug("[token:~s/~s] New token ~p.", [Realm, User, Token]),
             {ok, Token};
         E ->
             lager:debug("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
             E
     end.
+
 
 delete(Realm, Token) ->
     lager:debug("[token:~s] deleted token ~s.", [Realm, Token]),

@@ -11,7 +11,7 @@
          reindex/2,
          find_key/2,
          get/2, raw/2,
-         lookup_/2, lookup/2,
+         lookup/2,
          add/2, add/3,
          delete/2,
          passwd/3,
@@ -33,7 +33,7 @@
               import/3,
               wipe/2,
               join_org/3, leave_org/3, select_org/3,
-              lookup_/2, list_/1,
+              list_/1,
               raw/2, sync_repair/3,
               reindex/2
              ]).
@@ -96,7 +96,7 @@ auth(Realm, User, Passwd, basic) ->
     end;
 
 auth(Realm, User, Passwd, OTP) ->
-    Res1 = case lookup_(Realm, User) of
+    Res1 = case lookup(Realm, User) of
                {ok, UserR} ->
                    case check_pw(UserR, Passwd) of
                        true ->
@@ -135,22 +135,10 @@ auth(Realm, User, Passwd, OTP) ->
     end.
 
 -spec lookup(Realm::binary(), User::binary()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, User::fifo:user()}.
-lookup(Realm, User) ->
-    case lookup_(Realm, User) of
-        {ok, Obj} ->
-            {ok, ft_user:to_json(Obj)};
-        R ->
-            R
-    end.
-
--spec lookup_(Realm::binary(), User::binary()) ->
                      not_found |
                      {error, timeout} |
                      {ok, User::fifo:user()}.
-lookup_(Realm, User) ->
+lookup(Realm, User) ->
     folsom_metrics:histogram_timed_update(
       {snarl, user, lookup},
       fun() ->
@@ -393,7 +381,7 @@ add(Realm, User) ->
     add(Realm, undefined, User).
 
 create(Realm, UUID, User) ->
-    case lookup_(Realm, User) of
+    case lookup(Realm, User) of
         not_found ->
             ok = do_write(Realm, UUID, add, User),
             snarl_2i:add(Realm, ?NAME_2i, User, UUID),
