@@ -276,7 +276,6 @@ expire(State) ->
     State.
 
 expiery(T) ->
-    io:format("T: ~p", [T]),
     bitcask_time:tstamp() + T.
 
 max_timeout() ->
