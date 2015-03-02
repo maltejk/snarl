@@ -1,9 +1,9 @@
 -module(snarl_oauth).
 
--export([scope/1, add_scope/3, delete_scope/2, add_permission/3,
+-export([scope/1, scope/2, add_scope/3, delete_scope/2, add_permission/3,
          remove_permission/3]).
 
--ignore_xref([scope/1, add_scope/3, delete_scope/2, add_permission/3,
+-ignore_xref([scope/1, scope/2, add_scope/3, delete_scope/2, add_permission/3,
          remove_permission/3]).
 
 scope(Realm) ->
@@ -13,6 +13,13 @@ scope(Realm) ->
         V ->
             V
     end.
+
+scope(Realm, Subscope) ->
+    Set = oauth2_priv_set:new(Subscope),
+    AS = scope(Realm),
+    [{S, Desc, Perms}
+     || {S, Desc, Perms} <- AS,
+        oauth2_priv_set:is_member(S, Set)].
 
 add_scope(Realm, Scope, Description) ->
     OldScopes = scope(Realm),
