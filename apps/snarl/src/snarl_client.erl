@@ -369,7 +369,7 @@ test_roles(Realm, Permission, [Role|Roles]) ->
         {ok, RoleObj} ->
             case libsnarlmatch:test_perms(
                    Permission,
-                   ft_role:permissions(RoleObj)) of
+                   ft_role:ptree(RoleObj)) of
                 true ->
                     true;
                 false ->
@@ -382,7 +382,7 @@ test_roles(Realm, Permission, [Role|Roles]) ->
 test_client(Realm, ClientObj, Permission) ->
     case libsnarlmatch:test_perms(
            Permission,
-           ft_client:permissions(ClientObj)) of
+           ft_client:ptree(ClientObj)) of
         true ->
             true;
         false ->
