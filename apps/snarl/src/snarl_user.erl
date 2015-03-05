@@ -253,13 +253,13 @@ cache(Realm, User) ->
                    fun(Role, Permissions) ->
                            case snarl_role:get(Realm, Role) of
                                {ok, RoleObj} ->
-                                   GrPerms = ft_role:permissions(RoleObj),
-                                   ordsets:union(Permissions, GrPerms);
+                                   GrPerms = ft_role:ptree(RoleObj),
+                                   libsnarlmatch_tree:merge(Permissions, GrPerms);
                                _ ->
                                    Permissions
                            end
                    end,
-                   ft_user:permissions(UserObj),
+                   ft_user:ptree(UserObj),
                    ft_user:roles(UserObj))};
         E ->
             E
@@ -558,7 +558,7 @@ test_roles(Realm, Permission, [Role|Roles]) ->
         {ok, RoleObj} ->
             case libsnarlmatch:test_perms(
                    Permission,
-                   ft_role:permissions(RoleObj)) of
+                   ft_role:ptree(RoleObj)) of
                 true ->
                     true;
                 false ->
@@ -571,7 +571,7 @@ test_roles(Realm, Permission, [Role|Roles]) ->
 test_user(Realm, UserObj, Permission) ->
     case libsnarlmatch:test_perms(
            Permission,
-           ft_user:permissions(UserObj)) of
+           ft_user:ptree(UserObj)) of
         true ->
             true;
         false ->
