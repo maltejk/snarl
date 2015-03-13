@@ -288,7 +288,7 @@
 ]}.
 
 %% @doc Schema directory
-{mapping, "yubico.client_id", "riak_core.schema_dirs",
+{mapping, "schema_dir", "riak_core.schema_dirs",
  [{commented, "./share/schema"},
   {datatype, string}]
 }.
