@@ -17,6 +17,7 @@
      snmp,
      crypto,
      bcrypt,
+     bitcask,
      snarl_oauth,
      uuid
      ]},
