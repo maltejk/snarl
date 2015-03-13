@@ -286,3 +286,9 @@
     merge,
     {default, "sniffle"}
 ]}.
+
+%% @doc Schema directory
+{mapping, "yubico.client_id", "riak_core.schema_dirs",
+ [{commented, "./share/schema"},
+  {datatype, string}]
+}.
