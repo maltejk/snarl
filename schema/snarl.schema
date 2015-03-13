@@ -289,7 +289,7 @@
 
 %% @doc Schema directory
 {mapping, "schema_dir", "riak_core.schema_dirs",
- [{commented, "./share/schema"},
+ [{default, "./share/schema"},
   {datatype, string}]
 }.
 
