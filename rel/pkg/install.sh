@@ -1,5 +1,8 @@
 #!/usr/bin/bash
 
+AWK=/usr/bin/awk
+SED=/usr/bin/sed
+
 USER=snarl
 GROUP=$USER
 DBID=4
@@ -53,13 +56,13 @@ case $2 in
         echo Importing service ...
         svccfg import /opt/local/fifo-snarl/share/snarl.xml
         echo Trying to guess configuration ...
-        IP=`ifconfig net0 | grep inet | awk -e '{print $2}'`
+        IP=`ifconfig net0 | grep inet | $AWK '{print $2}'`
         CONFFILE=/opt/local/fifo-snarl/etc/snarl.conf
         if [ ! -f "${CONFFILE}" ]
         then
             echo "Creating new configuration from example file."
             cp ${CONFFILE}.example ${CONFFILE}
-            sed --in-place -e "s/127.0.0.1/${IP}/g" ${CONFFILE}
+            $SED -i bak -e "s/127.0.0.1/${IP}/g" ${CONFFILE}
         else
             echo "Merging old file with new template, the original can be found in ${CONFFILE}.old."
             /opt/local/fifo-snarl/share/update_config.sh ${CONFFILE}.example ${CONFFILE} > ${CONFFILE}.new &&
