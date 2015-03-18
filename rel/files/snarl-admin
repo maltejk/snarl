@@ -341,7 +341,7 @@ case "$1" in
         esac
         ;;
     init)
-        run snarl_console unit_user $@
+        run snarl_console init_user $@
         ;;
 
     *)
