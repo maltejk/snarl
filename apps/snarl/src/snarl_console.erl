@@ -8,7 +8,8 @@
          db_get/1,
          db_delete/1,
          get_ring/1,
-         db_update/1
+         db_update/1,
+         init_user/1
         ]).
 
 -export([join/1,
@@ -76,7 +77,8 @@
               scope_del/1,
               scope_add/1,
               scope_grant/1,
-              scope_revoke/1
+              scope_revoke/1,
+              init_user/1
              ]).
 
 db_update([]) ->
@@ -223,6 +225,27 @@ delete_user([RealmS, User]) ->
 delete_role([RealmS, User]) ->
     Realm = list_to_binary(RealmS),
     snarl_user:delete(Realm, list_to_binary(User)),
+    ok.
+
+init_user([RealmS, OrgS, UserS, PassS]) ->
+    Realm = list_to_binary(RealmS),
+    Org = list_to_binary(OrgS),
+    User = list_to_binary(UserS),
+    Pass = list_to_binary(PassS),
+    {ok, UserUUID} = snarl_user:add(Realm, User),
+    io:format("Created user '~s' with id ~s.~n", [User, UserUUID]),
+    ok = snarl_user:grant(Realm, UserUUID, [<<"...">>]),
+    io:format("Granted full permissions to ~s.~n", [User]),
+    ok = snarl_user:passwd(Realm, UserUUID, Pass),
+    io:format("Set password for to ~s.~n", [User]),
+    {ok, OrgUUID} = snarl_org:add(Realm, Org),
+    io:format("Created org '~s' with id ~s.~n", [Org, OrgUUID]),
+    ok = snarl_user:grant(Realm, UserUUID, [<<"orgs">>, OrgUUID, <<"_">>]),
+    io:format("Granted permission on org ~s to ~s.~n", [Org, User]),
+    ok = snarl_user:join_org(Realm, UserUUID, OrgUUID),
+    io:format("Joined ~s to ~s.~n", [User, Org]),
+    ok = snarl_user:select_org(Realm, UserUUID, OrgUUID),
+    io:format("Selected ~s as active org for ~s.~n", [Org, User]),
     ok.
 
 add_user([RealmS, User]) ->
