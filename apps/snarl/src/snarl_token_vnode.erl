@@ -285,7 +285,7 @@ max_timeout() ->
 
 max_timeout(T) ->
     SubSys = [code_grant, refresh_token, client_credentials,
-              password_credentials, expiry_time],
+              password_credentials],
     max_timeout(SubSys, T).
 
 max_timeout([S | R], T) ->
