@@ -136,6 +136,13 @@ message({user, yubikeys, get, Realm, User}, State) when
      snarl_user:yubikeys(Realm, User),
      State};
 
+message({user, yubikeys, check, Realm, User, OTP}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:check_yubikey(Realm, User, OTP),
+     State};
+
+
 message({user, yubikeys, add, Realm, User, OTP}, State) when
       is_binary(User) ->
     {reply,

@@ -23,7 +23,7 @@
          import/3,
          cache/2,
          add_key/4, revoke_key/3, keys/2,
-         add_yubikey/3, remove_yubikey/3, yubikeys/2,
+         add_yubikey/3, remove_yubikey/3, yubikeys/2, check_yubikey/3,
          active/2,
          orgs/2,
          wipe/2
@@ -96,48 +96,56 @@ auth(Realm, User, Passwd, basic) ->
     end;
 
 auth(Realm, User, Passwd, OTP) ->
-    Res1 = case lookup(Realm, User) of
-               {ok, UserR} ->
-                   case check_pw(UserR, Passwd) of
-                       true ->
-                           {ok, UserR};
-                       _ ->
-                           not_found
-                   end;
-               E ->
-                   E
-           end,
-    case Res1 of
-        {ok, UserR1} ->
-            case ft_user:yubikeys(UserR1) of
-                [] ->
-                    {ok, ft_user:uuid(UserR1)};
-                Ks ->
-                    case snarl_yubico:id(OTP) of
-                        <<>> ->
-                            key_required;
-                        YID  ->
-                            case lists:member(YID, Ks) of
-                                false ->
-                                    not_found;
-                                true ->
-                                    case snarl_yubico:verify(OTP) of
-                                        {auth, ok} ->
-                                            {ok, ft_user:uuid(UserR1)};
-                                        _ ->
-                                            not_found
-                                    end
-                            end
-                    end
+    case lookup(Realm, User) of
+        {ok, UserR} ->
+            case check_pw(UserR, Passwd) of
+                true ->
+                    check_yubikey(UserR, OTP);
+                _ ->
+                    not_found
             end;
-        E1 ->
-            E1
+               E ->
+            E
     end.
 
+check_yubikey(Realm, UUID, OTP) ->
+    case snarl_user:get(Realm, UUID) of
+        {ok, User} ->
+            check_yubikey(User, OTP);
+        E ->
+            E
+    end.
+
+check_yubikey(User, OTP) ->
+    UUID = ft_user:uuid(User),
+    case ft_user:yubikeys(User) of
+        [] ->
+            {ok, UUID};
+        Ks ->
+            case snarl_yubico:id(OTP) of
+                <<>> ->
+                    {key_required, UUID};
+                YID  ->
+                    case lists:member(YID, Ks) of
+                        false ->
+                            not_found;
+                        true ->
+                            case snarl_yubico:verify(OTP) of
+                                {auth, ok} ->
+                                    {ok, ft_user:uuid(User)};
+                                _ ->
+                                    not_found
+                            end
+                    end
+            end
+    end.
+
+
+
 -spec lookup(Realm::binary(), User::binary()) ->
-                     not_found |
-                     {error, timeout} |
-                     {ok, User::fifo:user()}.
+                    not_found |
+                    {error, timeout} |
+                    {ok, User::fifo:user()}.
 lookup(Realm, User) ->
     folsom_metrics:histogram_timed_update(
       {snarl, user, lookup},
@@ -266,9 +274,9 @@ cache(Realm, User) ->
     end.
 
 -spec get(Realm::binary(), User::fifo:user_id()) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, User::fifo:user()}.
+                 not_found |
+                 {error, timeout} |
+                 {ok, User::fifo:user()}.
 get(Realm, User) ->
     case ?FM(get, snarl_entity_read_fsm, start,
              [{snarl_user_vnode, snarl_user}, get, {Realm, User}]) of
