@@ -49,7 +49,14 @@ authenticate_user({UserID}, AppContext) ->
     {ok, {AppContext, UserID}};
 
 authenticate_user({Username, Password}, AppContext) ->
-    authenticate_user({Username, Password, <<>>}, AppContext);
+    case snarl_user:auth(AppContext#oauth_state.realm, Username, Password) of
+        {ok, UserID} ->
+            {ok, {AppContext, UserID}};
+        {otp_required, yubikey, UserID} ->
+            {error, {yubikey_required, UserID}};
+        not_found ->
+            {error, notfound}
+    end;
 
 authenticate_user({Username, Password, OTP}, AppContext) ->
     case snarl_user:auth(AppContext#oauth_state.realm, Username, Password, OTP) of
