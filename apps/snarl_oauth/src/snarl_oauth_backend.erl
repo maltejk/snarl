@@ -49,16 +49,21 @@ authenticate_user({UserID}, AppContext) ->
     {ok, {AppContext, UserID}};
 
 authenticate_user({Username, Password}, AppContext) ->
-    authenticate_user({Username, Password, <<>>}, AppContext);
+    case snarl_user:auth(AppContext#oauth_state.realm, Username, Password) of
+        {ok, UserID} ->
+            {ok, {AppContext, UserID}};
+        {otp_required, yubikey, UserID} ->
+            {error, {yubikey_required, UserID}};
+        not_found ->
+            {error, notfound}
+    end;
 
 authenticate_user({Username, Password, OTP}, AppContext) ->
-
-    %%case get(?USER_TABLE, Username) of
     case snarl_user:auth(AppContext#oauth_state.realm, Username, Password, OTP) of
-        {ok, UserID} -> %#resowner{password = Password} = Identity} ->
+        {ok, UserID} ->
             {ok, {AppContext, UserID}};
-        %%{ok, #resowner{password = _WrongPassword}} ->
-        %%    {error, badpass};
+        {otp_required, yubikey, UserID} ->
+            {error, {yubikey_required, UserID}};
         not_found ->
             {error, notfound}
     end.
@@ -68,11 +73,8 @@ authenticate_client({UserID}, AppContext) ->
 authenticate_client({ClientId, ClientSecret},
                     AppContext = #oauth_state{realm = Realm}) ->
     case snarl_client:auth(Realm, ClientId, ClientSecret) of
-        %%case get(?CLIENT_TABLE, ClientId) of
-        {ok, UserID} -> %#resowner{password = Password} = Identity} ->
+        {ok, UserID} ->
             {ok, {AppContext, UserID}};
-        %%{ok, #resowner{password = _WrongPassword}} ->
-        %%    {error, badpass};
         not_found ->
             {error, notfound}
     end.
@@ -88,7 +90,7 @@ associate_access_code(AccessCode, Context, AppContext) ->
 
 resolve_access_code(AccessCode, AppContext) ->
     %% case get(?ACCESS_CODE_TABLE, AccessCode) of
-    case snarl_token:get(AppContext#oauth_state.realm,{?ACCESS_CODE_TABLE, AccessCode}) of
+    case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
