@@ -84,7 +84,7 @@ find_key(Realm, KeyID) ->
                   {ok, User::fifo:user_id()}.
 
 auth(Realm, User, Passwd) ->
-    case snarl_user:get(Realm, User) of
+    case lookup(Realm, User) of
         {ok, UserR} ->
             case check_pw(UserR, Passwd) of
                 true ->
