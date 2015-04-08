@@ -195,34 +195,16 @@ message({user, add, Realm, Creator, User}, State) when
 message({user, auth, Realm, User, Pass}, State) when
       is_binary(User),
       is_binary(Pass) ->
-    message({user, auth, Realm, User, Pass, <<>>}, State);
-
-message({user, auth, Realm, User, Pass, basic}, State) when
-      is_binary(User),
-      is_binary(Pass) ->
-    Res = case snarl_user:auth(Realm, User, Pass, basic) of
-              not_found ->
-                  {error, not_found};
-              {ok, UUID}  ->
-                  {ok, UUID}
-          end,
     {reply,
-     Res,
+     snarl_user:auth(Realm, User, Pass),
      State};
 
 message({user, auth, Realm, User, Pass, OTP}, State) when
       is_binary(User),
       is_binary(Pass),
       is_binary(OTP) ->
-    Res = case snarl_user:auth(Realm, User, Pass, OTP) of
-              not_found ->
-                  {error, not_found};
-              {ok, UUID}  ->
-                  {ok, Token} = snarl_token:add(Realm, UUID),
-                  {ok, {token, Token}}
-          end,
     {reply,
-     Res,
+     snarl_user:auth(Realm, User, Pass, OTP),
      State};
 
 message({user, allowed, Realm, {token, Token}, Permission}, State) ->
@@ -277,8 +259,19 @@ message({user, revoke_prefix, Realm, User, Prefix}, State) when
     {reply, snarl_user:revoke_prefix(Realm, User, Prefix), State};
 
 message({token, delete, Realm, Token}, State) when
-      is_binary(Token) ->
+      Token ->
     {reply, snarl_token:delete(Realm, Token), State};
+
+message({token, get, Realm, Token}, State)  ->
+    {reply, snarl_token:get(Realm, Token), State};
+
+message({token, add, Realm, Timeout, Data}, State) when
+      is_integer(Timeout), Timeout > 0 ->
+    {reply, snarl_token:add(Realm, Timeout, Data), State};
+
+message({token, add, Realm, Token, Timeout, Data}, State) when
+      is_integer(Timeout), Timeout > 0 ->
+    {reply, snarl_token:add(Realm, Token, Timeout, Data), State};
 
 message({user, org, get, Realm, User}, State) when
       is_binary(User) ->

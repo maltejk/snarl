@@ -8,6 +8,7 @@
          list_/1,
          list/3,
          auth/4,
+         auth/3,
          reindex/2,
          find_key/2,
          get/2, raw/2,
@@ -82,7 +83,7 @@ find_key(Realm, KeyID) ->
                   {error, timeout} |
                   {ok, User::fifo:user_id()}.
 
-auth(Realm, User, Passwd, basic) ->
+auth(Realm, User, Passwd) ->
     case snarl_user:get(Realm, User) of
         {ok, UserR} ->
             case check_pw(UserR, Passwd) of
@@ -93,7 +94,7 @@ auth(Realm, User, Passwd, basic) ->
             end;
         E ->
             E
-    end;
+    end.
 
 auth(Realm, User, Passwd, OTP) ->
     case lookup(Realm, User) of
@@ -124,7 +125,7 @@ check_yubikey(User, OTP) ->
         Ks ->
             case snarl_yubico:id(OTP) of
                 <<>> ->
-                    {key_required, UUID};
+                    {otp_required, yubikey, UUID};
                 YID  ->
                     case lists:member(YID, Ks) of
                         false ->

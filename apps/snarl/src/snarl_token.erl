@@ -4,13 +4,13 @@
 
 -export([
          get/2,
-         add/2, add/4,
+         add/2, add/3, add/4,
          delete/2,
          reindex/2
         ]).
 
 -ignore_xref([
-              reindex/2, add/4
+              reindex/2
              ]).
 
 
@@ -41,6 +41,10 @@ get(Realm, Token) ->
 
 add(Realm, User) ->
     add(Realm, oauth2_token:generate('x-snarl-token'), default, User).
+
+
+add(Realm, Timeout, User) ->
+    add(Realm, oauth2_token:generate('x-snarl-token'), Timeout, User).
 
 add(Realm, Token, Timeout, User) ->
     case do_write(Realm, Token, add, {Timeout, User}) of

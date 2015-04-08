@@ -55,7 +55,7 @@ authenticate_user({Username, Password, OTP}, AppContext) ->
     case snarl_user:auth(AppContext#oauth_state.realm, Username, Password, OTP) of
         {ok, UserID} ->
             {ok, {AppContext, UserID}};
-        {key_required, UserID} ->
+        {otp_required, yubikey, UserID} ->
             {error, {yubikey_required, UserID}};
         not_found ->
             {error, notfound}
@@ -83,7 +83,7 @@ associate_access_code(AccessCode, Context, AppContext) ->
 
 resolve_access_code(AccessCode, AppContext) ->
     %% case get(?ACCESS_CODE_TABLE, AccessCode) of
-    case snarl_token:get(AppContext#oauth_state.realm,{?ACCESS_CODE_TABLE, AccessCode}) of
+    case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
