@@ -122,7 +122,7 @@ init([Partition]) ->
 
 handle_command({repair, {Realm, Token}, _, Obj}, _Sender,
                #state{tokens=Tokens0, db = DBRef}=State) ->
-    lager:warning("repair performed ~p~n", [Obj]),
+    lager:warning("[repair:~p/~p] performed ~p~n", [Realm, Token, Obj]),
     bitcask:put(DBRef,
                 term_to_binary({Realm, Token}),
                 term_to_binary(Obj)),
