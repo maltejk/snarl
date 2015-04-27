@@ -258,7 +258,8 @@ init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
     ok = snarl_role:grant(Realm, RoleUUID, [<<"hypervisors">>, <<"_">>, <<"create">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"datasets">>, <<"_">>, <<"create">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"roles">>, RoleUUID, <<"get">>]),
-    snarl_opt:get(users, Realm, initial_role, users_initial_role, RoleUUID),
+    snarl_opt:set([users, Realm, initial_role], RoleUUID),
+    io:format("Adding default role ~s (~s).~n", [Role, RoleUUID]),
     ok.
 
 add_user([RealmS, User]) ->
