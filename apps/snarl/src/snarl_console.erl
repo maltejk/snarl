@@ -251,11 +251,16 @@ init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
     io:format("Selected ~s as active org for ~s.~n", [Org, User]),
     {ok, RoleUUID} = snarl_role:add(Realm, Role),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"cloud">>, <<"status">>]),
+
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"datasets">>, <<"list">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"networks">>, <<"list">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"ipranges">>, <<"list">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"packages">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"list">>]),
+    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"roles">>, <<"list">>]),
+    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"orgs">>, <<"list">>]),
+    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"users">>, <<"list">>]),
+    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"hypervisors">>, <<"list">>]),
+
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"create">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"hypervisors">>, <<"_">>, <<"create">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"datasets">>, <<"_">>, <<"create">>]),
