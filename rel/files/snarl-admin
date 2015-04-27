@@ -337,7 +337,10 @@ case "$1" in
                 shift
                 run snarl_console scope_revoke $@
                 ;;
-
+            toggle)
+                shift
+                run snarl_console scope_toggle $@
+                ;;
         esac
         ;;
     init)
@@ -373,6 +376,12 @@ case "$1" in
         echo "               roles revoke <realm> <role> <permission>   - revokes a permission."
         echo "               roles export <realm> <uuid>                - Exports a role to a json file."
         echo "               role import <realm> <file>                 - imports a role json file."
+        echo "               scope list <realm>                         - lists all the scopes in a realm."
+        echo "               scope add <realm> <scope> <description>    - Adds a scope."
+        echo "               scope del <realm> <scope>                  - Deletes a scope."
+        echo "               scope grant <realm> <scope> <permission>   - grants a permission to a scope."
+        echo "               scope revoke <realm> <scope> <permission>  - revokes a permission to a scope."
+        echo "               scope toggle <realm> <scope>               - toggles weather this is part of the default scope."
         echo "               intit <realm> <org> <role> <user> <pass>   - initializes a realm with a fresh org and user and role."
         exit 1
         ;;

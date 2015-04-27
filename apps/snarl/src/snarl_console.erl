@@ -42,7 +42,8 @@
          scope_del/1,
          scope_grant/1,
          scope_revoke/1,
-         scope_add/1]).
+         scope_add/1,
+         scope_toggle/1]).
 
 -ignore_xref([
               db_keys/1,
@@ -78,6 +79,7 @@
               scope_add/1,
               scope_grant/1,
               scope_revoke/1,
+              scope_toggle/1,
               init_user/1
              ]).
 
@@ -258,8 +260,12 @@ init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
     ok = snarl_role:grant(Realm, RoleUUID, [<<"hypervisors">>, <<"_">>, <<"create">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"datasets">>, <<"_">>, <<"create">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"roles">>, RoleUUID, <<"get">>]),
+    io:format("Added default role ~s (~s).~n", [Role, RoleUUID]),
     snarl_opt:set([users, Realm, initial_role], RoleUUID),
-    io:format("Adding default role ~s (~s).~n", [Role, RoleUUID]),
+    snarl_oauth:add_scope(Realm, <<"*">>, <<"Everything">>),
+    snarl_oauth:add_permission(Realm, <<"*">>, [<<"...">>]),
+    snarl_oauth:default(Realm, <<"*">>),
+    io:format("Added 'Everything' scope and set it default.~n", []),
     ok.
 
 add_user([RealmS, User]) ->
@@ -733,10 +739,11 @@ do_update(RealmS, MainMod, StateMod) ->
 scope_list([RealmS]) ->
     Realm = list_to_binary(RealmS),
     io:format("Registered scopes:~n"),
-    io:format("~-25s ~-30s  ~s~n", ["Scope", "Description", "Permissions"]),
+    io:format("~-25s ~-30s ~-7s ~s~n",
+              ["Scope", "Description", "Default", "Permissions"]),
     [
-     io:format("~-25s ~-30s  ~s~n", [Scope, Desc, fmt_perms(Perms)])
-     || {Scope, Desc, Perms} <- snarl_oauth:scope(Realm)
+     io:format("~-25s ~-30s ~-7s ~s~n", [Scope, Desc, Dflt, fmt_perms(Perms)])
+     || {Scope, Desc, Dflt, Perms} <- snarl_oauth:scope(Realm)
     ],
     ok.
 
@@ -793,6 +800,19 @@ scope_revoke([RealmS, ScopeS | PermS]) ->
             ok;
         _ ->
             io:format("Permission added to sope ~s in realm ~s.~n",
+                      [Realm, Scope]),
+            ok
+    end.
+
+scope_toggle([RealmS, ScopeS]) ->
+    Realm = list_to_binary(RealmS),
+    Scope = list_to_binary(ScopeS),
+    case snarl_oauth:default(Realm, Scope) of
+        {error, not_found} ->
+            io:format("Scope ~s nor defined in realm ~s.~n", [Scope, Realm]),
+            ok;
+        _ ->
+            io:format("Toggled default for scope sope ~s in realm ~s.~n",
                       [Realm, Scope]),
             ok
     end.
