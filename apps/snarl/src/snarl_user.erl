@@ -341,8 +341,8 @@ add(Realm, undefined, User) ->
         {ok, UUID} ->
             lager:info("[~p:create] Created.", [UUID]),
             case snarl_opt:get(users, Realm,
-                               inital_role,
-                               user_inital_role, undefined) of
+                               initial_role,
+                               user_initial_role, undefined) of
                 undefined ->
                     lager:info("[~p:create] No default role.",
                                [UUID]),

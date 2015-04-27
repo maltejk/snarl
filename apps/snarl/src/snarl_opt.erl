@@ -15,8 +15,9 @@ unset(Ks) ->
 update() ->
     Opts =
         [
-         {defaults, users, inital_role},
-         {defaults, users, inital_org},
+         {defaults, users, initial_role},
+         {defaults, users, initial_org},
+         {defaults, clients, initial_role},
          {yubico, api, client_id},
          {yubico, api, secret_key}
         ],
@@ -39,6 +40,6 @@ update(A, B, C) ->
 opts() ->
     [{"users",
       [{'_',
-        [{"inital_role", binary}, {"inital_org", binary}]}]},
+        [{"initial_role", binary}, {"initial_org", binary}]}]},
      {"yubico",
       [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].

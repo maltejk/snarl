@@ -227,9 +227,10 @@ delete_role([RealmS, User]) ->
     snarl_user:delete(Realm, list_to_binary(User)),
     ok.
 
-init_user([RealmS, OrgS, UserS, PassS]) ->
+init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
     Realm = list_to_binary(RealmS),
     Org = list_to_binary(OrgS),
+    Role = list_to_binary(RoleS),
     User = list_to_binary(UserS),
     Pass = list_to_binary(PassS),
     {ok, UserUUID} = snarl_user:add(Realm, User),
@@ -246,6 +247,18 @@ init_user([RealmS, OrgS, UserS, PassS]) ->
     io:format("Joined ~s to ~s.~n", [User, Org]),
     ok = snarl_user:select_org(Realm, UserUUID, OrgUUID),
     io:format("Selected ~s as active org for ~s.~n", [Org, User]),
+    {ok, RoleUUID} = snarl+role:create(Realm, Role),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"cloud">>, <<"status">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"datasets">>, <<"list">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"networks">>, <<"list">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"ipranges">>, <<"list">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"packages">>, <<"list">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"list">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"create">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"hypervisors">>, <<"_">>, <<"create">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"datasets">>, <<"_">>, <<"create">>]),
+    ok = snarl_roles:grant(Realm, RoleUUID, [<<"roles">>, RoleUUID, <<"get">>]),
+    snarl_opt:get(users, Realm, initial_role, users_initial_role, RoleUUID),
     ok.
 
 add_user([RealmS, User]) ->
