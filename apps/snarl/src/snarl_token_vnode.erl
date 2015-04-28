@@ -122,7 +122,7 @@ init([Partition]) ->
 
 handle_command({repair, {Realm, Token}, _, Obj}, _Sender,
                #state{tokens=Tokens0, db = DBRef}=State) ->
-    lager:warning("repair performed ~p~n", [Obj]),
+    lager:warning("[repair:~p/~p] performed ~p~n", [Realm, Token, Obj]),
     bitcask:put(DBRef,
                 term_to_binary({Realm, Token}),
                 term_to_binary(Obj)),
@@ -201,7 +201,7 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, State) ->
     {{Realm, Token}, HObject} = binary_to_term(Data),
-    Hs0 = dict:store({Realm, Token}, {now(), HObject}, State#state.tokens),
+    Hs0 = dict:store({Realm, Token}, {bitcask_time:tstamp(), HObject}, State#state.tokens),
     {reply, ok, State#state{tokens = Hs0}}.
 
 encode_handoff_item(Token, {_, Data}) ->
@@ -259,13 +259,13 @@ expire(#state{tokens = Tokens, db = DBRef} = State) ->
     Tokens1 = dict:filter(
                 fun({Realm, Token}, Obj) ->
                         case ft_obj:val(Obj) of
-                            {Exp, _} when T0 =< Exp ->
-                                lager:debug("[token:~s] Expiering: ~s", [Realm, Token]),
+                            {Exp, _V} when Exp > T0  ->
+                                true;
+                            _->
+                                lager:debug("[token:~p] Expiering: ~p", [Realm, Token]),
                                 Key = term_to_binary({Realm, Token}),
                                 bitcask:delete(DBRef, Key),
-                                false;
-                            _ ->
-                                true
+                                false
                         end
                 end, Tokens),
     State#state{

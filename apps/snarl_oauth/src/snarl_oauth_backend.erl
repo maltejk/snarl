@@ -172,7 +172,7 @@ verify_redirection_uri(ClientUUID, Uri, AppContext) ->
 
 verify_client_scope(_Client, Scope, AppContext) ->
     %% TODO: Do we need to look at what the scope of the client should be?
-    RealmScope = [S || {S, _, _} <-
+    RealmScope = [S || {S, _, _, _} <-
                            snarl_oauth:scope(AppContext#oauth_state.realm)],
     verify_scope(RealmScope, Scope, AppContext).
 %%verify_client_scope({Client, _Secret}, Scope, AppContext) ->
@@ -184,7 +184,7 @@ verify_client_scope(_Client, Scope, AppContext) ->
     %% end.
 
 verify_resowner_scope(_UserID, Scope, AppContext) ->
-    RealmScope = [S || {S, _, _} <-
+    RealmScope = [S || {S, _, _, _} <-
                            snarl_oauth:scope(AppContext#oauth_state.realm)],
     verify_scope(RealmScope, Scope, AppContext).
 
@@ -192,8 +192,10 @@ verify_resowner_scope(_UserID, Scope, AppContext) ->
 %%     {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, UserID),
 %%     verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext).
 
-verify_scope(RegisteredScope, undefined, AppContext) ->
-    {ok, {AppContext, RegisteredScope}};
+verify_scope(_RegisteredScope, undefined, AppContext) ->
+    DefaultScope = [S || {S, _, true, _} <-
+                             snarl_oauth:scope(AppContext#oauth_state.realm)],
+    {ok, {AppContext, DefaultScope}};
 verify_scope(_RegisteredScope, [], AppContext) ->
     {ok, {AppContext, []}};
 verify_scope([], _Scope, _AppContext) ->

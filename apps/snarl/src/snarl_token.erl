@@ -31,10 +31,8 @@ get(Realm, Token) ->
             [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]),
     case R of
         {ok, not_found} ->
-            lager:debug("[token:~s] ~s not found.", [Realm, Token]),
             not_found;
         {ok, {_Exp, Value}} ->
-            lager:debug("[token:~s] ~s found.", [Realm, Token]),
             {ok, Value}
     end.
 
@@ -49,10 +47,9 @@ add(Realm, Timeout, User) ->
 add(Realm, Token, Timeout, User) ->
     case do_write(Realm, Token, add, {Timeout, User}) of
         {ok, Token} ->
-            lager:debug("[token:~s/~s] New token ~p.", [Realm, User, Token]),
             {ok, Token};
         E ->
-            lager:debug("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
+            lager:warning("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
             E
     end.
 
