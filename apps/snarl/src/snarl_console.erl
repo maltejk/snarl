@@ -259,6 +259,7 @@ init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"roles">>, <<"list">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"orgs">>, <<"list">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"users">>, <<"list">>]),
+    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"list">>]),
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"hypervisors">>, <<"list">>]),
 
     ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"create">>]),
