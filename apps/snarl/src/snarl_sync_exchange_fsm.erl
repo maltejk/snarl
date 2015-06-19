@@ -1,8 +1,30 @@
 %%%-------------------------------------------------------------------
 %%% @author Heinz Nikolaus Gies <heinz@licenser.net>
 %%% @copyright (C) 2014, Heinz Nikolaus Gies
-%%% @doc
-%%%
+%%% @doc FSM to syncronize differences for the remote DC replication
+%%%                             ┌────────┐
+%%%                             │   not  │
+%%%                             ▼  empty │
+%%%  ┌───────────┐        ┌───────────┐  │
+%%%  │   comp    │───────▶│ sync_diff │──┘
+%%%  └───────────┘        └───────────┘
+%%%                      empty  │
+%%%                             │
+%%%         ┌───────────────────┘
+%%%         │                   ┌────────┐
+%%%         │                   │    not │
+%%%         ▼       empty       ▼   empty│
+%%%   ┌───────────┐       ┌───────────┐  │
+%%%┌─▶│    get    │──────▶│   push    │──┘
+%%%│  └───────────┘       └───────────┘
+%%%│  not   │                   │
+%%%│ empty  │                   │  empty
+%%%└────────┘                   │
+%%%                             │
+%%%                             ▼
+%%%                       ┌───────────┐
+%%%                       │   done    │
+%%%                       └───────────┘
 %%% @end
 %%% Created :  7 Jan 2014 by Heinz Nikolaus Gies <heinz@licenser.net>
 %%%-------------------------------------------------------------------
@@ -130,16 +152,16 @@ sync_diff(_, State = #state{
                                     Msg = write(Sys, Realm, UUID, sync_repair, Merged),
                                     case gen_tcp:send(Socket, Msg) of
                                         ok ->
-                                            {next_state, sync_get, State#state{diff=R}, 0};
+                                            {next_state, sync_diff, State#state{diff=R}, 0};
                                         E ->
                                             lager:error("[sync-exchange] Error: ~p", [E]),
                                             {stop, recv, State}
                                     end;
                                 _ ->
-                                    {next_state, sync_get, State#state{diff=R}, 0}
+                                    {next_state, sync_diff, State#state{diff=R}, 0}
                             end;
                         not_found ->
-                            {next_state, sync_get, State#state{diff=R}, 0}
+                            {next_state, sync_diff, State#state{diff=R}, 0}
                     end
             end;
         E ->
@@ -192,7 +214,7 @@ sync_push(_, State = #state{
            end,
     case gen_tcp:send(Socket, Msg) of
         ok ->
-            {next_state, sync_get, State#state{push=R}, 0};
+            {next_state, sync_push, State#state{push=R}, 0};
         E ->
             lager:error("[sync-exchange] Error: ~p", [E]),
             {stop, recv, State}
