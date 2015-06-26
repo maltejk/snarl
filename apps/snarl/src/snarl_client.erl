@@ -62,7 +62,7 @@ sync_repair(Realm, UUID, Obj) ->
                   {ok, Client::fifo:client_id()}.
 
 auth(Realm, Client, Secret) ->
-    case snarl_client:get(Realm, Client) of
+    case snarl_client:lookup(Realm, Client) of
         {ok, ClientR} ->
             case check_pw(ClientR, Secret) of
                 true ->
