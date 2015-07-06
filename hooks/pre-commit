@@ -7,6 +7,11 @@
 #
 # To enable this hook, rename this file to "pre-commit".
 
+if [[ "x${SKIP}x" == "x1x" ]]
+then
+        exit 0
+fi
+
 make quick-xref
 RETVAL=$?
 if [ $RETVAL -ne 0 ]
