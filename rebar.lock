@@ -192,5 +192,5 @@
   0},
  {<<"bcrypt">>,
   {git,"https://github.com/project-fifo/erlang-bcrypt.git",
-       {ref,"56820339ce021b12d07e48130a8abed4e9637603"}},
+       {ref,"464e42386a486a42a0ea65d5b850fef52f87156a"}},
   0}].
