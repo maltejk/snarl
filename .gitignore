@@ -29,3 +29,4 @@ current_counterexample.eqc
 .rebar
 *.log
 *.log.?
+_build
