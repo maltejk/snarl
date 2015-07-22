@@ -35,12 +35,15 @@ quick-xref:
 quick-test:
 	$(REBAR) as eqc eunit -v
 
-rel:
+update:
+	$(REBAR) update
+	
+rel: update
 	$(REBAR) as prod compile
 	sh generate_zabbix_template.sh
 	$(REBAR) release
 
-package:
+package: rel
 	make -C rel/pkg package
 
 ###
