@@ -8,6 +8,8 @@
      stdlib,
      riak_core,
      fifo_db,
+     fifo_dt,
+     fifo_utils,
      folsom_ddb,
      mdns_server_lib,
      lager,
