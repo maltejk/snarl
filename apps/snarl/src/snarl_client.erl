@@ -9,6 +9,7 @@
          list/3,
          auth/3,
          name/3,
+         type/3,
          reindex/2,
          get/2, raw/2,
          lookup/2,
@@ -277,6 +278,10 @@ secret(Realm, Client, Secret) ->
         end,
     do_write(Realm, Client, secret, H).
 
+
+type(Realm, Client, Type) when Type =:= confidential;
+                               Type =:= public ->
+    do_write(Realm, Client, type, Type).
 
 name(Realm, Client, Name) ->
     do_write(Realm, Client, name, Name).
