@@ -321,6 +321,10 @@ message({client, name, Realm, Client, Name}, State) when
       is_binary(Name) ->
     {reply, snarl_client:name(Realm, Client, Name), State};
 
+message({client, type, Realm, Client, Type}, State) when
+      is_binary(Client),
+      is_atom(Type) ->
+    {reply, snarl_client:type(Realm, Client, Type), State};
 
 message({client, token, Realm, Client}, State) when
     is_binary(Client) ->
