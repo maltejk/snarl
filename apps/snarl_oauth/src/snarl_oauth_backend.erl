@@ -77,9 +77,7 @@ authenticate_client({ClientId, ClientSecret},
             {error, notfound}
     end;
 authenticate_client(ClientID, AppContext) when is_binary(ClientID) ->
-    {ok, C} = libsnarl_client:lookup(ClientID),
-    UUID = ft_client:uuid(C),
-    {ok, {AppContext, UUID}}.
+    get_client_identity(ClientID, AppContext).
 
 
 %% Is this a Authrorization Code?
