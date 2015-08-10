@@ -84,7 +84,6 @@ authenticate_client(ClientID, AppContext) when is_binary(ClientID) ->
     get_client_identity(ClientID, AppContext).
 
 
-
 %% Is this a Authrorization Code?
 associate_access_code(AccessCode, Context, AppContext) ->
     %% put(?ACCESS_CODE_TABLE, AccessCode, Context),
