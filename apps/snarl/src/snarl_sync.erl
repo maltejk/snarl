@@ -263,7 +263,13 @@ maybe_close(Old) ->
     gen_tcp:close(Old).
 
 hash(BKey, Obj) ->
-    list_to_binary(integer_to_list(erlang:phash2({BKey, ft_obj:vclock(Obj)}))).
+    Data = case ft_obj:is_a(Obj) of
+               true ->
+                   lists:sort(ft_obj:vclock(Obj));
+               _ ->
+                   Obj
+           end,
+    integer_to_binary(erlang:phash2({BKey, Obj})).
 
 sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     {Diff, Get, Push} = split_trees(LTree, RTree),

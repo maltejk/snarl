@@ -2,9 +2,10 @@
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
+         sync_repair/3,
          create/5,
          update/5,
-         delete/5,
+         destroy/5,
          get/2,
          get/3,
          get/4
@@ -13,7 +14,7 @@
 -ignore_xref([
               create/5,
               update/5,
-              delete/5,
+              destroy/5,
               get/2,
               get/3,
               get/4
@@ -26,14 +27,17 @@
           {snarl,accounting, Met},
           Mod, Fun, Args)).
 
+sync_repair(Realm, {Org, Elem}, Obj) ->
+    do_write(Realm, Org, sync_repair, {Elem, Obj}).
+
 create(Realm, Org, Element, Time, Metadata) ->
     do_write(Realm, Org, create, {Element, Time, Metadata}).
 
 update(Realm, Org, Element, Time, Metadata) ->
     do_write(Realm, Org, update, {Element, Time, Metadata}).
 
-delete(Realm, Org, Element, Time, Metadata) ->
-    do_write(Realm, Org, delete, {Element, Time, Metadata}).
+destroy(Realm, Org, Element, Time, Metadata) ->
+    do_write(Realm, Org, destroy, {Element, Time, Metadata}).
 
 
 

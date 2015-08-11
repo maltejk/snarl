@@ -21,16 +21,16 @@ start_link() ->
 
 init(_Args) ->
     RoleVMaster = {snarl_role_vnode_master,
-                    {riak_core_vnode_master, start_link, [snarl_role_vnode]},
-                    permanent, 5000, worker, [riak_core_vnode_master]},
+                   {riak_core_vnode_master, start_link, [snarl_role_vnode]},
+                   permanent, 5000, worker, [riak_core_vnode_master]},
 
     UserVMaster = {snarl_user_vnode_master,
                    {riak_core_vnode_master, start_link, [snarl_user_vnode]},
                    permanent, 5000, worker, [riak_core_vnode_master]},
 
     ClientVMaster = {snarl_client_vnode_master,
-                   {riak_core_vnode_master, start_link, [snarl_client_vnode]},
-                   permanent, 5000, worker, [riak_core_vnode_master]},
+                     {riak_core_vnode_master, start_link, [snarl_client_vnode]},
+                     permanent, 5000, worker, [riak_core_vnode_master]},
 
     WriteFSMs = {snarl_entity_write_fsm_sup,
                  {snarl_entity_write_fsm_sup, start_link, []},
@@ -44,6 +44,10 @@ init(_Args) ->
                   {riak_core_vnode_master, start_link, [snarl_org_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
+    AccountingVMaster = {snarl_accounting_vnode_master,
+                         {riak_core_vnode_master, start_link, [snarl_accounting_vnode]},
+                         permanent, 5000, worker, [riak_core_vnode_master]},
+
     S2iVMaster = {snarl_2i_vnode_master,
                   {riak_core_vnode_master, start_link, [snarl_2i_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
@@ -56,6 +60,10 @@ init(_Args) ->
     ReadFSMs = {snarl_entity_read_fsm_sup,
                 {snarl_entity_read_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [snarl_entity_read_fsm_sup]},
+
+    AccountingFSMs = {snarl_accounting_read_fsm_sup,
+                      {snarl_accounting_read_fsm_sup, start_link, []},
+                      permanent, infinity, supervisor, [snarl_accounting_read_fsm_sup]},
 
     riak_core_entropy_info:create_table(),
 
@@ -89,11 +97,18 @@ init(_Args) ->
           [snarl_s2i, snarl_s2i_vnode]},
          permanent, 30000, worker, [riak_core_entropy_manager]},
 
+    EntropyManagerAccounting =
+        {snarl_accounting_entropy_manager,
+         {riak_core_entropy_manager, start_link,
+          [snarl_accounting, snarl_accounting_vnode]},
+         permanent, 30000, worker, [riak_core_entropy_manager]},
+
+
     VNodeMasters = [RoleVMaster, UserVMaster, TokenVMaster, OrgVMaster,
-                    S2iVMaster, ClientVMaster],
-    FSMs = [ReadFSMs, WriteFSMs, CoverageFSMs],
+                    S2iVMaster, ClientVMaster, AccountingVMaster],
+    FSMs = [ReadFSMs, WriteFSMs, CoverageFSMs, AccountingFSMs],
     AAE = [EntropyManagerUser, EntropyManagerRole, EntropyManagerOrg,
-           EntropyManagerClient, EntropyManagerS2i],
+           EntropyManagerClient, EntropyManagerS2i, EntropyManagerAccounting],
     AdditionalServices =
         [{snarl_sync_sup, {snarl_sync_sup, start_link, []},
           permanent, 5000, supervisor, []},
@@ -105,7 +120,6 @@ init(_Args) ->
           permanent, 5000, worker, []},
          {snarl_sync_tree, {snarl_sync_tree, start_link, []},
           permanent, 5000, worker, []}],
-
     {ok,
      {{one_for_one, 5, 10},
       VNodeMasters ++ FSMs ++ AAE ++ AdditionalServices

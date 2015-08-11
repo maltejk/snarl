@@ -1,5 +1,6 @@
 -module(snarl_accounting_vnode).
 -behaviour(riak_core_vnode).
+-behaviour(riak_core_aae_vnode).
 
 %%-behaviour(riak_core_aae_vnode).
 
@@ -24,7 +25,7 @@
 
 -export([
          master/0,
-         %% aae_repair/2,
+         aae_repair/2,
          hash_object/2
         ]).
 
@@ -34,16 +35,18 @@
 %% Writes
 -export([
          create/4,
-         delete/4,
+         destroy/4,
          update/4,
-         repair/3, sync_repair/4
+         repair/3, sync_repair/4,
+         get_index_n/1
         ]).
 
 -ignore_xref([
               create/4,
-              delete/4,
+              destroy/4,
               update/4,
-              repair/3, sync_repair/4
+              repair/3, sync_repair/4,
+              get_index_n/1
              ]).
 
 -define(SERVICE, snarl_accounting).
@@ -54,7 +57,8 @@
           partition,
           node = node(),
           dbs = #{},
-          db_path
+          db_path,
+          hashtrees
          }).
 
 %%%===================================================================
@@ -65,11 +69,15 @@ master() ->
     ?MASTER.
 
 hash_object(Key, Obj) ->
-    snarl_vnode:hash_object(Key, Obj).
+    integer_to_binary(erlang:phash2({Key, Obj})).
 
-%% aae_repair(Realm, Key) ->
-%%     lager:debug("AAE Repair: ~p", [Key]),
-%%     snarl_org:get(Realm, Key).
+aae_repair(Realm, {OrgID, Element}) ->
+    lager:debug("AAE Repair: ~p/~p", [OrgID, Element]),
+    snarl_accounting:get(Realm, OrgID, Element).
+
+get_index_n({Bucket, {Key, _}}) ->
+    riak_core_util:get_index_n({Bucket, Key}).
+
 
 %%%===================================================================
 %%% API
@@ -110,9 +118,9 @@ get(Preflist, ReqID, {Realm, Org}, Element) when is_binary(Element) ->
 %%% API - writes
 %%%===================================================================
 
-sync_repair(Preflist, ReqID, UUID, Obj) ->
+sync_repair(Preflist, ReqID, {Realm, OrgID}, {Elem, Obj}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {sync_repair, ReqID, UUID, Obj},
+                                   {sync_repair, ReqID, Realm, OrgID, Elem, Obj},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -128,9 +136,9 @@ update(Preflist, ReqID, {Realm, OrgID}, {ElementID, Timestamp, Metadata}) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-delete(Preflist, ReqID, {Realm, OrgID}, {ElementID, Timestamp, Metadata}) ->
+destroy(Preflist, ReqID, {Realm, OrgID}, {ElementID, Timestamp, Metadata}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {delete, ReqID, Realm, OrgID, ElementID, Timestamp, Metadata},
+                                   {destroy, ReqID, Realm, OrgID, ElementID, Timestamp, Metadata},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -147,10 +155,14 @@ init([Partition]) ->
                      end,
     {ok, DBPath} = application:get_env(fifo_db, db_path),
     FoldWorkerPool = {pool, snarl_worker, WorkerPoolSize, []},
+    HT = riak_core_aae_vnode:maybe_create_hashtrees(
+           snarl_accounting, Partition, snarl_accounting_vnode, undefined),
+
     {ok,
      #state{
         partition = Partition,
-        db_path = DBPath
+        db_path = DBPath,
+        hashtrees = HT
        },
      [FoldWorkerPool]}.
 
@@ -158,60 +170,131 @@ init([Partition]) ->
 %%% General
 %%%===================================================================
 
-handle_command({create, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata},
-               _Sender, State) ->
+insert(Action, Realm, OrgID, Element, Timestamp, Metadata, State) ->
+    State1 = insert1(Action, Realm, OrgID, Element, Timestamp, Metadata, State),
+    {Res, State2} = for_element(Realm, OrgID, Element, State1),
+    Hash = hash_object({Realm, OrgID, Element}, Res),
+    snarl_sync_tree:update(accounting, {Realm, OrgID, Element}, Res),
+    riak_core_aae_vnode:update_hashtree(
+      Realm, {OrgID, Element}, Hash, State#state.hashtrees),
+    State2.
+
+insert1(create, Relam, OrgID, Element, Timestamp, Metadata, State) ->
     {DB, State1} = get_db(Relam, OrgID, State),
     esqlite3:q("INSERT INTO `create` (uuid, time, metadata) VALUES "
                "(?1, ?2, ?3)",
                [Element, Timestamp, term_to_binary(Metadata)], DB),
-    {reply, {ok, ReqID}, State1};
-
-handle_command({update, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata},
-               _Sender, State) ->
+    State1;
+insert1(update, Relam, OrgID, Element, Timestamp, Metadata, State) ->
     {DB, State1} = get_db(Relam, OrgID, State),
     esqlite3:q("INSERT INTO `update` (uuid, time, metadata) VALUES "
                "(?1, ?2, ?3)",
                [Element, Timestamp, term_to_binary(Metadata)], DB),
-    {reply, {ok, ReqID}, State1};
-
-handle_command({delete, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata}, _Sender, State) ->
+    State1;
+insert1(destroy, Relam, OrgID, Element, Timestamp, Metadata, State) ->
     {DB, State1} = get_db(Relam, OrgID, State),
-    esqlite3:q("INSERT INTO `delete` (uuid, time, metadata) VALUES "
+    esqlite3:q("INSERT INTO `destroy` (uuid, time, metadata) VALUES "
                "(?1, ?2, ?3)",
                [Element, Timestamp, term_to_binary(Metadata)], DB),
+    State1.
+
+handle_command({create, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata},
+               _Sender, State) ->
+    State1 = insert(create, Relam, OrgID, Element, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({get, ReqID, Relam, OrgID}, _Sender, State) ->
-    {DB, State1} = get_db(Relam, OrgID, State),
+handle_command({update, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata},
+               _Sender, State) ->
+    State1 = insert(update, Relam, OrgID, Element, Timestamp, Metadata, State),
+    {reply, {ok, ReqID}, State1};
+
+handle_command({destroy, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata}, _Sender, State) ->
+    State1 = insert(destroy, Relam, OrgID, Element, Timestamp, Metadata, State),
+    {reply, {ok, ReqID}, State1};
+
+handle_command({get, ReqID, Realm, OrgID}, _Sender, State) ->
+    {DB, State1} = get_db(Realm, OrgID, State),
     ResC = [ {T, create, E, binary_to_term(M)} ||
                {E, T, M} <- esqlite3:q("SELECT * FROM `create`", DB)],
     ResU = [ {T, update, E, binary_to_term(M)} ||
                {E, T, M} <- esqlite3:q("SELECT * FROM `update`", DB)],
-    ResD = [ {T, delete, E, binary_to_term(M)} ||
+    ResD = [ {T, destroy, E, binary_to_term(M)} ||
                {E, T, M} <- esqlite3:q("SELECT * FROM `destroy`", DB)],
     Res = ResC ++ ResU ++ ResD,
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State1};
 
-handle_command({get, ReqID, Relam, OrgID, Element}, _Sender, State) ->
-    {DB, State1} = get_db(Relam, OrgID, State),
-    ResC = [ {T, create, E, binary_to_term(M)} ||
-               {E, T, M} <- esqlite3:q("SELECT * FROM `create` "
-                                       "WHERE uuid=?", [Element], DB)],
-    ResU = [ {T, update, E, binary_to_term(M)} ||
-               {E, T, M} <- esqlite3:q("SELECT * FROM `update` "
-                                       "WHERE uuid=?", [Element], DB)],
-    ResD = [ {T, delete, E, binary_to_term(M)} ||
-               {E, T, M} <- esqlite3:q("SELECT * FROM `destroy` "
-                                       "WHERE uuid=?", [Element], DB)],
-    Res = ResC ++ ResU ++ ResD,
+handle_command({get, ReqID, Realm, OrgID, Element}, _Sender, State) ->
+    {Res, State1} = for_element(Realm, OrgID, Element, State),
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State1};
 
-handle_command({get, ReqID, _Relam, _OrgID, _Start, _Stop}, _Sender, State) ->
-    Res = [random:uniform(100)],
+handle_command({hashtree_pid, Node}, _, State) ->
+    %% Handle riak_core request forwarding during ownership handoff.
+    %% Following is necessary in cases where anti-entropy was enabled
+    %% after the vnode was already running
+    case {node(), State#state.hashtrees} of
+        {Node, undefined} ->
+            HT1 =  riak_core_aae_vnode:maybe_create_hashtrees(
+                     snarl_accounting,
+                     State#state.partition,
+                     snarl_accounting_vnode,
+                     undefined),
+            {reply, {ok, HT1}, State#state{hashtrees = HT1}};
+        {Node, HT} ->
+            {reply, {ok, HT}, State};
+        _ ->
+            {reply, {error, wrong_node}, State}
+    end;
+
+handle_command({rehash, {Realm, {OrgID, Element}}}, _,
+               State=#vstate{hashtrees=HT}) when is_binary(Realm) ->
+    case for_element(Realm, OrgID, Element, State) of
+        {[], State1} ->
+            %% Make sure hashtree isn't tracking deleted data
+            riak_core_index_hashtree:delete({Realm, {OrgID, Element}}, HT),
+            {noreply, State1};
+        {Res, State1} ->
+            Hash = hash_object({Realm, OrgID, Element}, Res),
+            riak_core_aae_vnode:update_hashtree(
+              Realm, {OrgID, Element}, Hash, HT),
+            {noreply, State1}
+    end;
+
+handle_command({get, ReqID, Realm, OrgID, Start, Stop}, _Sender, State) ->
+    {DB, State1} = get_db(Realm, OrgID, State),
+    Q = "SELECT `create`.uuid AS uuid, `create`.time AS time,"
+        "       `create`.metadata AS metadata, 'create' AS action"
+        "  FROM `create`"
+        "  LEFT JOIN `destroy` ON `create`.uuid = `destroy`.uuid"
+        "  WHERE `create`.time < ?2"
+        "    AND (`destroy`.time IS NULL OR `destroy`.time > ?1)"
+        " UNION ALL "
+        "SELECT `destroy`.uuid AS uuid, `destroy`.time AS time,"
+        "       `destroy`.metadata AS metadata, 'destroy' AS action"
+        "  FROM `destroy`"
+        "  JOIN `create` ON `create`.uuid = `destroy`.uuid"
+        "  WHERE `create`.time < ?2"
+        "    AND `destroy`.time > ?1 AND `destroy`.time < ?2"
+        " UNION ALL "
+        "SELECT `update`.uuid AS uuid, `update`.time AS time,"
+        "       `update`.metadata AS metadata, 'update' AS action"
+        "  FROM `update` WHERE uuid IN ("
+        "    SELECT `create`.uuid"
+        "      FROM `create`"
+        "      LEFT JOIN `destroy` ON `create`.uuid = `destroy`.uuid"
+        "      WHERE `create`.time < ?2"
+        "        AND (`destroy`.time IS NULL OR `destroy`.time > ?1));",
+    Res = [{T, a2a(A), E, binary_to_term(M)} ||
+              {E, T, M, A} <- esqlite3:q(Q, [Start, Stop], DB)],
     NodeIdx = {State#state.partition, State#state.node},
-    {reply, {ok, ReqID, NodeIdx, Res}, State};
+    {reply, {ok, ReqID, NodeIdx, lists:sort(Res)}, State1};
+
+handle_command({sync_repair, ReqID, Realm, OrgID, Element, Entries}, _Sender, State) ->
+    State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
+                                 insert(Action, Realm, OrgID, Element, Timestamp, Metadata, SAcc)
+                         end, State, Entries),
+    {reply, {ok, ReqID}, State1};
 
 handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
                State=#state{partition = P, db_path = Path, dbs = DBs}) ->
@@ -226,30 +309,9 @@ handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
                                   RealmPath = filename:join([BasePath, Realm]),
                                   case file:list_dir(RealmPath) of
                                       {ok, Orgs} when length(Orgs) > 0 ->
-                                          lists:foldl(
-                                            fun(Org, AccO) ->
-                                                    OrgPath = filename:join([RealmPath, Org]),
-                                                    {ok, C} = esqlite3:open(OrgPath),
-
-                                                    Fc = fun({E, T, M}, AccE) ->
-                                                                 V = {T, create, E, M},
-                                                                 Fun({Realm, Org}, V, AccE)
-                                                         end,
-                                                    Fu = fun({E, T, M}, AccE) ->
-                                                                 V = {T, update, E, M},
-                                                                 Fun({Realm, Org}, V, AccE)
-                                                       end,
-                                                    Fd = fun({E, T, M}, AccE) ->
-                                                                 V = {T, delete, E, M},
-                                                                 Fun({Realm, Org}, V, AccE)
-                                                         end,
-                                                    Cs = esqlite3:q("select * from `create`", C),
-                                                    Acc1 = lists:foldl(Fc, AccO, Cs),
-                                                    Us = esqlite3:q("select * from `update`", C),
-                                                    Acc2 = lists:foldl(Fu, Acc1, Us),
-                                                    Ds = esqlite3:q("select * from `destroy`", C),
-                                                    lists:foldl(Fd, Acc2, Ds)
-                                            end, AccR, Orgs);
+                                          lists:foldl(fun (Org, AccO) ->
+                                                              handle_org(RealmPath, Fun, Realm, Org, AccO)
+                                                      end, AccR, Orgs);
                                       _ ->
                                           AccR
                                   end
@@ -262,6 +324,40 @@ handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
                         riak_core_vnode:reply(Sender, Acc)
                 end,
     {async, {fold, AsyncWork, FinishFun}, Sender, State#state{dbs = #{}}}.
+
+handle_org(RealmPath, Fun, Realm, Org, Acc) ->
+    OrgPath = filename:join([RealmPath, Org]),
+    {ok, C} = esqlite3:open(OrgPath),
+    Q = "SELECT * FROM ("
+        "SELECT `create`.uuid AS uuid, `create`.time AS time,"
+        "       `create`.metadata AS metadata, 'create' AS action"
+        "  FROM `create`"
+        " UNION ALL "
+        "SELECT `destroy`.uuid AS uuid, `destroy`.time AS time,"
+        "       `destroy`.metadata AS metadata, 'destroy' AS action"
+        "  FROM `destroy`"
+        " UNION ALL "
+        "SELECT `update`.uuid AS uuid, `update`.time AS time,"
+        "       `update`.metadata AS metadata, 'update' AS action"
+        "  FROM `update`) ORDER BY uuid",
+    case esqlite3:q(Q, C) of
+        [] ->
+            Acc;
+        [{E0, T0, M0, A0} | Es] ->
+            In = {E0, [{T0, a2a(A0), M0}]},
+            {{EOut, LOut}, AccOut} =
+                lists:foldl(fun({E, T, M, A}, {{E, L}, AccE}) ->
+                                    {{E, [{T, a2a(A), M} | L]}, AccE};
+                               ({E, T, M, A}, {{EOut, LOut}, AccE}) ->
+                                    AccE1 = Fun({Realm, {Org,EOut}}, LOut, AccE),
+                                    {{E, [{T, a2a(A), M}]}, AccE1}
+                            end, {In, Acc}, Es),
+            Fun({Realm, {Org, EOut}}, LOut, AccOut)
+    end.
+
+a2a(<<"create">>) -> create;
+a2a(<<"update">>) -> update;
+a2a(<<"destroy">>) -> destroy.
 
 handle_handoff_command(?FOLD_REQ{} = FR, Sender, State) ->
     handle_command(FR, Sender, State);
@@ -333,9 +429,26 @@ terminate(_Reason, #state{dbs = DBs}) ->
     [esqlite3:close(DB) || DB <- maps:values(DBs)],
     ok.
 
+%%% AAE
+handle_info(retry_create_hashtree,
+            State=#state{hashtrees=undefined, partition=Idx}) ->
+    lager:debug("snarl_accounting/~p retrying to create a hash tree.", [Idx]),
+    HT = riak_core_aae_vnode:maybe_create_hashtrees(snarl_accounting, Idx, snarl_accounting_vnode, undefined),
+    {ok, State#state{hashtrees = HT}};
+
+handle_info(retry_create_hashtree, State) ->
+    {ok, State};
+
+handle_info({'DOWN', _, _, Pid, _},
+            State=#state{hashtrees=Pid, partition=Idx}) ->
+    lager:debug("snarl_accounting/~p hashtree ~p went down.", [Idx, Pid]),
+    erlang:send_after(1000, self(), retry_create_hashtree),
+    {ok, State#state{hashtrees = undefined}};
+
+handle_info({'DOWN', _, _, _, _}, State) ->
+    {ok, State};
+
 handle_info(_Msg, State) ->
-    %% TODO: snarl_vnode:handle_info(Msg, State).
-    %% we do't have infos.
     {ok, State}.
 
 get_db(Realm, Org, State = #state{partition = P, dbs = DBs, db_path = Path}) ->
@@ -363,12 +476,22 @@ get_db(Realm, Org, State = #state{partition = P, dbs = DBs, db_path = Path}) ->
 
 init_db(DB) ->
     ok = esqlite3:exec("CREATE TABLE IF NOT EXISTS `create` "
-                       "(uuid CHAR(36), time INTEGER, metadata BLOB)", DB),
+                       "(uuid CHAR(36), time INTEGER, metadata BLOB, "
+                       "PRIMARY KEY (time, uuid))", DB),
+    ok = esqlite3:exec("CREATE INDEX IF NOT EXISTS create_time "
+                       "ON 'create'(time)", DB),
     ok = esqlite3:exec("CREATE TABLE IF NOT EXISTS `destroy` "
-                       "(uuid CHAR(36), time INTEGER, metadata BLOB)", DB),
+                       "(uuid CHAR(36), time INTEGER, metadata BLOB ,"
+                       "PRIMARY KEY (time, uuid))", DB),
+    ok = esqlite3:exec("CREATE INDEX IF NOT EXISTS destroy_time "
+                       "ON 'destroy'(time)", DB),
     ok = esqlite3:exec("CREATE TABLE IF NOT EXISTS `update` "
-                       "(uuid CHAR(36), time INTEGER, metadata BLOB)", DB).
-
+                       "(uuid CHAR(36), time INTEGER, metadata BLOB ,"
+                       "PRIMARY KEY (time, uuid))", DB),
+    ok = esqlite3:exec("CREATE INDEX IF NOT EXISTS update_time ON "
+                       "'update'(time)", DB),
+    ok = esqlite3:exec("CREATE INDEX IF NOT EXISTS update_uuid "
+                       "ON 'update'(uuid)", DB).
 
 del_dir(Dir) ->
     lists:foreach(fun(D) ->
@@ -392,3 +515,16 @@ del_all_files([Dir | T], EmptyDirs) ->
                           ok = file:delete(F)
                   end, Files),
     del_all_files(T ++ Dirs, [Dir | EmptyDirs]).
+
+for_element(Realm, OrgID, Element, State) ->
+    {DB, State1} = get_db(Realm, OrgID, State),
+    ResC = [ {T, create, binary_to_term(M)} ||
+               {T, M} <- esqlite3:q("SELECT time, metadata FROM `create` "
+                                    "WHERE uuid=?", [Element], DB)],
+    ResU = [ {T, update, binary_to_term(M)} ||
+               {T, M} <- esqlite3:q("SELECT time, metadata FROM `update` "
+                                    "WHERE uuid=?", [Element], DB)],
+    ResD = [ {T, destroy, binary_to_term(M)} ||
+               {T, M} <- esqlite3:q("SELECT time, metadata FROM `destroy` "
+                                    "WHERE uuid=?", [Element], DB)],
+    {ResC ++ ResU ++ ResD, State1}.
