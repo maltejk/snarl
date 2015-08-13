@@ -99,7 +99,7 @@ reindex() ->
     lager:info("[reindex] Starting reindex, giving the cluste 5s for the "
                "cluster to start up."),
     timer:sleep(5000),
-    Now = now(),
+    Start = erlang:monotonic_time(micro_seconds),
     lager:info("[reindex] Gathering elements to reindex..."),
     {ok, Users} = snarl_user:list(),
     Users1 = [{snarl_user, U} || U <- Users],
@@ -114,8 +114,9 @@ reindex() ->
     lager:info("[reindex] A total of ~p elements are going to be reindexed...",
                [Cnt]),
     lists:foldl(fun do_index/2, {0, 0, Cnt}, All),
+    End = erlang:monotonic_time(micro_seconds),
     lager:info("[reindex] Reindex completed after ~.2fms...",
-               [timer:now_diff(now(), Now)/1000]).
+               [(End - Start)/1000]).
 
 do_index({Mod, {Realm, UUID}}, {P, Cnt, Max}) ->
     timer:sleep(100),
