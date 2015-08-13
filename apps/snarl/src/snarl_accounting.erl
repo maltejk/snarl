@@ -32,14 +32,14 @@
 sync_repair(Realm, {Org, Elem}, Obj) ->
     do_write(Realm, Org, sync_repair, {Elem, Obj}).
 
-create(Realm, Org, Element, Time, Metadata) ->
-    do_write(Realm, Org, create, {Element, Time, Metadata}).
+create(Realm, Org, Resource, Time, Metadata) ->
+    do_write(Realm, Org, create, {Resource, Time, Metadata}).
 
-update(Realm, Org, Element, Time, Metadata) ->
-    do_write(Realm, Org, update, {Element, Time, Metadata}).
+update(Realm, Org, Resource, Time, Metadata) ->
+    do_write(Realm, Org, update, {Resource, Time, Metadata}).
 
-destroy(Realm, Org, Element, Time, Metadata) ->
-    do_write(Realm, Org, destroy, {Element, Time, Metadata}).
+destroy(Realm, Org, Resource, Time, Metadata) ->
+    do_write(Realm, Org, destroy, {Resource, Time, Metadata}).
 
 raw(Realm, {Org, UUID}) ->
     get(Realm, Org, UUID).
@@ -66,10 +66,10 @@ get(Realm, Org) ->
             R
     end.
 
-get(Realm, Org, Element) ->
+get(Realm, Org, Resource) ->
     case ?FM(get, snarl_accounting_read_fsm, start,
              [{snarl_accounting_vnode, snarl_accounting}, get,
-              {Realm, Org}, Element, false]) of
+              {Realm, Org}, Resource, false]) of
         {ok, not_found} ->
             not_found;
         R ->

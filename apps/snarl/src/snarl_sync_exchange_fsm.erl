@@ -211,7 +211,7 @@ sync_push(_, State = #state{
     lager:debug("[sync-exchange] Push: ~p", [{Sys, {Realm, UUID}}]),
     Msg  = case Sys:raw(Realm, UUID) of
                {ok, Obj} ->
-                   Sys:sync_repair(Realm, UUID, Obj);
+                   write(Sys, Realm, UUID, sync_repair, Obj);
                not_found ->
                    write(Sys, Realm, UUID, delete)
            end,

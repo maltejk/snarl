@@ -72,9 +72,9 @@ master() ->
 hash_object(Key, Obj) ->
     integer_to_binary(erlang:phash2({Key, Obj})).
 
-aae_repair(Realm, {OrgID, Element}) ->
-    lager:debug("AAE Repair: ~p/~p", [OrgID, Element]),
-    snarl_accounting:get(Realm, OrgID, Element).
+aae_repair(Realm, {OrgID, Resource}) ->
+    lager:debug("AAE Repair: ~p/~p", [OrgID, Resource]),
+    snarl_accounting:get(Realm, OrgID, Resource).
 
 get_index_n({Bucket, {Key, _}}) ->
     riak_core_util:get_index_n({Bucket, Key}).
@@ -87,9 +87,9 @@ get_index_n({Bucket, {Key, _}}) ->
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
-repair(IdxNode, Org, Elements) ->
+repair(IdxNode, Org, Resources) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, Org, Elements},
+                                   {repair, Org, Resources},
                                    ignore,
                                    ?MASTER).
 
@@ -109,9 +109,9 @@ get(Preflist, ReqID, {Realm, Org}, {Start, Stop}) ->
                                    {fsm, undefined, self()},
                                    ?MASTER);
 
-get(Preflist, ReqID, {Realm, Org}, Element) when is_binary(Element) ->
+get(Preflist, ReqID, {Realm, Org}, Resource) when is_binary(Resource) ->
     riak_core_vnode_master:command(Preflist,
-                                   {get, ReqID, Realm, Org, Element},
+                                   {get, ReqID, Realm, Org, Resource},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -128,21 +128,21 @@ sync_repair(Preflist, ReqID, {Realm, OrgID}, {Elem, Obj}) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-create(Preflist, ReqID, {Realm, OrgID}, {ElementID, Timestamp, Metadata}) ->
+create(Preflist, ReqID, {Realm, OrgID}, {ResourceID, Timestamp, Metadata}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {create, ReqID, Realm, OrgID, ElementID, Timestamp, Metadata},
+                                   {create, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-update(Preflist, ReqID, {Realm, OrgID}, {ElementID, Timestamp, Metadata}) ->
+update(Preflist, ReqID, {Realm, OrgID}, {ResourceID, Timestamp, Metadata}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {update, ReqID, Realm, OrgID, ElementID, Timestamp, Metadata},
+                                   {update, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-destroy(Preflist, ReqID, {Realm, OrgID}, {ElementID, Timestamp, Metadata}) ->
+destroy(Preflist, ReqID, {Realm, OrgID}, {ResourceID, Timestamp, Metadata}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {destroy, ReqID, Realm, OrgID, ElementID, Timestamp, Metadata},
+                                   {destroy, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -175,52 +175,52 @@ init([Partition]) ->
 %%% General
 %%%===================================================================
 
-insert(Action, Realm, OrgID, Element, Timestamp, Metadata, State) ->
-    State1 = insert1(Action, Realm, OrgID, Element, Timestamp, Metadata, State),
-    {Res, State2} = for_element(Realm, OrgID, Element, State1),
-    Hash = hash_object({Realm, OrgID, Element}, Res),
+insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, State) ->
+    State1 = insert1(Action, Realm, OrgID, Resource, Timestamp, Metadata, State),
+    {Res, State2} = for_resource(Realm, OrgID, Resource, State1),
+    Hash = hash_object({Realm, OrgID, Resource}, Res),
     snarl_sync_tree:update(State#state.sync_tree, snarl_accounting,
-                           {Realm, {OrgID, Element}}, Res),
+                           {Realm, {OrgID, Resource}}, Res),
     riak_core_aae_vnode:update_hashtree(
-      Realm, {OrgID, Element}, Hash, State#state.hashtrees),
+      Realm, {OrgID, Resource}, Hash, State#state.hashtrees),
     State2.
 
-insert1(create, Relam, OrgID, Element, Timestamp, Metadata, State) ->
+insert1(create, Relam, OrgID, Resource, Timestamp, Metadata, State) ->
     {DB, State1} = get_db(Relam, OrgID, State),
     esqlite3:q("INSERT INTO `create` (uuid, time, metadata) VALUES "
                "(?1, ?2, ?3)",
-               [Element, Timestamp, term_to_binary(Metadata)], DB),
+               [Resource, Timestamp, term_to_binary(Metadata)], DB),
     State1;
-insert1(update, Relam, OrgID, Element, Timestamp, Metadata, State) ->
+insert1(update, Relam, OrgID, Resource, Timestamp, Metadata, State) ->
     {DB, State1} = get_db(Relam, OrgID, State),
     esqlite3:q("INSERT INTO `update` (uuid, time, metadata) VALUES "
                "(?1, ?2, ?3)",
-               [Element, Timestamp, term_to_binary(Metadata)], DB),
+               [Resource, Timestamp, term_to_binary(Metadata)], DB),
     State1;
-insert1(destroy, Relam, OrgID, Element, Timestamp, Metadata, State) ->
+insert1(destroy, Relam, OrgID, Resource, Timestamp, Metadata, State) ->
     {DB, State1} = get_db(Relam, OrgID, State),
     esqlite3:q("INSERT INTO `destroy` (uuid, time, metadata) VALUES "
                "(?1, ?2, ?3)",
-               [Element, Timestamp, term_to_binary(Metadata)], DB),
+               [Resource, Timestamp, term_to_binary(Metadata)], DB),
     State1.
 
-handle_command({create, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata},
+handle_command({create, {ReqID, _}, Relam, OrgID, Resource, Timestamp, Metadata},
                _Sender, State) ->
-    State1 = insert(create, Relam, OrgID, Element, Timestamp, Metadata, State),
+    State1 = insert(create, Relam, OrgID, Resource, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({update, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata},
+handle_command({update, {ReqID, _}, Relam, OrgID, Resource, Timestamp, Metadata},
                _Sender, State) ->
-    State1 = insert(update, Relam, OrgID, Element, Timestamp, Metadata, State),
+    State1 = insert(update, Relam, OrgID, Resource, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({destroy, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata}, _Sender, State) ->
-    State1 = insert(destroy, Relam, OrgID, Element, Timestamp, Metadata, State),
+handle_command({destroy, {ReqID, _}, Relam, OrgID, Resource, Timestamp, Metadata}, _Sender, State) ->
+    State1 = insert(destroy, Relam, OrgID, Resource, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Element, Entries}, _Sender, State) ->
+handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Resource, Entries}, _Sender, State) ->
     State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
-                                 insert(Action, Realm, OrgID, Element, Timestamp, Metadata, SAcc)
+                                 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
                          end, State, Entries),
     {reply, {ok, ReqID}, State1};
 
@@ -236,8 +236,8 @@ handle_command({get, ReqID, Realm, OrgID}, _Sender, State) ->
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State1};
 
-handle_command({get, ReqID, Realm, OrgID, Element}, _Sender, State) ->
-    {Res, State1} = for_element(Realm, OrgID, Element, State),
+handle_command({get, ReqID, Realm, OrgID, Resource}, _Sender, State) ->
+    {Res, State1} = for_resource(Realm, OrgID, Resource, State),
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State1};
 
@@ -259,17 +259,17 @@ handle_command({hashtree_pid, Node}, _, State) ->
             {reply, {error, wrong_node}, State}
     end;
 
-handle_command({rehash, {Realm, {OrgID, Element}}}, _,
+handle_command({rehash, {Realm, {OrgID, Resource}}}, _,
                State=#vstate{hashtrees=HT}) when is_binary(Realm) ->
-    case for_element(Realm, OrgID, Element, State) of
+    case for_resource(Realm, OrgID, Resource, State) of
         {[], State1} ->
             %% Make sure hashtree isn't tracking deleted data
-            riak_core_index_hashtree:delete({Realm, {OrgID, Element}}, HT),
+            riak_core_index_hashtree:delete({Realm, {OrgID, Resource}}, HT),
             {noreply, State1};
         {Res, State1} ->
-            Hash = hash_object({Realm, OrgID, Element}, Res),
+            Hash = hash_object({Realm, OrgID, Resource}, Res),
             riak_core_aae_vnode:update_hashtree(
-              Realm, {OrgID, Element}, Hash, HT),
+              Realm, {OrgID, Resource}, Hash, HT),
             {noreply, State1}
     end;
 
@@ -567,15 +567,15 @@ del_all_files([Dir | T], EmptyDirs) ->
             del_all_files(T, EmptyDirs)
     end.
 
-for_element(Realm, OrgID, Element, State) ->
+for_resource(Realm, OrgID, Resource, State) ->
     {DB, State1} = get_db(Realm, OrgID, State),
     ResC = [ {T, create, binary_to_term(M)} ||
                {T, M} <- esqlite3:q("SELECT time, metadata FROM `create` "
-                                    "WHERE uuid=?", [Element], DB)],
+                                    "WHERE uuid=?", [Resource], DB)],
     ResU = [ {T, update, binary_to_term(M)} ||
                {T, M} <- esqlite3:q("SELECT time, metadata FROM `update` "
-                                    "WHERE uuid=?", [Element], DB)],
+                                    "WHERE uuid=?", [Resource], DB)],
     ResD = [ {T, destroy, binary_to_term(M)} ||
                {T, M} <- esqlite3:q("SELECT time, metadata FROM `destroy` "
-                                    "WHERE uuid=?", [Element], DB)],
+                                    "WHERE uuid=?", [Resource], DB)],
     {ResC ++ ResU ++ ResD, State1}.
