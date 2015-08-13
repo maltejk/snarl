@@ -215,6 +215,12 @@ handle_command({destroy, {ReqID, _}, Relam, OrgID, Element, Timestamp, Metadata}
     State1 = insert(destroy, Relam, OrgID, Element, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
+handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Element, Entries}, _Sender, State) ->
+    State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
+                                 insert(Action, Realm, OrgID, Element, Timestamp, Metadata, SAcc)
+                         end, State, Entries),
+    {reply, {ok, ReqID}, State1};
+
 handle_command({get, ReqID, Realm, OrgID}, _Sender, State) ->
     {DB, State1} = get_db(Realm, OrgID, State),
     ResC = [ {T, create, E, binary_to_term(M)} ||
@@ -292,12 +298,6 @@ handle_command({get, ReqID, Realm, OrgID, Start, Stop}, _Sender, State) ->
               {E, T, M, A} <- esqlite3:q(Q, [Start, Stop], DB)],
     NodeIdx = {State#state.partition, State#state.node},
     {reply, {ok, ReqID, NodeIdx, lists:sort(Res)}, State1};
-
-handle_command({sync_repair, ReqID, Realm, OrgID, Element, Entries}, _Sender, State) ->
-    State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
-                                 insert(Action, Realm, OrgID, Element, Timestamp, Metadata, SAcc)
-                         end, State, Entries),
-    {reply, {ok, ReqID}, State1};
 
 handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
                State=#state{partition = P, db_path = Path, dbs = DBs}) ->
