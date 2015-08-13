@@ -561,7 +561,7 @@ del_all_files([Dir | T], EmptyDirs) ->
                           end, Files),
             del_all_files(T ++ Dirs, [Dir | EmptyDirs]);
         _ ->
-            ok
+            del_all_files(T, EmptyDirs)
     end.
 
 for_element(Realm, OrgID, Element, State) ->
