@@ -152,7 +152,7 @@ sync_diff(_, State = #state{
                                     Merged = ft_obj:merge(snarl_entity_read_fsm, Objs),
                                     NVS = {{remote, node()}, vnode(Sys), Sys},
                                     snarl_entity_write_fsm:write(NVS, {Realm, UUID}, sync_repair, Merged),
-                                    Msg = Sys:sync_repair(Realm, UUID, Merged),
+                                    Msg = write(Sys, Realm, UUID, sync_repair, Merged),
                                     case gen_tcp:send(Socket, Msg) of
                                         ok ->
                                             {next_state, sync_diff, State#state{diff=R}, 0};

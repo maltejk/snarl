@@ -119,6 +119,9 @@ get(Preflist, ReqID, {Realm, Org}, Element) when is_binary(Element) ->
 %%% API - writes
 %%%===================================================================
 
+sync_repair(Preflist, ReqID, {Realm, {OrgID, Elem}}, Obj) ->
+    sync_repair(Preflist, ReqID, {Realm, OrgID}, {Elem, Obj});
+
 sync_repair(Preflist, ReqID, {Realm, OrgID}, {Elem, Obj}) ->
     riak_core_vnode_master:command(Preflist,
                                    {sync_repair, ReqID, Realm, OrgID, Elem, Obj},
