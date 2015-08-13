@@ -73,7 +73,8 @@ init(Partition, Bucket, Service, VNode, StateMod) ->
     FoldWorkerPool = {pool, snarl_worker, WorkerPoolSize, []},
     {ok,
      #vstate{db=DB, hashtrees=HT, partition=Partition, node=node(),
-             service=Service, bucket=Bucket, state=StateMod, vnode=VNode},
+             service=Service, bucket=Bucket, state=StateMod, vnode=VNode,
+             sync_tree = snarl_sync_tree:get_tree(Service)},
      [FoldWorkerPool]}.
 
 list_keys(Realm, Sender, State = #vstate{db=DB}) ->
@@ -129,7 +130,8 @@ fold(Prefix, Fun, Acc0, Sender, State=#vstate{db=DB}) ->
 put(Realm, Key, Obj, State) when is_binary(Realm) ->
     Bucket = mk_pfx(Realm, State),
     ?FM(fifo_db, put, [State#vstate.db, Bucket, Key, Obj]),
-    snarl_sync_tree:update(State#vstate.service, {Realm, Key}, Obj),
+    snarl_sync_tree:update(State#vstate.sync_tree, State#vstate.service,
+                           {Realm, Key}, Obj),
     riak_core_aae_vnode:update_hashtree(
       Realm, Key, vc_bin(ft_obj:vclock(Obj)), State#vstate.hashtrees).
 

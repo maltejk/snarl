@@ -58,7 +58,8 @@
           node = node(),
           dbs = #{},
           db_path,
-          hashtrees
+          hashtrees,
+          sync_tree
          }).
 
 %%%===================================================================
@@ -162,7 +163,8 @@ init([Partition]) ->
      #state{
         partition = Partition,
         db_path = DBPath,
-        hashtrees = HT
+        hashtrees = HT,
+        sync_tree = snarl_sync_tree:get_tree(snarl_accounting)
        },
      [FoldWorkerPool]}.
 
@@ -174,7 +176,8 @@ insert(Action, Realm, OrgID, Element, Timestamp, Metadata, State) ->
     State1 = insert1(Action, Realm, OrgID, Element, Timestamp, Metadata, State),
     {Res, State2} = for_element(Realm, OrgID, Element, State1),
     Hash = hash_object({Realm, OrgID, Element}, Res),
-    snarl_sync_tree:update(accounting, {Realm, OrgID, Element}, Res),
+    snarl_sync_tree:update(State#state.sync_tree, snarl_accounting,
+                           {Realm, {OrgID, Element}}, Res),
     riak_core_aae_vnode:update_hashtree(
       Realm, {OrgID, Element}, Hash, State#state.hashtrees),
     State2.
@@ -342,8 +345,10 @@ handle_org(RealmPath, Fun, Realm, Org, Acc) ->
         "  FROM `update`) ORDER BY uuid",
     case esqlite3:q(Q, C) of
         [] ->
+            esqlite3:close(C),
             Acc;
         [{E0, T0, M0, A0} | Es] ->
+            esqlite3:close(C),
             In = {E0, [{T0, a2a(A0), M0}]},
             {{EOut, LOut}, AccOut} =
                 lists:foldl(fun({E, T, M, A}, {{E, L}, AccE}) ->
@@ -417,10 +422,49 @@ delete(State = #state{partition = P, db_path = Path, dbs = DBs}) ->
     del_dir(BasePath),
     {ok, State#state{dbs = #{}}}.
 
-handle_coverage(ReqID, _KeySpaces, _Sender, State) ->
-    %% TODO: snarl_vnode:handle_coverage(Req, KeySpaces, Sender, State).
-    %% We don't really have coverage
-    {reply, {ok, ReqID}, State}.
+handle_coverage(list, _KeySpaces, Sender,
+                State=#state{partition = P, db_path = Path, dbs = DBs}) ->
+    [esqlite3:close(DB) || DB <- maps:values(DBs)],
+    BasePath = filename:join([Path, integer_to_list(P), "accounting"]),
+    AsyncWork =
+        fun() ->
+                case file:list_dir(BasePath) of
+                    {ok, Realms} ->
+                        [begin
+                             RealmPath = filename:join([BasePath, Realm]),
+                             case file:list_dir(RealmPath) of
+                                 {ok, Orgs} ->
+                                     [handle_list(
+                                        Sender,
+                                        RealmPath,
+                                        Realm,
+                                        Org) || Org <- Orgs],
+                                     ok;
+                                 _ ->
+                                     ok
+                             end
+                         end || Realm <- Realms],
+                        ok;
+                    _ ->
+                        ok
+                end
+        end,
+    FinishFun = fun(_Acc) ->
+                        riak_core_vnode:reply(Sender, {done, {P, node()}})
+
+                end,
+
+    {async, {fold, AsyncWork, FinishFun}, Sender, State#state{dbs = #{}}}.
+
+handle_list(Sender, RealmPath, Realm, Org) ->
+    OrgPath = filename:join([RealmPath, Org]),
+    {ok, C} = esqlite3:open(OrgPath),
+    Q = "SELECT uuid FROM `create`",
+    UUIDs = esqlite3:q(Q, C),
+    esqlite3:close(C),
+    riak_core_vnode:reply(Sender, {partial,
+                                   list_to_binary(Realm),
+                                   list_to_binary(Org), UUIDs}).
 
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.

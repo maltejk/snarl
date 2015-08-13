@@ -6,9 +6,11 @@
          create/5,
          update/5,
          destroy/5,
+         raw/2,
          get/2,
          get/3,
-         get/4
+         get/4,
+         list/0
         ]).
 
 -ignore_xref([
@@ -39,6 +41,12 @@ update(Realm, Org, Element, Time, Metadata) ->
 destroy(Realm, Org, Element, Time, Metadata) ->
     do_write(Realm, Org, destroy, {Element, Time, Metadata}).
 
+raw(Realm, {Org, UUID}) ->
+    get(Realm, Org, UUID).
+
+list() ->
+    ?FM(list_all, snarl_accounting_coverage, start,
+        [snarl_accounting_vnode_master, snarl_accounting, list]).
 
 
 %% sync_repair(Realm, UUID, Obj) ->

@@ -21,6 +21,8 @@
      bcrypt,
      bitcask,
      snarl_oauth,
+     merklet,
+     esqlite,
      uuid
      ]},
   {mod, {snarl_app, []}},

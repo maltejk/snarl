@@ -17,7 +17,7 @@
 -endif.
 
 %% API
--export([start/2, start_link/2, sync_op/7, hash/2]).
+-export([start/2, start_link/2, sync_op/7, hash/2, split_trees/2]).
 
 -ignore_xref([start_link/2]).
 

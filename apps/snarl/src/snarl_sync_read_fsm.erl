@@ -36,7 +36,7 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
-update(_System, _Vsn, [], _From) ->
+update (_System, _Vsn, [], _From) ->
     ok;
 
 update(System, Vsn, List, From) ->
