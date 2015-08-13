@@ -123,6 +123,7 @@ init([IP, Port, Diff, Get, Push]) ->
 vnode(snarl_2i) -> snarl_2i_vnode;
 vnode(snarl_role) -> snarl_role_vnode;
 vnode(snarl_user) -> snarl_user_vnode;
+vnode(snarl_client) -> snarl_client_vnode;
 vnode(snarl_acounting) -> snarl_acounting_vnode;
 vnode(snarl_org) -> snarl_org_vnode.
 
