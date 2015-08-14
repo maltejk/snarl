@@ -68,8 +68,9 @@ authenticate_user({Username, Password, OTP}, AppContext) ->
             {error, notfound}
     end.
 
-authenticate_client({UserID}, AppContext) ->
-    {ok, {AppContext, UserID}};
+authenticate_client({ClientID}, AppContext) ->
+    {ok, {AppContext, ClientID}};
+
 authenticate_client({ClientId, ClientSecret},
                     AppContext = #oauth_state{realm = Realm}) ->
     case snarl_client:auth(Realm, ClientId, ClientSecret) of
@@ -77,7 +78,11 @@ authenticate_client({ClientId, ClientSecret},
             {ok, {AppContext, UserID}};
         not_found ->
             {error, notfound}
-    end.
+    end;
+
+authenticate_client(ClientID, AppContext) when is_binary(ClientID) ->
+    get_client_identity(ClientID, AppContext).
+
 
 %% Is this a Authrorization Code?
 associate_access_code(AccessCode, Context, AppContext) ->

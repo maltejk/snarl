@@ -52,14 +52,6 @@ message({org, set_metadata, Realm, Org, Attributes}, State) when
      snarl_org:set_metadata(Realm, Org, Attributes),
      State};
 
-message({org, resource_action, Realm, Org, Resource, TimeStamp, Action, Opts},
-        State) when
-      is_binary(Realm), is_binary(Org), is_atom(Action), is_list(Opts),
-      is_integer(TimeStamp), TimeStamp > 0 ->
-    {reply,
-     snarl_org:resource_action(Realm, Org, Resource, TimeStamp, Action, Opts),
-     State};
-
 message({org, add, Realm, Org}, State) ->
     {reply, snarl_org:add(Realm, Org), State};
 
@@ -404,6 +396,52 @@ message({client, revoke, Realm, Client, Permission}, State) when
 message({client, revoke_prefix, Realm, Client, Prefix}, State) when
       is_binary(Client) ->
     {reply, snarl_client:revoke_prefix(Realm, Client, Prefix), State};
+
+%%%===================================================================
+%%% Accounting Functions
+%%%===================================================================
+
+message({accounting, create, Realm, Org, Resource, Time, Metadata}, State)
+  when is_binary(Realm),
+       is_binary(Org),
+       is_binary(Resource),
+       is_integer(Time), Time > 0 ->
+    {reply, snarl_accounting:create(Realm, Org, Resource, Time, Metadata), State};
+
+message({accounting, update, Realm, Org, Resource, Time, Metadata}, State)
+  when is_binary(Realm),
+       is_binary(Org),
+       is_binary(Resource),
+       is_integer(Time), Time > 0 ->
+    {reply, snarl_accounting:update(Realm, Org, Resource, Time, Metadata), State};
+
+message({accounting, destroy, Realm, Org, Resource, Time, Metadata}, State)
+  when is_binary(Realm),
+       is_binary(Org),
+       is_binary(Resource),
+       is_integer(Time), Time > 0 ->
+    {reply, snarl_accounting:destroy(Realm, Org, Resource, Time, Metadata), State};
+
+message({accounting, get, Realm, Org}, State)
+  when is_binary(Realm),
+       is_binary(Org) ->
+    {reply, snarl_accounting:get(Realm, Org), State};
+
+message({accounting, get, Realm, Org, Resource}, State)
+  when is_binary(Realm),
+       is_binary(Org),
+       is_binary(Resource) ->
+    {reply, snarl_accounting:get(Realm, Org, Resource), State};
+
+message({accounting, get, Realm, Org, Start, End}, State)
+  when is_binary(Realm),
+       is_binary(Org),
+       is_integer(Start),
+       is_integer(End),
+       Start > 0,
+       End > Start ->
+    {reply, snarl_accounting:get(Realm, Org, Start, End), State};
+
 
 %%%===================================================================
 %%% Role Functions

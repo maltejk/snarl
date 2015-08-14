@@ -33,6 +33,7 @@ start(_StartType, _StartArgs) ->
             ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
             ?SRV_WITH_AAE(snarl_org_vnode, snarl_org),
             ?SRV_WITH_AAE(snarl_2i_vnode, snarl_2i),
+            ?SRV_WITH_AAE(snarl_accounting_vnode, snarl_accounting),
 
             ok = riak_core:register([{vnode_module, snarl_token_vnode}]),
             ok = riak_core_node_watcher:service_up(snarl_token, self()),
@@ -79,8 +80,9 @@ init_folsom() ->
     OrgMs = [wipe, lookup, get, list, list_all, sync_repair, add_trigger,
              remove_target, remove_trigger, import, add, delete, set_metadata,
              resource_action],
-    S2i = [list, get, add, delete],
+    S2i = [list, get, add, destroy, sync_repair],
     TokenMs = [get, add, delete],
+    AccMs = [create, update, delete, get, get_range, list_all, sync_repair],
     [folsom_metrics:new_histogram(Name, slide, 60) ||
         Name <-
             [{fifo_db, M} || M <- DBMs] ++
@@ -89,6 +91,7 @@ init_folsom() ->
             [{snarl, role, M} || M <- RoleMs] ++
             [{snarl, org, M} || M <- OrgMs] ++
             [{snarl, s2i, M} || M <- S2i] ++
+            [{snarl, accounting, M} || M <- AccMs] ++
             [{snarl, token, M} || M <- TokenMs]
     ].
 
@@ -96,7 +99,7 @@ reindex() ->
     lager:info("[reindex] Starting reindex, giving the cluste 5s for the "
                "cluster to start up."),
     timer:sleep(5000),
-    Now = now(),
+    Start = erlang:monotonic_time(micro_seconds),
     lager:info("[reindex] Gathering elements to reindex..."),
     {ok, Users} = snarl_user:list(),
     Users1 = [{snarl_user, U} || U <- Users],
@@ -111,8 +114,9 @@ reindex() ->
     lager:info("[reindex] A total of ~p elements are going to be reindexed...",
                [Cnt]),
     lists:foldl(fun do_index/2, {0, 0, Cnt}, All),
+    End = erlang:monotonic_time(micro_seconds),
     lager:info("[reindex] Reindex completed after ~.2fms...",
-               [timer:now_diff(now(), Now)/1000]).
+               [(End - Start)/1000]).
 
 do_index({Mod, {Realm, UUID}}, {P, Cnt, Max}) ->
     timer:sleep(100),

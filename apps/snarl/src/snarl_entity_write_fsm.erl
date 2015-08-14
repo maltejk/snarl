@@ -48,7 +48,6 @@
                 entity :: string(),
                 op :: atom(),
                 vnode,
-                start,
                 system,
                 bucket,
                 w,
@@ -119,7 +118,6 @@ init([{Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val]) ->
                 entity=Entity,
                 op=Op,
                 vnode=VNode,
-                start=now(),
                 w = ?W,
                 n = ?N,
                 system=System,
@@ -161,7 +159,6 @@ execute(timeout, SD0=#state{req_id=ReqID,
 waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    lager:debug("Write(~p) ok", [NumW]),
     if
         NumW =:= W ->
             case From of

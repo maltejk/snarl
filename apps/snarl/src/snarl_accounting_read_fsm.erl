@@ -1,7 +1,7 @@
 %% @doc The coordinator for stat get operations.  The key here is to
 %% generate the preflist just like in wrtie_fsm and then query each
 %% replica and wait until a quorum is met.
--module(snarl_entity_read_fsm).
+-module(snarl_accounting_read_fsm).
 -behavior(gen_fsm).
 -include("snarl.hrl").
 
@@ -45,7 +45,7 @@
 -record(state, {raw = false ::boolean(),
                 req_id,
                 from,
-                entity,
+                accounting,
                 has_send = false,
                 op,
                 r,
@@ -64,19 +64,19 @@
 %%% API
 %%%===================================================================
 
-start_link(ReqID, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw], []).
+start_link(ReqID, {VNode, System}, Op, From, {Realm, Accounting}, Val, Raw) ->
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, {Realm, Accounting}, Val, Raw], []).
 
-start(VNodeInfo, Op, {Realm, Entity}) ->
-    start(VNodeInfo, Op, {Realm, Entity}, undefined).
+start(VNodeInfo, Op, {Realm, Accounting}) ->
+    start(VNodeInfo, Op, {Realm, Accounting}, undefined).
 
-start(VNodeInfo, Op, {Realm, Entity}, Val) ->
-    start(VNodeInfo, Op, {Realm, Entity}, Val, false).
+start(VNodeInfo, Op, {Realm, Accounting}, Val) ->
+    start(VNodeInfo, Op, {Realm, Accounting}, Val, false).
 
-start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
+start(VNodeInfo, Op, {Realm, Accounting}, Val, Raw) ->
     ReqID = snarl_vnode:mkid(),
-    snarl_entity_read_fsm_sup:start_read_fsm(
-      [ReqID, VNodeInfo, Op, self(), {Realm, Entity}, Val, Raw]
+    snarl_accounting_read_fsm_sup:start_read_fsm(
+      [ReqID, VNodeInfo, Op, self(), {Realm, Accounting}, Val, Raw]
      ),
     receive
         {ReqID, ok} ->
@@ -91,10 +91,10 @@ start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
 %%% States
 %%%===================================================================
 
-init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) when
+init([ReqId, {VNode, System}, Op, From, {Realm, Accounting}, Val, Raw]) when
       is_atom(VNode),
       is_atom(System) ->
-    ?DT_READ_ENTRY(Entity, Op),
+    ?DT_READ_ENTRY(Accounting, Op),
     SD = #state{raw=Raw,
                 bucket=Realm,
                 req_id=ReqId,
@@ -105,28 +105,28 @@ init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) when
                 val=Val,
                 vnode=VNode,
                 system=System,
-                entity=Entity},
+                accounting=Accounting},
     {ok, prepare, SD, 0};
 
-init([ReqId, {VNode, System}, Op, From, {Realm, Entity}]) when
+init([ReqId, {VNode, System}, Op, From, {Realm, Accounting}]) when
       is_atom(VNode),
       is_atom(System) ->
-    ?DT_READ_ENTRY(Entity, Op),
+    ?DT_READ_ENTRY(Accounting, Op),
     SD = #state{req_id=ReqId,
                 bucket=Realm,
                 from=From,
                 op=Op,
                 vnode=VNode,
                 system=System,
-                entity=Entity},
+                accounting=Accounting},
     {ok, prepare, SD, 0}.
 
 %% @doc Calculate the Preflist.
-prepare(timeout, SD0=#state{entity=Entity,
+prepare(timeout, SD0=#state{accounting=Accounting,
                             bucket=Realm,
                             n = N,
                             system=System}) ->
-    DocIdx = riak_core_util:chash_key({Realm, Entity}),
+    DocIdx = riak_core_util:chash_key({Realm, Accounting}),
     Prelist = riak_core_apl:get_apl(DocIdx, N, System),
     SD = SD0#state{preflist=Prelist},
     {next_state, execute, SD, 0}.
@@ -134,16 +134,16 @@ prepare(timeout, SD0=#state{entity=Entity,
 %% @doc Execute the get reqs.
 execute(timeout, SD0=#state{req_id=ReqId,
                             bucket=Realm,
-                            entity=Entity,
+                            accounting=Accounting,
                             op=Op,
                             val=Val,
                             vnode=VNode,
                             preflist=Prelist}) ->
     case Val of
         undefined ->
-            VNode:Op(Prelist, ReqId, {Realm, Entity});
+            VNode:Op(Prelist, ReqId, {Realm, Accounting});
         _ ->
-            VNode:Op(Prelist, ReqId, {Realm, Entity}, Val)
+            VNode:Op(Prelist, ReqId, {Realm, Accounting}, Val)
     end,
     {next_state, waiting, SD0}.
 
@@ -165,14 +165,9 @@ waiting({ok, ReqID, IdxNode, Obj},
                           %% the replies
                           %% TODO: is this a good idea?
                           SD;
-                      Merged ->
-                          ?DT_READ_FOUND_RETURN(SD0#state.entity, SD0#state.op),
-                          Reply = case SD#state.raw of
-                                      false ->
-                                          ft_obj:val(Merged);
-                                      true ->
-                                          Merged
-                                  end,
+                      Reply ->
+
+                          ?DT_READ_FOUND_RETURN(SD0#state.accounting, SD0#state.op),
                           From ! {ReqID, ok, Reply},
                           SD#state{has_send = true}
                   end,
@@ -217,13 +212,13 @@ finalize(timeout, SD=#state{
                         vnode=VNode,
                         replies=Replies,
                         bucket=Realm,
-                        entity=Entity}) ->
+                        accounting=Accounting}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
             lager:warning("[read] performing read repair on '~p'(~p) <- ~p.",
-                          [Entity, MObj, Replies]),
-            repair(VNode, {Realm, Entity}, MObj, Replies),
+                          [Accounting, MObj, Replies]),
+            repair(VNode, {Realm, Accounting}, MObj, Replies),
             {stop, normal, SD};
         false ->
             {stop, normal, SD}
@@ -252,55 +247,25 @@ terminate(_Reason, _SN, _SD) ->
 %% @doc Given a list of `Replies' return the merged value.
 -spec merge([vnode_reply()]) -> fifo:obj() | not_found.
 merge(Replies) ->
-    Objs = [Obj || {_,Obj} <- Replies],
-    ft_obj:merge(snarl_entity_read_fsm, Objs).
+    Data = [Obj || {_,Obj} <- Replies],
+    Flattened = lists:flatten(Data),
+    Unique = lists:usort(Flattened),
+    Unique.
+    %% TODO: ft_obj:merge(snarl_accounting_read_fsm, Objs).
 
 %% @pure
 %%
 %% @doc Reconcile conflicts among conflicting values.
--type entity_list() ::
+-type accounting_list() ::
         [fifo:user()] |
         [fifo:org()] |
         [fifo:role()].
--spec reconcile(entity_list()) ->
+-spec reconcile(accounting_list()) ->
                        fifo:user() | user:role() | fifo:org().
 
-reconcile([V | Vs]) ->
-    case {ft_user:is_a(V),
-          ft_client:is_a(V),
-          ft_role:is_a(V),
-          ft_org:is_a(V)} of
-        {true, _, _, _} ->
-            reconcile_user(Vs, V);
-        {_, true, _, _} ->
-            reconcile_client(Vs, V);
-        {_, _, true, _} ->
-            reconcile_role(Vs, V);
-        {_, _, _, true} ->
-            reconcile_org(Vs, V);
-        _ ->
-            V
-    end.
-
-reconcile_role([G | R], Acc) ->
-    reconcile_role(R, ft_role:merge(Acc, G));
-reconcile_role(_, Acc) ->
-    Acc.
-
-reconcile_user([U | R], Acc) ->
-    reconcile_user(R, ft_user:merge(Acc, U));
-reconcile_user(_, Acc) ->
-    Acc.
-
-reconcile_client([U | R], Acc) ->
-    reconcile_client(R, ft_client:merge(Acc, U));
-reconcile_client(_, Acc) ->
-    Acc.
-
-reconcile_org([U | R], Acc) ->
-    reconcile_org(R, ft_org:merge(Acc, U));
-reconcile_org(_, Acc) ->
-    Acc.
+%% TODO:
+reconcile(Vs) ->
+    Vs.
 
 %% @pure
 %%
@@ -308,11 +273,11 @@ reconcile_org(_, Acc) ->
 %% determine if repair is needed.
 -spec needs_repair(any(), [vnode_reply()]) -> boolean().
 needs_repair(MObj, Replies) ->
-    Objs = [Obj || {_,Obj} <- Replies],
+    Objs = [lists:usort(Obj) || {_,Obj} <- Replies],
     lists:any(different(MObj), Objs).
 
 %% @pure
-different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
+different(A) -> fun(B) -> (A =/= B) end.
 
 %% @impure
 %%
@@ -321,15 +286,15 @@ different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
 repair(_, _, _, []) -> io;
 
 repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
-    case ft_obj:equal(MObj, Obj) of
+    case MObj =:= Obj of
         true ->
             repair(VNode, StatName, MObj, T);
         false ->
             case Obj of
                 not_found ->
-                    VNode:repair(IdxNode, StatName, not_found, MObj);
+                    VNode:repair(IdxNode, StatName, MObj);
                 _ ->
-                    VNode:repair(IdxNode, StatName, ft_obj:vclock(Obj), MObj)
+                    VNode:repair(IdxNode, StatName, MObj)
             end,
             repair(VNode, StatName, MObj, T)
     end.

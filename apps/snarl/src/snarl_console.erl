@@ -545,9 +545,12 @@ down([Node]) ->
             error
     end.
 
+aae_status(["accounting"]) ->
+    aae_status({snarl_accounting, "Accounting"});
+
 aae_status([]) ->
     Services = [{snarl_user, "User"}, {snarl_role, "Role"},
-                {snarl_org, "Org"}],
+                {snarl_org, "Org"}, {snarl_accounting, "Accounting"}],
     [aae_status(E) || E <- Services];
 
 aae_status({System, Name}) ->

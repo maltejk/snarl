@@ -60,11 +60,12 @@
 %%--------------------------------------------------------------------
 start(_IP, _Port, [], [], []) ->
     ok;
+
 start(IP, Port, Diff, Get, Push) ->
     snarl_sync_exchange_sup:start_child(IP, Port, Diff, Get, Push).
 
 start_link(IP, Port, Diff, Get, Push) ->
-    gen_fsm:start_link({local, ?SERVER}, ?MODULE, [IP, Port, Diff, Get, Push], []).
+    gen_fsm:start_link(?MODULE, [IP, Port, Diff, Get, Push], []).
 
 %%%===================================================================
 %%% gen_fsm callbacks
@@ -122,6 +123,8 @@ init([IP, Port, Diff, Get, Push]) ->
 vnode(snarl_2i) -> snarl_2i_vnode;
 vnode(snarl_role) -> snarl_role_vnode;
 vnode(snarl_user) -> snarl_user_vnode;
+vnode(snarl_client) -> snarl_client_vnode;
+vnode(snarl_accounting) -> snarl_accounting_vnode;
 vnode(snarl_org) -> snarl_org_vnode.
 
 write(Sys, Realm, UUID, Op) ->
