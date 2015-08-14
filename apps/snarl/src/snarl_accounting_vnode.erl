@@ -37,7 +37,7 @@
          create/4,
          destroy/4,
          update/4,
-         repair/3, sync_repair/4,
+         repair/3, repair/4, sync_repair/4,
          get_index_n/1
         ]).
 
@@ -45,7 +45,7 @@
               create/4,
               destroy/4,
               update/4,
-              repair/3, sync_repair/4,
+              sync_repair/4,
               get_index_n/1
              ]).
 
@@ -90,6 +90,12 @@ start_vnode(I) ->
 repair(IdxNode, Org, Resources) ->
     riak_core_vnode_master:command(IdxNode,
                                    {repair, Org, Resources},
+                                   ignore,
+                                   ?MASTER).
+
+repair(IdxNode, Org, Resource, Entries) ->
+    riak_core_vnode_master:command(IdxNode,
+                                   {repair, Org, Resource, Entries},
                                    ignore,
                                    ?MASTER).
 
