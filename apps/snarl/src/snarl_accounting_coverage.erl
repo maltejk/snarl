@@ -6,6 +6,7 @@
 
 -export([
          init/2,
+         process_results/2,
          process_results/3,
          finish/2,
          start/3,
@@ -53,6 +54,9 @@ init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
 
 plan(Plan, State) ->
     {ok, State#state{nodes = Plan}}.
+
+process_results(_, State) ->
+     {error, State}.
 
 process_results(_VNode, {partial, Realm, Org, UUIDs},
                 State = #state{replies = Replies}) ->

@@ -38,8 +38,7 @@ mkid(Actor) ->
     {mk_reqid(), Actor}.
 
 mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+    erlang:unique_integer().
 
 mk_bkt(#vstate{bucket = Bucket})
   when byte_size(Bucket) < 256 ->

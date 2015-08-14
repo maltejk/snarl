@@ -269,7 +269,7 @@ hash(BKey, Obj) ->
                _ ->
                    Obj
            end,
-    integer_to_binary(erlang:phash2({BKey, Obj})).
+    integer_to_binary(erlang:phash2({BKey, Data})).
 
 sync_trees(LTree, RTree, State = #state{ip=IP, port=Port}) ->
     {Diff, Get, Push} = split_trees(LTree, RTree),

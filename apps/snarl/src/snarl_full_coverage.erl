@@ -93,8 +93,7 @@ finish(How, State) ->
 %%%===================================================================
 
 mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+    erlang:unique_integer().
 
 raw_merge([{Score, V} | R]) ->
     raw_merge(R, Score, [V]).
