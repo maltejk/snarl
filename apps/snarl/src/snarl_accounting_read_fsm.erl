@@ -137,13 +137,12 @@ execute(timeout, SD0=#state{req_id=ReqId,
                             accounting=Accounting,
                             op=Op,
                             val=Val,
-                            vnode=VNode,
                             preflist=Prelist}) ->
     case Val of
         undefined ->
-            VNode:Op(Prelist, ReqId, {Realm, Accounting});
+            snarl_accounting_vnode:Op(Prelist, ReqId, {Realm, Accounting});
         _ ->
-            VNode:Op(Prelist, ReqId, {Realm, Accounting}, Val)
+            snarl_accounting_vnode:Op(Prelist, ReqId, {Realm, Accounting}, Val)
     end,
     {next_state, waiting, SD0}.
 
@@ -209,16 +208,17 @@ wait_for_n(timeout, SD) ->
     {stop, timeout, SD}.
 
 finalize(timeout, SD=#state{
-                        vnode=VNode,
                         replies=Replies,
                         bucket=Realm,
+                        val = Val,
                         accounting=Accounting}) ->
     MObj = merge(Replies),
     case needs_repair(MObj, Replies) of
         true ->
             lager:warning("[read] performing read repair on '~p'(~p) <- ~p.",
                           [Accounting, MObj, Replies]),
-            repair(VNode, {Realm, Accounting}, MObj, Replies),
+
+            repair({Realm, Accounting}, MObj, Replies, Val),
             {stop, normal, SD};
         false ->
             {stop, normal, SD}
@@ -282,22 +282,23 @@ different(A) -> fun(B) -> (A =/= B) end.
 %% @impure
 %%
 %% @doc Repair any vnodes that do not have the correct object.
--spec repair(atom(), {binary(), binary()}, fifo:obj(), [vnode_reply()]) -> io.
-repair(_, _, _, []) -> io;
+-spec repair({binary(), binary()}, [term()], [vnode_reply()], any()) -> ok.
+repair(_, _, [], _) -> io;
 
-repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
+repair(StatName, MObj, [{IdxNode,Obj}|T], Val) ->
     case MObj =:= Obj of
         true ->
-            repair(VNode, StatName, MObj, T);
+            repair(StatName, MObj, T, Val);
         false ->
-            case Obj of
-                not_found ->
-                    VNode:repair(IdxNode, StatName, MObj);
-                _ ->
-                    VNode:repair(IdxNode, StatName, MObj)
-            end,
-            repair(VNode, StatName, MObj, T)
+            do_repair(IdxNode, StatName, MObj, Val),
+            repair(StatName, MObj, T, Val)
     end.
+
+do_repair(IdxNode, StatName, MObj, Resource)
+  when is_binary(Resource) ->
+    snarl_accounting_vnode:repair(IdxNode, StatName, Resource, MObj);
+do_repair(IdxNode, StatName, MObj, _) ->
+    snarl_accounting_vnode:repair(IdxNode, StatName, MObj).
 
 %% pure
 %%

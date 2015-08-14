@@ -37,7 +37,7 @@
          create/4,
          destroy/4,
          update/4,
-         repair/3, sync_repair/4,
+         repair/3, repair/4, sync_repair/4,
          get_index_n/1
         ]).
 
@@ -45,7 +45,7 @@
               create/4,
               destroy/4,
               update/4,
-              repair/3, sync_repair/4,
+              sync_repair/4,
               get_index_n/1
              ]).
 
@@ -87,9 +87,15 @@ get_index_n({Bucket, {Key, _}}) ->
 start_vnode(I) ->
     riak_core_vnode_master:get_vnode_pid(I, ?MODULE).
 
-repair(IdxNode, Org, Resources) ->
+repair(IdxNode, {Realm, Org}, Resources) ->
     riak_core_vnode_master:command(IdxNode,
-                                   {repair, Org, Resources},
+                                   {repair, Realm, Org, Resources},
+                                   ignore,
+                                   ?MASTER).
+
+repair(IdxNode, {Realm, Org}, Resource, Entries) ->
+    riak_core_vnode_master:command(IdxNode,
+                                   {repair, Realm, Org, Resource, Entries},
                                    ignore,
                                    ?MASTER).
 
@@ -223,6 +229,18 @@ handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Resource, Entries}, _Send
                                  insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
                          end, State, Entries),
     {reply, {ok, ReqID}, State1};
+
+handle_command({repair, Realm, OrgID, Entries}, _Sender, State) ->
+    State1 = lists:foldl(fun({Resource, Timestamp, Action, Metadata}, SAcc) ->
+                                 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
+                         end, State, Entries),
+    {noreply, State1};
+
+handle_command({repair, Realm, OrgID, Resource, Entries}, _Sender, State) ->
+    State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
+                                 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
+                         end, State, Entries),
+    {noreply, State1};
 
 handle_command({get, ReqID, Realm, OrgID}, _Sender, State) ->
     {DB, State1} = get_db(Realm, OrgID, State),
