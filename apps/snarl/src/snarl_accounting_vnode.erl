@@ -368,17 +368,19 @@ handle_org(RealmPath, Fun, Realm, Org, Acc) ->
         [] ->
             esqlite3:close(C),
             Acc;
-        [{E0, T0, M0, A0} | Es] ->
+        [{Res0, T0, M0, A0} | Es] ->
             esqlite3:close(C),
-            In = {E0, [{T0, a2a(A0), M0}]},
-            {{EOut, LOut}, AccOut} =
-                lists:foldl(fun({E, T, M, A}, {{E, L}, AccE}) ->
-                                    {{E, [{T, a2a(A), M} | L]}, AccE};
-                               ({E, T, M, A}, {{EOut, LOut}, AccE}) ->
-                                    AccE1 = Fun({Realm, {Org,EOut}}, LOut, AccE),
-                                    {{E, [{T, a2a(A), M}]}, AccE1}
+            In = {Res0, [{T0, a2a(A0), M0}]},
+            {{ResOut, LOut}, AccOut} =
+                lists:foldl(fun({Res, T, M, A}, {{Res, L}, AccRes}) ->
+                                    {{Res, [{T, a2a(A), M} | L]}, AccRes};
+                               ({Res, T, M, A}, {{ResOut, LOut}, AccRes}) ->
+                                    AccRes1 = Fun({list_to_binary(Realm),
+                                                   {list_to_binary(Org), ResOut}},
+                                                  LOut, AccRes),
+                                    {{Res, [{T, a2a(A), M}]}, AccRes1}
                             end, {In, Acc}, Es),
-            Fun({Realm, {Org, EOut}}, LOut, AccOut)
+            Fun({Realm, {Org, ResOut}}, LOut, AccOut)
     end.
 
 a2a(<<"create">>) -> create;
@@ -404,25 +406,22 @@ handoff_cancelled(State) ->
 handoff_finished(_TargetNode, State) ->
     {ok, State}.
 
-handle_handoff_data({{R, O}, {T, create, E, M}}, State) ->
-    {DB, State1} = get_db(R, O, State),
-    esqlite3:q("INSERT INTO `create` (uuid, time, metadata) VALUES "
-               "(?1, ?2, ?3)",
-               [E, T, term_to_binary(M)], DB),
-    {ok, State1};
-
-handle_handoff_data({{R, O}, {T, update, E, M}}, State) ->
-    {DB, State1} = get_db(R, O, State),
-    esqlite3:q("INSERT INTO `update` (uuid, time, metadata) VALUES "
-               "(?1, ?2, ?3)",
-               [E, T, term_to_binary(M)], DB),
-    {ok, State1};
-
-handle_handoff_data({{R, O}, {T, destroy, E, M}}, State) ->
-    {DB, State1} = get_db(R, O, State),
-    esqlite3:q("INSERT INTO `destroy` (uuid, time, metadata) VALUES "
-               "(?1, ?2, ?3)",
-               [E, T, term_to_binary(M)], DB),
+handle_handoff_data(Data, State) ->
+    {{Realm, {Org, Resource}}, Entries} = binary_to_term(Data),
+    {DB, State1} = get_db(Realm, Org, State),
+    lists:map(fun ({Time, create, Meta}) ->
+                      esqlite3:q("INSERT INTO `create` (uuid, time, metadata) VALUES "
+                                 "(?1, ?2, ?3)",
+                                 [Resource, Time, term_to_binary(Meta)], DB);
+                  ({Time, update, Meta}) ->
+                      esqlite3:q("INSERT INTO `update` (uuid, time, metadata) VALUES "
+                                 "(?1, ?2, ?3)",
+                                 [Resource, Time, term_to_binary(Meta)], DB);
+                  ({Time, destroy, Meta}) ->
+                      esqlite3:q("INSERT INTO `destroy` (uuid, time, metadata) VALUES "
+                                 "(?1, ?2, ?3)",
+                                 [Resource, Time, term_to_binary(Meta)], DB)
+              end, Entries),
     {ok, State1}.
 
 encode_handoff_item(Org, Data) ->
