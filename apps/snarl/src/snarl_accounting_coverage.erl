@@ -22,7 +22,7 @@
                 nodes = []}).
 
 start(VNodeMaster, NodeCheckService, Request) ->
-    ReqID = mk_reqid(),
+    ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, something_else},
       {VNodeMaster, NodeCheckService, Request}),
@@ -104,6 +104,3 @@ inc(K, M) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
-mk_reqid() ->
-    erlang:unique_integer().
