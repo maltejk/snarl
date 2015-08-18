@@ -23,7 +23,7 @@
 |- lager-3.0.1
 |  |- goldrush-0.1.6
 |- lager_watchdog-0.1.10
-|- libsnarlmatch-0.1.5
+|- libsnarlmatch-0.1.6
 |- mdns_server_lib-0.1.19
 |  |- mdns_server-0.1.1
 |  |- ranch-1.1.0
