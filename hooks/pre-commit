@@ -7,7 +7,6 @@
 #
 # To enable this hook, rename this file to "pre-commit".
 
-make tree
 
 if [[ "x${SKIP}x" == "x1x" ]]
 then
