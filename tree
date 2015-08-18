@@ -14,16 +14,16 @@
 |  |- riak_dt-0.0.0+build.307.reff7981d4
 |- fifo_spec-0.1.19
 |- fifo_utils-0.1.12
-|- folsom_ddb-0.1.14
-|  |- ddb_client-0.1.6
-|  |  |- dproto-0.1.7
-|  |  |- mmath-0.1.6
+|- folsom_ddb-0.1.15
+|  |- ddb_client-0.1.11
+|  |  |- dproto-0.1.9
+|  |  |- mmath-0.1.7
 |- jsx-1.4.5
 |- jsxd-0.1.10
 |- lager-3.0.1
 |  |- goldrush-0.1.6
 |- lager_watchdog-0.1.10
-|- libsnarlmatch-0.1.5
+|- libsnarlmatch-0.1.6
 |- mdns_server_lib-0.1.19
 |  |- mdns_server-0.1.1
 |  |- ranch-1.1.0
@@ -43,6 +43,6 @@
 |  |- pbkdf2-0.0.0+build.2676.ref7076584
 |  |- poolboy-0.0.0+build.124.ref8bb45fb
 |  |- riak_sysmon-2.0.0
-|- riak_ensemble-0.0.0+build.113.refe0652c6
+|- riak_ensemble-0.0.0+build.151.ref1755a8a
 |- uuid-0.4.7
 |- yubico-0.1.1
