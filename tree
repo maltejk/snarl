@@ -21,7 +21,7 @@
 |- jsx-1.4.5
 |- jsxd-0.1.10
 |- lager-3.0.1
-|  |- goldrush-0.1.6
+|  |- goldrush-0.1.7
 |- lager_watchdog-0.1.10
 |- libsnarlmatch-0.1.6
 |- mdns_server_lib-0.1.19
@@ -43,6 +43,8 @@
 |  |- pbkdf2-0.0.0+build.2676.ref7076584
 |  |- poolboy-0.0.0+build.124.ref8bb45fb
 |  |- riak_sysmon-2.0.0
-|- riak_ensemble-0.0.0+build.151.ref1755a8a
+|- riak_ensemble-git
+|- snarl-0.6.2
+|- snarl_oauth-0.1.0
 |- uuid-0.4.7
 |- yubico-0.1.1
