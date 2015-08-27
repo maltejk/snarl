@@ -82,7 +82,7 @@ init_folsom() ->
              resource_action],
     S2i = [list, get, add, delete, sync_repair],
     TokenMs = [get, add, delete],
-    AccMs = [create, update, delete, get, get_range, list_all, sync_repair],
+    AccMs = [create, update, destroy, get, get_range, list_all, sync_repair],
     [folsom_metrics:new_histogram(Name, slide, 60) ||
         Name <-
             [{fifo_db, M} || M <- DBMs] ++
