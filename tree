@@ -41,7 +41,7 @@
 |- recon-2.2.0
 |- riak_core-0.0.0+build.1758.refaf8cc7b
 |- riak_dt-0.0.0+build.307.reff7981d4
-|- riak_ensemble-0.0.0+build.154.ref2f6eb9c
+|- riak_ensemble-git
 |- riak_sysmon-2.0.0
 |- setup-0.0.0+build.79.ref51ee7c9
 |- snarl-0.6.2
