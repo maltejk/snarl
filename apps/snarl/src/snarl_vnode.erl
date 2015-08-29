@@ -38,7 +38,7 @@ mkid(Actor) ->
     {mk_reqid(), Actor}.
 
 mk_reqid() ->
-    erlang:system_time().
+    erlang:system_time(nano_seconds).
 
 mk_bkt(#vstate{bucket = Bucket})
   when byte_size(Bucket) < 256 ->

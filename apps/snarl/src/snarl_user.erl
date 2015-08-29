@@ -117,6 +117,15 @@ check_yubikey(Realm, UUID, OTP) ->
             E
     end.
 
+check_yubikey(User, undefined) ->
+    UUID = ft_user:uuid(User),
+    case ft_user:yubikeys(User) of
+        [] ->
+            {ok, UUID};
+        _ ->
+            {otp_required, yubikey, UUID}
+    end;
+
 check_yubikey(User, OTP) ->
     UUID = ft_user:uuid(User),
     case ft_user:yubikeys(User) of
