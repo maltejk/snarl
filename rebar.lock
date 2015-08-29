@@ -161,5 +161,5 @@
   0},
  {<<"yubico">>,
   {git,"https://github.com/project-fifo/erlang-yubico.git",
-       {ref,"eba477c1e7e5d28d9b28eb78e884ade6632a6285"}},
+       {ref,"ead25f98f961cfe6be762c63d95347b1a03f5774"}},
   0}].
