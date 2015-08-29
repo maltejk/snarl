@@ -23,6 +23,7 @@
      snarl_oauth,
      merklet,
      esqlite,
+     yubico,
      uuid
      ]},
   {mod, {snarl_app, []}},
