@@ -7,8 +7,7 @@ id(OTP) ->
     list_to_binary(yubico:yubikey_id(OTP)).
 
 verify(OTP) ->
-    ClientID = snarl_opt:get(yubico, api, client_id, yubico_client_id,
-                             undefined),
-    SecretKey = snarl_opt:get(yubico, api, secret_key, yubico_secret_key,
-                             undefined),
+    ClientIDi = snarl_opt:get(yubico, api, client_id, yubico_client_id, 0),
+    ClientID = integer_to_list(ClientIDi),
+    SecretKey = snarl_opt:get(yubico, api, secret_key, yubico_secret_key, <<>>),
     yubico:simple_verify(OTP, ClientID, SecretKey, []).
