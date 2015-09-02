@@ -251,7 +251,8 @@ message({user, revoke_prefix, Realm, User, Prefix}, State) when
     {reply, snarl_user:revoke_prefix(Realm, User, Prefix), State};
 
 message({token, delete, Realm, Token}, State) when
-      Token ->
+      is_binary(Realm),
+      is_binary(Token) ->
     {reply, snarl_token:delete(Realm, Token), State};
 
 message({token, get, Realm, Token}, State)  ->
