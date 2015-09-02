@@ -32,7 +32,7 @@
 |- oauth2-0.6.0
 |- rankmatcher-0.1.2
 |- recon-2.2.0
-|- riak_core-0.0.0+build.1758.refaf8cc7b
+|- riak_core-git
 |  |- basho_stats-1.0.3
 |  |- chash-0.1.1
 |  |- exometer_core-0.0.0+build.19.refb47a5d6
