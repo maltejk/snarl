@@ -43,6 +43,6 @@ opts() ->
         [{"initial_role", binary}, {"initial_org", binary}]}]},
      {"clients",
       [{'_',
-        [{"initial_role", binary}, {"initial_org", binary}]}]},
+        [{"initial_role", binary}]}]},
      {"yubico",
       [{"api", [{"client_id", integer}, {"secret_key", binary}]}]}].

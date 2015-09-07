@@ -422,7 +422,7 @@ handle_handoff_data(Data, State) ->
                                  "(?1, ?2, ?3)",
                                  [Resource, Time, term_to_binary(Meta)], DB)
               end, Entries),
-    {ok, State1}.
+    {reply, ok, State1}.
 
 encode_handoff_item(Org, Data) ->
     term_to_binary({Org, Data}).
