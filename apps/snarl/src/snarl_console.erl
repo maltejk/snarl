@@ -608,11 +608,15 @@ ringready([]) ->
             error
     end.
 
+config(["show", Realm]) ->
+    io:format("Defaults for ~s~n  User Section~n", [Realm]),
+    fifo_console:print_config(users, Realm),
+    io:format("~n  User Section~n"),
+    fifo_console:print_config(clients, Realm),
+    ok;
+
 config(["show"]) ->
-    io:format("Defaults~n  User Section~n"),
-    fifo_console:print_config(defaults, users),
-    io:format("~n"
-              "Yubikey~n"),
+    io:format("Defaults~n  Yubikey~n"),
     fifo_console:print_config(yubico, api),
     ok;
 

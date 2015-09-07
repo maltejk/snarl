@@ -1,10 +1,10 @@
 -module(snarl_opt).
 
--export([get/5, set/2, unset/1, update/0]).
+-export([get/3, set/2, unset/1, update/0]).
 -ignore_xref([update/0]).
 
-get(Prefix, SubPrefix, Key, EnvKey, Dflt) ->
-    fifo_opt:get(opts(), Prefix, SubPrefix, Key, {snarl, EnvKey}, Dflt).
+get(Prefix, SubPrefix, Key) ->
+    fifo_opt:get(Prefix, SubPrefix, Key).
 
 set(Ks, Val) ->
     fifo_opt:set(opts(), Ks, Val).

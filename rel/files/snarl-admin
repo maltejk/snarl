@@ -359,6 +359,7 @@ case "$1" in
         echo "               db get <hash> <prefix> <key>               - gets raw data from the db."
         echo "               db delete <hash> <prefix> <key>            - deletes directly from db."
         echo "               config show                                - shows global config options."
+        echo "               config show <realm>                        - shows relm related config options."
         echo "               config set <key> <value>                   - sets global config options."
         echo "               users list <realm>                         - list users."
         echo "               users add <realm> <user>                   - adds a new user."
