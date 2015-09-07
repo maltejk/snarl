@@ -371,16 +371,18 @@ handle_org(RealmPath, Fun, Realm, Org, Acc) ->
         [{Res0, T0, M0, A0} | Es] ->
             esqlite3:close(C),
             In = {Res0, [{T0, a2a(A0), M0}]},
+            RealmB = list_to_binary(Realm),
+            OrgB = list_to_binary(Org),
             {{ResOut, LOut}, AccOut} =
                 lists:foldl(fun({Res, T, M, A}, {{Res, L}, AccRes}) ->
                                     {{Res, [{T, a2a(A), M} | L]}, AccRes};
                                ({Res, T, M, A}, {{ResOut, LOut}, AccRes}) ->
-                                    AccRes1 = Fun({list_to_binary(Realm),
-                                                   {list_to_binary(Org), ResOut}},
+                                    AccRes1 = Fun({RealmB,
+                                                   {OrgB, ResOut}},
                                                   LOut, AccRes),
                                     {{Res, [{T, a2a(A), M}]}, AccRes1}
                             end, {In, Acc}, Es),
-            Fun({Realm, {Org, ResOut}}, LOut, AccOut)
+            Fun({RealmB, {OrgB, ResOut}}, LOut, AccOut)
     end.
 
 a2a(<<"create">>) -> create;
@@ -422,7 +424,7 @@ handle_handoff_data(Data, State) ->
                                  "(?1, ?2, ?3)",
                                  [Resource, Time, term_to_binary(Meta)], DB)
               end, Entries),
-    {ok, State1}.
+    {reply, ok, State1}.
 
 encode_handoff_item(Org, Data) ->
     term_to_binary({Org, Data}).
