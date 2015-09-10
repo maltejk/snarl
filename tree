@@ -43,7 +43,7 @@
 │  ├─ pbkdf2─0.0.0+build.2676.ref7076584
 │  ├─ poolboy─0.0.0+build.124.ref8bb45fb
 │  └─ riak_sysmon─2.0.0
-├─ riak_ensemble─git
+├─ riak_ensemble─0.0.0+build.159.refa62b0cc
 ├─ snarl─0.6.2
 ├─ snarl_oauth─0.1.0
 ├─ uuid─0.4.7
