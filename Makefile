@@ -73,3 +73,6 @@ typer:
 
 tree:
 	rebar3 tree | grep -v '=' | sed 's/ (.*//' > tree
+
+tree-diff: tree
+	git diff test -- tree
