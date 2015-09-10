@@ -1,9 +1,3 @@
-[0;32m===> Verifying dependencies...
-[0m[0;32m===> Upgrading folsom_ddb
-[0m[0;32m===> Version cached at /Users/heinz/.cache/rebar3/hex/default/packages/folsom_ddb-0.1.16.tar is up to date, reusing it
-[0m[0;32m===> Upgrading riak_ensemble
-[0m[0;32m===> Upgrading ddb_client
-[0m[0;32m===> Version cached at /Users/heinz/.cache/rebar3/hex/default/packages/ddb_client-0.1.12.tar is up to date, reusing it
 [0m├─ bcrypt─0.0.0+build.89.ref464e423
 ├─ bitcask─1.7.0
 │  └─ otp_compat─1.0.0
