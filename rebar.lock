@@ -57,7 +57,7 @@
   {git,"https://github.com/project-fifo/fifo_spec.git",
        {ref,"ed8a5b0120b01b84846df328b85a831bce8868cd"}},
   0},
- {<<"fifo_utils">>,{pkg,<<"fifo_utils">>,<<"0.1.12">>},0},
+ {<<"fifo_utils">>,{pkg,<<"fifo_utils">>,<<"0.1.13">>},0},
  {<<"folsom">>,
   {git,"git://github.com/basho/folsom.git",
        {ref,"72944523b6467c9f7add5f1c96dd5020424a2681"}},
