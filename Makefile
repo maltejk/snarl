@@ -72,4 +72,4 @@ typer:
 	typer --plt ./_build/default/rebar3_*_plt _build/default/lib/*/ebin
 
 tree:
-	rebar3 tree | grep -v '^=' | sed 's/ (.*//' > tree
+	rebar3 tree | grep -v '=' | sed 's/ (.*//' > tree
