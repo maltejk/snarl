@@ -14,8 +14,8 @@
 │  └─ riak_dt─0.0.0+build.307.reff7981d4
 ├─ fifo_spec─0.1.19
 ├─ fifo_utils─0.1.13
-├─ folsom_ddb─0.1.15
-│  └─ ddb_client─0.1.11
+├─ folsom_ddb─0.1.16
+│  └─ ddb_client─0.1.12
 │     ├─ dproto─0.1.9
 │     └─ mmath─0.1.7
 ├─ jsx─1.4.5
@@ -43,7 +43,7 @@
 │  ├─ pbkdf2─0.0.0+build.2676.ref7076584
 │  ├─ poolboy─0.0.0+build.124.ref8bb45fb
 │  └─ riak_sysmon─2.0.0
-├─ riak_ensemble─0.0.0+build.159.refa62b0cc
+├─ riak_ensemble─git
 ├─ snarl─0.6.2
 ├─ snarl_oauth─0.1.0
 ├─ uuid─0.4.7
