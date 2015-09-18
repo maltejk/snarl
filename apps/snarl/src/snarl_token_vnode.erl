@@ -236,7 +236,7 @@ handle_command(_Message, _Sender, State) ->
 
 handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     FoldFn = fun(K, V, A) ->
-                     Fun({K, binary_to_term(V)}, A)
+                     Fun(K, binary_to_term(V), A)
              end,
     Acc1 = bitcask:fold(State#state.db, FoldFn, Acc0),
     Acc = bitcask:fold(State#state.api_db, FoldFn, Acc1),
