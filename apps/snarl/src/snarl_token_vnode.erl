@@ -238,8 +238,8 @@ handle_handoff_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, _Sender, State) ->
     FoldFn = fun(K, V, A) ->
                      Fun({K, binary_to_term(V)}, A)
              end,
-    Acc1 = bitcask:fold(FoldFn, Acc0, State#state.db),
-    Acc = bitcask:fold(FoldFn, Acc1, State#state.api_db),
+    Acc1 = bitcask:fold(State#state.db, FoldFn, Acc0),
+    Acc = bitcask:fold(State#state.api_db, FoldFn, Acc1),
     {reply, Acc, State}.
 
 handoff_starting(_TargetNode, State) ->
