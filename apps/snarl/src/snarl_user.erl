@@ -23,7 +23,7 @@
          set_metadata/3,
          import/3,
          cache/2,
-         add_token/8, remove_token/3,
+         add_token/8, add_token/9, remove_token/3,
          add_key/4, revoke_key/3, keys/2,
          add_yubikey/3, remove_yubikey/3, yubikeys/2, check_yubikey/3,
          active/2,
@@ -170,7 +170,11 @@ lookup(Realm, User) ->
       end).
 
 add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope) ->
-    do_write(Realm, User, add_token, {TokenID, Type, Token, Expiery, Client, Scope}).
+    add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope, undefined).
+
+add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope, Comment) ->
+    do_write(Realm, User, add_token,
+             {TokenID, Type, Token, Expiery, Client, Scope, Comment}).
 
 remove_token(Realm, User, Token) ->
     do_write(Realm, User, remove_token, Token).

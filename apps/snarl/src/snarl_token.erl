@@ -1,12 +1,15 @@
 -module(snarl_token).
 -include("snarl.hrl").
+-include_lib("snarl_oauth/include/snarl_oauth.hrl").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
          get/2,
          add/2, add/3, add/4,
          delete/2,
-         reindex/2
+         reindex/2,
+         api_token/4
         ]).
 
 -ignore_xref([
@@ -35,6 +38,27 @@ get(Realm, Token) ->
         {ok, {_Exp, Value}} ->
             {ok, Value}
     end.
+
+
+api_token(Realm, User, Scope, Comment) ->
+
+    %% This os mostly copied from snarl_oauth:associate_access_token/3
+    AccessToken = oauth2_token:generate(api),
+    TokenID = uuid:uuid4s(),
+    Expiery = infinity,
+    Client = undefined,
+    Context = [{<<"client">>, Client},
+               {<<"resource_owner">>, User},
+               {<<"expiry_time">>, Expiery},
+               {<<"scope">>, Scope}],
+    Type = access,
+    add(Realm,
+        {?ACCESS_TOKEN_TABLE, AccessToken},
+        Expiery,
+        Context),
+    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
+                         Scope, Comment),
+    {ok, TokenID, AccessToken}.
 
 
 add(Realm, User) ->

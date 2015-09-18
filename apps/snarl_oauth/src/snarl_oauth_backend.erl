@@ -32,11 +32,6 @@
          verify_scope/3
         ]).
 
--define(ACCESS_CODE_TABLE, access_codes).
--define(ACCESS_TOKEN_TABLE, access_tokens).
--define(REFRESH_TOKEN_TABLE, refresh_tokens).
--define(REQUEST_TABLE, requests).
-
 %%-type grantctx() :: oauth2:context().
 %%-type appctx()   :: oauth2:appctx().
 %%-type token()    :: oauth2:token().
@@ -93,6 +88,7 @@ associate_access_code(AccessCode, Context, AppContext) ->
                     Context),
     {ok, AppContext}.
 
+
 resolve_access_code(AccessCode, AppContext) ->
     %% case get(?ACCESS_CODE_TABLE, AccessCode) of
     case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}) of
@@ -109,15 +105,15 @@ revoke_access_code(AccessCode, AppContext) ->
 
 associate_access_token(AccessToken, Context,
                        AppContext = #oauth_state{realm = Realm}) ->
+    {ok, Expiery} = jsxd:get(<<"expiry_time">>, Context),
     snarl_token:add(Realm,
                     {?ACCESS_TOKEN_TABLE, AccessToken},
-                    oauth2_config:expiry_time(expiery_time), %% TODO: is this a grant
+                    Expiery,
                     Context),
     TokenID = uuid:uuid4s(),
     Type = access,
     {ok, User} = jsxd:get(<<"resource_owner">>, Context),
     {ok, Client} = jsxd:get(<<"client">>, Context),
-    {ok, Expiery} = jsxd:get(<<"expiry_time">>, Context),
     {ok, Scope} = jsxd:get(<<"scope">>, Context),
     snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client, Scope),
     {ok, AppContext}.
