@@ -149,7 +149,7 @@ revoke_access_token(AccessToken, AppContext = #oauth_state{realm = Realm}) ->
 %%
 %% It can be used to get a new access token.
 associate_refresh_token(RefreshToken, Context,
-                        AppContext = #oauth_state{realm = Realm}) ->  
+                        AppContext = #oauth_state{realm = Realm}) ->
     snarl_token:add(Realm,
                     {?REFRESH_TOKEN_TABLE, RefreshToken},
                     oauth2_config:expiry_time(refresh_token),
