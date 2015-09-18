@@ -105,13 +105,21 @@ resolve_access_code(AccessCode, AppContext) ->
 %% @doc Revokes an access code AccessCode, so that it cannot be used again.
 revoke_access_code(AccessCode, AppContext) ->
     snarl_token:delete(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}),
-        {ok, AppContext}.
+    {ok, AppContext}.
 
-associate_access_token(AccessToken, Context, AppContext) ->
-    snarl_token:add(AppContext#oauth_state.realm,
+associate_access_token(AccessToken, Context,
+                       AppContext = #oauth_state{realm = Realm}) ->
+    snarl_token:add(Realm,
                     {?ACCESS_TOKEN_TABLE, AccessToken},
                     oauth2_config:expiry_time(expiery_time), %% TODO: is this a grant
                     Context),
+    TokenID = uuid:uuid4s(),
+    Type = access,
+    {ok, User} = jsxd:get(Context, <<"resource_owner">>),
+    {ok, Client} = jsxd:get(Context, <<"client">>),
+    {ok, Expiery} = jsxd:get(Context, <<"expiry_time">>),
+    {ok, Scope} = jsxd:get(Context, <<"scope">>),
+    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client, Scope),
     {ok, AppContext}.
 
 resolve_access_token(AccessToken, AppContext) ->
@@ -124,8 +132,15 @@ resolve_access_token(AccessToken, AppContext) ->
     end.
 
 %% Not implemented yet.
-revoke_access_token(AccessToken, AppContext) ->
-    snarl_token:delete(AppContext#oauth_state.realm, {?ACCESS_TOKEN_TABLE, AccessToken}),
+revoke_access_token(AccessToken, AppContext = #oauth_state{realm = Realm}) ->
+    Tkn = {?ACCESS_TOKEN_TABLE, AccessToken},
+    {ok, Context} = snarl_token:get(AppContext#oauth_state.realm, Tkn),
+
+    snarl_token:delete(AppContext#oauth_state.realm, Tkn),
+
+    {ok, User} = jsxd:get(Context, <<"resource_owner">>),
+    snarl_user:remove_token(Realm, User, AccessToken),
+
     {ok, AppContext}.
 
 
@@ -133,12 +148,19 @@ revoke_access_token(AccessToken, AppContext) ->
 %% with the maximum available permissions.
 %%
 %% It can be used to get a new access token.
-associate_refresh_token(RefreshToken, Context, AppContext) ->
-    snarl_token:add(AppContext#oauth_state.realm,
+associate_refresh_token(RefreshToken, Context,
+                        AppContext = #oauth_state{realm = Realm}) ->  
+    snarl_token:add(Realm,
                     {?REFRESH_TOKEN_TABLE, RefreshToken},
                     oauth2_config:expiry_time(refresh_token),
                     Context),
-    %% put(?REFRESH_TOKEN_TABLE, RefreshToken, Context),
+    TokenID = uuid:uuid4s(),
+    Type = refresh,
+    {ok, User} = jsxd:get(Context, <<"resource_owner">>),
+    {ok, Client} = jsxd:get(Context, <<"client">>),
+    {ok, Expiery} = jsxd:get(Context, <<"expiry_time">>),
+    {ok, Scope} = jsxd:get(Context, <<"scope">>),
+    snarl_user:add_token(Realm, User, TokenID, Type, RefreshToken, Expiery, Client, Scope),
     {ok, AppContext}.
 
 resolve_refresh_token(RefreshToken, AppContext) ->
@@ -150,8 +172,15 @@ resolve_refresh_token(RefreshToken, AppContext) ->
             {error, notfound}
     end.
 
-revoke_refresh_token(RefreshToken, AppContext) ->
-    snarl_token:delete(AppContext#oauth_state.realm, {?REFRESH_TOKEN_TABLE, RefreshToken}),
+revoke_refresh_token(RefreshToken, AppContext = #oauth_state{realm = Realm}) ->
+    Tkn = {?REFRESH_TOKEN_TABLE, RefreshToken},
+    {ok, Context} = snarl_token:get(AppContext#oauth_state.realm, Tkn),
+
+    snarl_token:delete(AppContext#oauth_state.realm, Tkn),
+
+    {ok, User} = jsxd:get(Context, <<"resource_owner">>),
+    snarl_user:remove_token(Realm, User, RefreshToken),
+
     {ok, AppContext}.
 
 get_client_identity(ClientId, AppContext) ->

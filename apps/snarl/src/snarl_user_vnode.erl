@@ -47,7 +47,9 @@
          passwd/4,
          join_org/4, leave_org/4, select_org/4,
          revoke_key/4,
-         set_metadata/4
+         set_metadata/4,
+         add_token/4,
+         remove_token/4
         ]).
 
 -ignore_xref([
@@ -155,6 +157,18 @@ add_yubikey(Preflist, ReqID, {Realm, UUID}, OTP) ->
 remove_yubikey(Preflist, ReqID, {Realm, UUID}, KeyId) ->
     riak_core_vnode_master:command(Preflist,
                                    {remove_yubikey, ReqID, {Realm, UUID}, KeyId},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+add_token(Preflist, ReqID, {Realm, UUID}, Token) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {add_token, ReqID, {Realm, UUID}, Token},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+remove_token(Preflist, ReqID, {Realm, UUID}, Token) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {remove_token, ReqID, {Realm, UUID}, Token},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 

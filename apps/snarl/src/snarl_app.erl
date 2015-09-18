@@ -71,7 +71,7 @@ init_folsom() ->
     UserMs = [wipe, get, list, list_all, sync_repair, revoke_prefix, add_key,
               revoke_key, add_yubikey, remove_yubikey, add, set_metadata,
               passwd, import, join, leave, join_org, select_org, leave_org,
-              delete, grant, revoke, lookup, find_key],
+              delete, grant, revoke, lookup, find_key, add_token, remove_token],
     ClientMs = [wipe, get, list, list_all, sync_repair, revoke_prefix, add_uri,
                 remove_uri, add, set_metadata, secret, import, join, leave,
                 delete, grant, revoke, lookup_key, lookup, name, type],

@@ -132,7 +132,7 @@ handle_command({repair, {Realm, Token}, _, Obj}, _Sender,
 handle_command({get, ReqID, {Realm, Token}}, _Sender,
                #state{tokens = Tokens0, db = DBRef} = State) ->
     NodeIdx = {State#state.partition, State#state.node},
-    T0 = bitcask_time:tstamp(),
+    T0 = erlang:system_time(seconds),
     Key = term_to_binary({Realm, Token}),
     {Tokens1, Res} =
         case dict:find({Realm, Token}, Tokens0) of
@@ -201,7 +201,7 @@ handoff_finished(_TargetNode, State) ->
 
 handle_handoff_data(Data, State) ->
     {{Realm, Token}, HObject} = binary_to_term(Data),
-    Hs0 = dict:store({Realm, Token}, {bitcask_time:tstamp(), HObject}, State#state.tokens),
+    Hs0 = dict:store({Realm, Token}, {erlang:system_time(seconds), HObject}, State#state.tokens),
     {reply, ok, State#state{tokens = Hs0}}.
 
 encode_handoff_item(Token, {_, Data}) ->
@@ -255,7 +255,7 @@ expire(#state{access_cnt = Cnt, timeout_cycle = Cycle} = State)
     State;
 
 expire(#state{tokens = Tokens, db = DBRef} = State) ->
-    T0 = bitcask_time:tstamp(),
+    T0 = erlang:system_time(seconds),
     Tokens1 = dict:filter(
                 fun({Realm, Token}, Obj) ->
                         case ft_obj:val(Obj) of
@@ -278,7 +278,7 @@ expire(State) ->
     State.
 
 expiery(T) ->
-    bitcask_time:tstamp() + T.
+    erlang:system_time(seconds) + T.
 
 max_timeout() ->
     max_timeout(dflt_env(token_timeout, ?TIMEOUT)).

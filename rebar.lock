@@ -51,7 +51,7 @@
   0},
  {<<"fifo_dt">>,
   {git,"https://github.com/project-fifo/fifo_dt.git",
-       {ref,"d099f504766d4f2d42d1e79aeb1e48c059fd2ede"}},
+       {ref,"e8af053389ccf783d73fda0c75fbcd85c2bf954e"}},
   0},
  {<<"fifo_spec">>,
   {git,"https://github.com/project-fifo/fifo_spec.git",
