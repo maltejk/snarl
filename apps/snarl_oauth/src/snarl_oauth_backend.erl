@@ -135,7 +135,7 @@ revoke_access_token(AccessToken, AppContext = #{realm := Realm}) ->
 
     snarl_token:delete(Realm, Tkn),
 
-    {ok, User} = jsxd:get(Context, <<"resource_owner">>),
+    {ok, User} = jsxd:get(<<"resource_owner">>, Context),
     snarl_user:remove_token(Realm, User, AccessToken),
 
     {ok, AppContext}.
@@ -175,7 +175,7 @@ revoke_refresh_token(RefreshToken, AppContext = #{realm := Realm}) ->
 
     snarl_token:delete(Realm, Tkn),
 
-    {ok, User} = jsxd:get(Context, <<"resource_owner">>),
+    {ok, User} = jsxd:get(<<"resource_owner">>, Context),
     snarl_user:remove_token(Realm, User, RefreshToken),
 
     {ok, AppContext}.
