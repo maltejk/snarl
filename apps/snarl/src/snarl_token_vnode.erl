@@ -169,7 +169,7 @@ handle_command({get, ReqID, {Realm, Token}}, _Sender,
         _ ->
             T0 = erlang:system_time(seconds),
             {Tokens1, Res} =
-                case maps:find({Realm, Token}, Tokens0) of
+                case maps:find(Key, Tokens0) of
                     error ->
                         case bitcask:get(DBRef, Key) of
                             {ok, V} ->
