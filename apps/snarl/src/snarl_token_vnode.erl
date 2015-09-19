@@ -327,8 +327,9 @@ handle_coverage(_Req, _KeySpaces, _Sender, State) ->
 handle_exit(_Pid, _Reason, State) ->
     {noreply, State}.
 
-terminate(_Reason, #state{db=DBRef}) ->
+terminate(_Reason, #state{db=DBRef, api_db = APIDB}) ->
     bitcask:close(DBRef),
+    bitcask:close(APIDB),
     ok.
 
 
