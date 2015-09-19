@@ -128,16 +128,22 @@ resolve_access_token(AccessToken, AppContext = #{realm := Realm}) ->
             {error, notfound}
     end.
 
-%% Not implemented yet.
 revoke_access_token(AccessToken, AppContext = #{realm := Realm}) ->
     Tkn = {?ACCESS_TOKEN_TABLE, AccessToken},
-    {ok, Context} = snarl_token:get(Realm, Tkn),
+    case snarl_token:get(Realm, Tkn) of
+        {ok, Context} ->
+            {ok, User} = jsxd:get(<<"resource_owner">>, Context),
+            snarl_user:remove_token(Realm, User, AccessToken);
+        _ ->
+            case maps:find(user, AppContext) of
+                {ok, User} ->
+                    snarl_user:remove_token(Realm, User, AccessToken);
+                _ ->
+                    ok
+            end
 
+    end,
     snarl_token:delete(Realm, Tkn),
-
-    {ok, User} = jsxd:get(<<"resource_owner">>, Context),
-    snarl_user:remove_token(Realm, User, AccessToken),
-
     {ok, AppContext}.
 
 
@@ -171,13 +177,20 @@ resolve_refresh_token(RefreshToken, AppContext = #{realm := Realm}) ->
 
 revoke_refresh_token(RefreshToken, AppContext = #{realm := Realm}) ->
     Tkn = {?REFRESH_TOKEN_TABLE, RefreshToken},
-    {ok, Context} = snarl_token:get(Realm, Tkn),
+    case snarl_token:get(Realm, Tkn) of
+        {ok, Context} ->
+            {ok, User} = jsxd:get(<<"resource_owner">>, Context),
+            snarl_user:remove_token(Realm, User, RefreshToken);
+        _ ->
+            case maps:find(user, AppContext) of
+                {ok, User} ->
+                    snarl_user:remove_token(Realm, User, RefreshToken);
+                _ ->
+                    ok
+            end
 
+    end,
     snarl_token:delete(Realm, Tkn),
-
-    {ok, User} = jsxd:get(<<"resource_owner">>, Context),
-    snarl_user:remove_token(Realm, User, RefreshToken),
-
     {ok, AppContext}.
 
 get_client_identity(ClientId, AppContext = #{realm := Realm}) ->

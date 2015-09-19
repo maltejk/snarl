@@ -50,7 +50,7 @@
 
 %% Revokes a token by a given tokenID (not the token itself!)
 revoke_token(Realm, User, TokenID) ->
-    Ctx = #{realm => Realm},
+    Ctx = #{realm => Realm, user => User},
     case snarl_user:get(Realm, User) of
         {ok, U} ->
             case ft_user:get_token_by_id(TokenID, U) of
