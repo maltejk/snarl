@@ -55,9 +55,11 @@ revoke_token(Realm, User, TokenID) ->
         {ok, U} ->
             case ft_user:get_token_by_id(TokenID, U) of
                 #{token := T, type := access} ->
-                    snarl_oauth_backend:revoke_access_token(T, Ctx);
+                    {ok, _} = snarl_oauth_backend:revoke_access_token(T, Ctx),
+                    ok;
                 #{token := T, type := refresh} ->
-                    snarl_oauth_backend:revoke_refresh_token(T, Ctx);
+                    {ok, _} = snarl_oauth_backend:revoke_refresh_token(T, Ctx),
+                    ok;
                 _ ->
                     not_found
             end;
