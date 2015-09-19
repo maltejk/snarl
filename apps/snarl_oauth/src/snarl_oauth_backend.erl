@@ -29,7 +29,8 @@
          verify_redirection_uri/3,
          verify_client_scope/3,
          verify_resowner_scope/3,
-         verify_scope/3
+         verify_scope/3,
+         verify_scope/2
         ]).
 
 %%-type grantctx() :: oauth2:context().
@@ -43,8 +44,8 @@
 authenticate_user({UserID}, AppContext) ->
     {ok, {AppContext, UserID}};
 
-authenticate_user({Username, Password}, AppContext) ->
-    case snarl_user:auth(AppContext#oauth_state.realm, Username, Password, undefined) of
+authenticate_user({Username, Password}, AppContext = #{realm := Realm}) ->
+    case snarl_user:auth(Realm, Username, Password, undefined) of
         {ok, UserID} ->
             {ok, {AppContext, UserID}};
         {otp_required, yubikey, UserID} ->
@@ -53,8 +54,8 @@ authenticate_user({Username, Password}, AppContext) ->
             {error, notfound}
     end;
 
-authenticate_user({Username, Password, OTP}, AppContext) ->
-    case snarl_user:auth(AppContext#oauth_state.realm, Username, Password, OTP) of
+authenticate_user({Username, Password, OTP}, AppContext = #{realm := Realm}) ->
+    case snarl_user:auth(Realm, Username, Password, OTP) of
         {ok, UserID} ->
             {ok, {AppContext, UserID}};
         {otp_required, yubikey, UserID} ->
@@ -67,7 +68,7 @@ authenticate_client({ClientID}, AppContext) ->
     {ok, {AppContext, ClientID}};
 
 authenticate_client({ClientId, ClientSecret},
-                    AppContext = #oauth_state{realm = Realm}) ->
+                    AppContext = #{realm := Realm}) ->
     case snarl_client:auth(Realm, ClientId, ClientSecret) of
         {ok, UserID} ->
             {ok, {AppContext, UserID}};
@@ -80,18 +81,18 @@ authenticate_client(ClientID, AppContext) when is_binary(ClientID) ->
 
 
 %% Is this a Authrorization Code?
-associate_access_code(AccessCode, Context, AppContext) ->
+associate_access_code(AccessCode, Context, AppContext = #{realm := Realm}) ->
     %% put(?ACCESS_CODE_TABLE, AccessCode, Context),
-    snarl_token:add(AppContext#oauth_state.realm,
+    snarl_token:add(Realm,
                     {?ACCESS_CODE_TABLE, AccessCode},
                     oauth2_config:expiry_time(code_grant),
                     Context),
     {ok, AppContext}.
 
 
-resolve_access_code(AccessCode, AppContext) ->
+resolve_access_code(AccessCode, AppContext = #{realm := Realm}) ->
     %% case get(?ACCESS_CODE_TABLE, AccessCode) of
-    case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}) of
+    case snarl_token:get(Realm, {?ACCESS_CODE_TABLE, AccessCode}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
@@ -99,12 +100,12 @@ resolve_access_code(AccessCode, AppContext) ->
     end.
 
 %% @doc Revokes an access code AccessCode, so that it cannot be used again.
-revoke_access_code(AccessCode, AppContext) ->
-    snarl_token:delete(AppContext#oauth_state.realm, {?ACCESS_CODE_TABLE, AccessCode}),
+revoke_access_code(AccessCode, AppContext = #{realm := Realm}) ->
+    snarl_token:delete(Realm, {?ACCESS_CODE_TABLE, AccessCode}),
     {ok, AppContext}.
 
 associate_access_token(AccessToken, Context,
-                       AppContext = #oauth_state{realm = Realm}) ->
+                       AppContext = #{realm := Realm}) ->
     {ok, Expiery} = jsxd:get(<<"expiry_time">>, Context),
     snarl_token:add(Realm,
                     {?ACCESS_TOKEN_TABLE, AccessToken},
@@ -118,9 +119,9 @@ associate_access_token(AccessToken, Context,
     snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client, Scope),
     {ok, AppContext}.
 
-resolve_access_token(AccessToken, AppContext) ->
+resolve_access_token(AccessToken, AppContext = #{realm := Realm}) ->
     %% case get(?ACCESS_TOKEN_TABLE, AccessToken) of
-    case snarl_token:get(AppContext#oauth_state.realm, {?ACCESS_TOKEN_TABLE, AccessToken}) of
+    case snarl_token:get(Realm, {?ACCESS_TOKEN_TABLE, AccessToken}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
@@ -128,11 +129,11 @@ resolve_access_token(AccessToken, AppContext) ->
     end.
 
 %% Not implemented yet.
-revoke_access_token(AccessToken, AppContext = #oauth_state{realm = Realm}) ->
+revoke_access_token(AccessToken, AppContext = #{realm := Realm}) ->
     Tkn = {?ACCESS_TOKEN_TABLE, AccessToken},
-    {ok, Context} = snarl_token:get(AppContext#oauth_state.realm, Tkn),
+    {ok, Context} = snarl_token:get(Realm, Tkn),
 
-    snarl_token:delete(AppContext#oauth_state.realm, Tkn),
+    snarl_token:delete(Realm, Tkn),
 
     {ok, User} = jsxd:get(Context, <<"resource_owner">>),
     snarl_user:remove_token(Realm, User, AccessToken),
@@ -145,7 +146,7 @@ revoke_access_token(AccessToken, AppContext = #oauth_state{realm = Realm}) ->
 %%
 %% It can be used to get a new access token.
 associate_refresh_token(RefreshToken, Context,
-                        AppContext = #oauth_state{realm = Realm}) ->
+                        AppContext = #{realm := Realm}) ->
     snarl_token:add(Realm,
                     {?REFRESH_TOKEN_TABLE, RefreshToken},
                     oauth2_config:expiry_time(refresh_token),
@@ -159,28 +160,28 @@ associate_refresh_token(RefreshToken, Context,
     snarl_user:add_token(Realm, User, TokenID, Type, RefreshToken, Expiery, Client, Scope),
     {ok, AppContext}.
 
-resolve_refresh_token(RefreshToken, AppContext) ->
+resolve_refresh_token(RefreshToken, AppContext = #{realm := Realm}) ->
     %% case get(?REFRESH_TOKEN_TABLE, RefreshToken) of
-    case snarl_token:get(AppContext#oauth_state.realm, {?REFRESH_TOKEN_TABLE, RefreshToken}) of
+    case snarl_token:get(Realm, {?REFRESH_TOKEN_TABLE, RefreshToken}) of
         {ok, Context} -> %% Was Grant
             {ok, {AppContext, Context}};
         not_found ->
             {error, notfound}
     end.
 
-revoke_refresh_token(RefreshToken, AppContext = #oauth_state{realm = Realm}) ->
+revoke_refresh_token(RefreshToken, AppContext = #{realm := Realm}) ->
     Tkn = {?REFRESH_TOKEN_TABLE, RefreshToken},
-    {ok, Context} = snarl_token:get(AppContext#oauth_state.realm, Tkn),
+    {ok, Context} = snarl_token:get(Realm, Tkn),
 
-    snarl_token:delete(AppContext#oauth_state.realm, Tkn),
+    snarl_token:delete(Realm, Tkn),
 
     {ok, User} = jsxd:get(Context, <<"resource_owner">>),
     snarl_user:remove_token(Realm, User, RefreshToken),
 
     {ok, AppContext}.
 
-get_client_identity(ClientId, AppContext) ->
-    case snarl_client:lookup(AppContext#oauth_state.realm, ClientId) of
+get_client_identity(ClientId, AppContext = #{realm := Realm}) ->
+    case snarl_client:lookup(Realm, ClientId) of
         {ok, Client} ->
             {ok, {AppContext, ft_client:uuid(Client)}};
         not_found ->
@@ -191,8 +192,8 @@ verify_redirection_uri(_Client, undefined, AppContext) ->
     {ok, AppContext};
 verify_redirection_uri(_Client, <<>>, AppContext) ->
     {ok, AppContext};
-verify_redirection_uri(ClientUUID, Uri, AppContext) ->
-    {ok, Client} = snarl_client:get(AppContext#oauth_state.realm, ClientUUID),
+verify_redirection_uri(ClientUUID, Uri, AppContext = #{realm := Realm}) ->
+    {ok, Client} = snarl_client:get(Realm, ClientUUID),
     case lists:member(Uri, ft_client:uris(Client)) of
         false ->
             {error, baduri};
@@ -200,10 +201,10 @@ verify_redirection_uri(ClientUUID, Uri, AppContext) ->
             {ok, AppContext}
     end.
 
-verify_client_scope(_Client, Scope, AppContext) ->
+verify_client_scope(_Client, Scope, AppContext = #{realm := Realm}) ->
     %% TODO: Do we need to look at what the scope of the client should be?
-    RealmScope = [S || {S, _, _, _} <-
-                           snarl_oauth:scope(AppContext#oauth_state.realm)],
+    RealmScope = [S || #{scope := S} <-
+                           snarl_oauth:scope(Realm)],
     verify_scope(RealmScope, Scope, AppContext).
 %%verify_client_scope({Client, _Secret}, Scope, AppContext) ->
     %% case snarl_user:lookup(AppContext#oauth_state.realm, <<"client:", Client/binary>>) of
@@ -213,18 +214,18 @@ verify_client_scope(_Client, Scope, AppContext) ->
     %%         {error, badscope}
     %% end.
 
-verify_resowner_scope(_UserID, Scope, AppContext) ->
-    RealmScope = [S || {S, _, _, _} <-
-                           snarl_oauth:scope(AppContext#oauth_state.realm)],
+verify_resowner_scope(_UserID, Scope, AppContext = #{realm := Realm}) ->
+    RealmScope = [S || #{scope := S} <-
+                           snarl_oauth:scope(Realm)],
     verify_scope(RealmScope, Scope, AppContext).
 
 %% verify_resowner_scope(UserID, Scope, AppContext) ->
 %%     {ok, Perms} = snarl_user:cache(AppContext#oauth_state.realm, UserID),
 %%     verify_scope([permissions_to_scope(E) || E <- Perms], Scope, AppContext).
 
-verify_scope(_RegisteredScope, undefined, AppContext) ->
-    DefaultScope = [S || {S, _, true, _} <-
-                             snarl_oauth:scope(AppContext#oauth_state.realm)],
+verify_scope(_RegisteredScope, undefined, AppContext = #{realm := Realm}) ->
+    DefaultScope = [S || #{scope := S, default := true} <-
+                             snarl_oauth:scope(Realm)],
     {ok, {AppContext, DefaultScope}};
 verify_scope(_RegisteredScope, [], AppContext) ->
     {ok, {AppContext, []}};
@@ -238,6 +239,12 @@ verify_scope(RegisteredScope, Scope, AppContext) ->
         false ->
             {error, badscope}
     end.
+
+verify_scope(Realm, Scope) ->
+    RealmScope = [S || #{scope := S} <-
+                           snarl_oauth:scope(Realm)],
+    oauth2_priv_set:is_subset(oauth2_priv_set:new(Scope),
+                              oauth2_priv_set:new(RealmScope)).
 
 %% permissions_to_scope([])->
 %%     <<>>;

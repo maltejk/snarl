@@ -1,5 +1,5 @@
 -module(snarl_user).
--include_lib("riak_core/include/riak_core_vnode.hrl").
+-include_lib("snarl_oauth/include/snarl_oauth.hrl").
 
 -export([
          sync_repair/3,
@@ -24,17 +24,15 @@
          import/3,
          cache/2,
          add_token/8, add_token/9, remove_token/3,
-         add_key/4, revoke_key/3, keys/2,
-         add_yubikey/3, remove_yubikey/3, yubikeys/2, check_yubikey/3,
-         active/2,
-         orgs/2,
-         wipe/2
+         add_key/4, revoke_key/3,
+         add_yubikey/3, remove_yubikey/3, check_yubikey/3,
+         wipe/2,
+         revoke_token/3
         ]).
 
 -ignore_xref([
               import/3,
               wipe/2,
-              join_org/3, leave_org/3, select_org/3,
               list_/1,
               raw/2, sync_repair/3,
               reindex/2
@@ -49,6 +47,23 @@
 
 -define(NAME_2i, {snarl_user, name}).
 -define(KEY_2i, {snarl_user, key}).
+
+%% Revokes a token by a given tokenID (not the token itself!)
+revoke_token(Realm, User, TokenID) ->
+    Ctx = #{realm => Realm},
+    case snarl_user:get(Realm, User) of
+        {ok, U} ->
+            case ft_user:get_token_by_id(TokenID, U) of
+                #{token := T, type := access} ->
+                    snarl_oauth_backend:revoke_access_token(T, Ctx);
+                #{token := T, type := refresh} ->
+                    snarl_oauth_backend:revoke_refresh_token(T, Ctx);
+                _ ->
+                    not_found
+            end;
+        E ->
+            E
+    end.
 
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
@@ -233,14 +248,6 @@ revoke_key(Realm, User, KeyID) ->
             E
     end.
 
-keys(Realm, User) ->
-    case snarl_user:get(Realm, User) of
-        {ok, UserObj} ->
-            {ok, ft_user:keys(UserObj)};
-        E ->
-            E
-    end.
-
 add_yubikey(Realm, User, OTP) ->
     KeyID = snarl_yubico:id(OTP),
     do_write(Realm, User, add_yubikey, KeyID).
@@ -248,29 +255,7 @@ add_yubikey(Realm, User, OTP) ->
 remove_yubikey(Realm, User, KeyID) ->
     do_write(Realm, User, remove_yubikey, KeyID).
 
-yubikeys(Realm, User) ->
-    case snarl_user:get(Realm, User) of
-        {ok, UserObj} ->
-            {ok, ft_user:yubikeys(UserObj)};
-        E ->
-            E
-    end.
 
-active(Realm, User) ->
-    case snarl_user:get(Realm, User) of
-        {ok, UserObj} ->
-            {ok, ft_user:active_org(UserObj)};
-        E ->
-            E
-    end.
-
-orgs(Realm, User) ->
-    case snarl_user:get(Realm, User) of
-        {ok, UserObj} ->
-            {ok, ft_user:orgs(UserObj)};
-        E ->
-            E
-    end.
 
 -spec cache(Realm::binary(), User::fifo:user_id()) ->
                    not_found |

@@ -41,24 +41,33 @@ get(Realm, Token) ->
 
 
 api_token(Realm, User, Scope, Comment) ->
-
-    %% This os mostly copied from snarl_oauth:associate_access_token/3
-    AccessToken = oauth2_token:generate(api),
-    TokenID = uuid:uuid4s(),
-    Expiery = infinity,
-    Client = undefined,
-    Context = [{<<"client">>, Client},
-               {<<"resource_owner">>, User},
-               {<<"expiry_time">>, Expiery},
-               {<<"scope">>, Scope}],
-    Type = access,
-    add(Realm,
-        {?ACCESS_TOKEN_TABLE, AccessToken},
-        Expiery,
-        Context),
-    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
-                         Scope, Comment),
-    {ok, TokenID, AccessToken}.
+    case snarl_oauth_backend:verify_scope(Realm, Scope) of
+        false ->
+            {error, bad_scope};
+        true ->
+            case snarl_user:get(Realm, User) of
+                {ok, _UserObj} ->
+                    %% This os mostly copied from snarl_oauth:associate_access_token/3
+                    AccessToken = oauth2_token:generate(api),
+                    TokenID = uuid:uuid4s(),
+                    Expiery = infinity,
+                    Client = undefined,
+                    Context = [{<<"client">>, Client},
+                               {<<"resource_owner">>, User},
+                               {<<"expiry_time">>, Expiery},
+                               {<<"scope">>, Scope}],
+                    Type = access,
+                    add(Realm,
+                        {?ACCESS_TOKEN_TABLE, AccessToken},
+                        Expiery,
+                        Context),
+                    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
+                                         Scope, Comment),
+                    {ok, TokenID, AccessToken};
+                E ->
+                    E
+            end
+    end.
 
 
 add(Realm, User) ->

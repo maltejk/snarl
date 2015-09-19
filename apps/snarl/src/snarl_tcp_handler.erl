@@ -91,22 +91,50 @@ message({user, get, Realm, User}, State) when
      snarl_user:get(Realm, User),
      State};
 
+message({user, lookup, Realm, User}, State) when is_binary(User) ->
+    {reply,
+     snarl_user:lookup(Realm, User),
+     State};
+
+message({user, add, Realm, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add(Realm, User),
+     State};
+
+message({user, add, Realm, Creator, User}, State) when
+      is_binary(User) ->
+    {reply,
+     snarl_user:add(Realm, Creator, User),
+     State};
+
 message({user, token, Realm, User}, State) when
     is_binary(User) ->
     {reply,
      snarl_token:add(Realm, User),
      State};
 
+message({user, api_token, Realm, User, Scope, Comment}, State) when
+      is_binary(Realm),
+      is_binary(User),
+      is_list(Scope),
+      (is_binary(Comment) orelse Comment =:= undefined) ->
+    {reply,
+     snarl_token:api_token(Realm, User, Scope, Comment),
+     State};
+
+message({user, revoke_token, Realm, User, TokenID}, State) when
+      is_binary(Realm),
+      is_binary(User),
+      is_binary(TokenID) ->
+    {reply,
+     snarl_user:revoke_token(Realm, User, TokenID),
+     State};
+
 message({user, keys, find, Realm, KeyID}, State) when
       is_binary(KeyID) ->
     {reply,
      snarl_user:find_key(Realm, KeyID),
-     State};
-
-message({user, keys, get, Realm, User}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:keys(Realm, User),
      State};
 
 message({user, keys, add, Realm, User, KeyId, Key}, State) when
@@ -121,19 +149,11 @@ message({user, keys, revoke, Realm, User, KeyId}, State) when
      snarl_user:revoke_key(Realm, User, KeyId),
      State};
 
-
-message({user, yubikeys, get, Realm, User}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:yubikeys(Realm, User),
-     State};
-
 message({user, yubikeys, check, Realm, User, OTP}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:check_yubikey(Realm, User, OTP),
      State};
-
 
 message({user, yubikeys, add, Realm, User, OTP}, State) when
       is_binary(User) ->
@@ -153,11 +173,6 @@ message({user, set_metadata, Realm, User, Attributes}, State) when
      snarl_user:set_metadata(Realm, User, Attributes),
      State};
 
-message({user, lookup, Realm, User}, State) when is_binary(User) ->
-    {reply,
-     snarl_user:lookup(Realm, User),
-     State};
-
 message({user, cache, Realm, {token, Token}}, State = #state{}) ->
     case snarl_token:get(Realm, Token) of
         not_found ->
@@ -170,18 +185,6 @@ message({user, cache, Realm, User}, State) when
       is_binary(User) ->
     {reply,
      snarl_user:cache(Realm, User),
-     State};
-
-message({user, add, Realm, User}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:add(Realm, User),
-     State};
-
-message({user, add, Realm, Creator, User}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:add(Realm, Creator, User),
      State};
 
 message({user, auth, Realm, User, Pass}, State) when
@@ -250,6 +253,26 @@ message({user, revoke_prefix, Realm, User, Prefix}, State) when
       is_binary(User) ->
     {reply, snarl_user:revoke_prefix(Realm, User, Prefix), State};
 
+message({user, org, join, Realm, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:join_org(Realm, User, Org), State};
+
+message({user, org, leave, Realm, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:leave_org(Realm, User, Org), State};
+
+message({user, org, select, Realm, User, Org}, State) when
+      is_binary(User),
+      is_binary(Org) ->
+    {reply, snarl_user:select_org(Realm, User, Org), State};
+
+
+%%%===================================================================
+%%% User Functions
+%%%===================================================================
+
 message({token, delete, Realm, Token}, State) when
       is_binary(Realm),
       is_binary(Token) ->
@@ -266,32 +289,6 @@ message({token, add, Realm, Token, Timeout, Data}, State) when
       is_integer(Timeout), Timeout > 0 ->
     {reply, snarl_token:add(Realm, Token, Timeout, Data), State};
 
-message({user, org, get, Realm, User}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:orgs(Realm, User),
-     State};
-
-message({user, org, active, Realm, User}, State) when
-      is_binary(User) ->
-    {reply,
-     snarl_user:active(Realm, User),
-     State};
-
-message({user, org, join, Realm, User, Org}, State) when
-      is_binary(User),
-      is_binary(Org) ->
-    {reply, snarl_user:join_org(Realm, User, Org), State};
-
-message({user, org, leave, Realm, User, Org}, State) when
-      is_binary(User),
-      is_binary(Org) ->
-    {reply, snarl_user:leave_org(Realm, User, Org), State};
-
-message({user, org, select, Realm, User, Org}, State) when
-      is_binary(User),
-      is_binary(Org) ->
-    {reply, snarl_user:select_org(Realm, User, Org), State};
 
 
 %%%===================================================================
@@ -498,14 +495,14 @@ message({oauth2, scope, Realm, Subscope}, State) ->
 %%-export([authorize_password/3]).
 message(
   {oauth2, authorize_password, Realm, User, Scope}, State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:authorize_password(User, Scope, Ctx)),
      State};
 %%-export([authorize_password/4]).
 message(
   {oauth2, authorize_password, Realm, User, Client, Scope}, State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:authorize_password(User, Client, Scope, Ctx)),
      State};
@@ -514,7 +511,7 @@ message(
 message(
   {oauth2, authorize_password, Realm, User, Client, RedirUri, Scope},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:authorize_password(User, Client, RedirUri, Scope, Ctx)),
      State};
@@ -523,7 +520,7 @@ message(
 message(
   {oauth2, authorize_client_credentials, Realm, Client, Scope},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:authorize_client_credentials(Client, Scope, Ctx)),
      State};
@@ -532,7 +529,7 @@ message(
 message(
   {oauth2, authorize_code_grant, Realm, Client, Code, RedirUri},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:authorize_code_grant(Client, Code, RedirUri, Ctx)),
      State};
@@ -541,7 +538,7 @@ message(
 message(
   {oauth2, authorize_code_request, Realm, User, Client, RedirUri, Scope},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:authorize_code_request(User, Client, RedirUri, Scope, Ctx)),
      State};
@@ -550,7 +547,7 @@ message(
 message(
   {oauth2, issue_code, Realm, Auth},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:issue_code(Auth, Ctx)),
      State};
@@ -559,7 +556,7 @@ message(
 message(
   {oauth2, issue_token, Realm, Auth},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:issue_token(Auth, Ctx)),
      State};
@@ -568,7 +565,7 @@ message(
 message(
   {oauth2, issue_token_and_refresh, Realm, Auth},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:issue_token_and_refresh(Auth, Ctx)),
      State};
@@ -577,7 +574,7 @@ message(
 message(
   {oauth2, verify_access_token, Realm, Token},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:verify_access_token(Token, Ctx)),
      State};
@@ -586,7 +583,7 @@ message(
 message(
   {oauth2, verify_access_code, Realm, AccessCode},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:verify_access_code(AccessCode, Ctx)),
      State};
@@ -595,7 +592,7 @@ message(
 message(
   {oauth2, verify_access_code, Realm, AccessCode, Client},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:verify_access_code(AccessCode, Client, Ctx)),
      State};
@@ -604,7 +601,7 @@ message(
 message(
   {oauth2, refresh_access_token, Realm, Client, RefreshToken, Scope},
   State) ->
-    Ctx = #oauth_state{realm = Realm},
+    Ctx = #{realm => Realm},
     {reply,
      oauth_reply(oauth2:refresh_access_token(Client, RefreshToken, Scope, Ctx)),
      State};
