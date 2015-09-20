@@ -756,7 +756,8 @@ scope_list([RealmS]) ->
               ["Scope", "Description", "Default", "Permissions"]),
     [
      io:format("~-25s ~-30s ~-7s ~s~n", [Scope, Desc, Dflt, fmt_perms(Perms)])
-     || {Scope, Desc, Dflt, Perms} <- snarl_oauth:scope(Realm)
+     || #{scope := Scope, desc := Desc,
+          default := Dflt, permissions := Perms} <- snarl_oauth:scope(Realm)
     ],
     ok.
 
@@ -840,4 +841,4 @@ fmt_perm(Perm) ->
 
 
 find_scope(Realm, Scope) ->
-    [S || S = {Name, _, _} <- snarl_oauth:scope(Realm), Name =:= Scope].
+    [S || S = #{scope := Name} <- snarl_oauth:scope(Realm), Name =:= Scope].
