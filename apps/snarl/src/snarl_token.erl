@@ -23,12 +23,11 @@
           Mod, Fun, Args)).
 
 %% Public API
+reindex(_, _) -> ok.
+
 -spec get(binary(), fifo:token()) ->
                  not_found |
                  {ok, fifo:user_id()}.
-
-reindex(_, _) -> ok.
-
 get(Realm, Token) ->
     R = ?FM(get, snarl_entity_read_fsm, start,
             [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]),
@@ -48,7 +47,7 @@ api_token(Realm, User, Scope, Comment) ->
             case snarl_user:get(Realm, User) of
                 {ok, _UserObj} ->
                     %% This os mostly copied from snarl_oauth:associate_access_token/3
-                    AccessToken = oauth2_token:generate(api),
+                    AccessToken = oauth2_token:generate([]),
                     TokenID = uuid:uuid4s(),
                     Expiery = infinity,
                     Client = undefined,
@@ -71,11 +70,11 @@ api_token(Realm, User, Scope, Comment) ->
 
 
 add(Realm, User) ->
-    add(Realm, oauth2_token:generate('x-snarl-token'), default, User).
+    add(Realm, oauth2_token:generate([]), default, User).
 
 
 add(Realm, Timeout, User) ->
-    add(Realm, oauth2_token:generate('x-snarl-token'), Timeout, User).
+    add(Realm, oauth2_token:generate([]), Timeout, User).
 
 add(Realm, Token, Timeout, User) ->
     case do_write(Realm, Token, add, {Timeout, User}) of

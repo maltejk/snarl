@@ -10,6 +10,8 @@
      fifo_db,
      fifo_dt,
      fifo_utils,
+     fifo_spec,
+     ranch,
      folsom_ddb,
      mdns_server_lib,
      lager,

@@ -62,6 +62,8 @@
           sync_tree
          }).
 
+-type state() :: #state{}.
+
 %%%===================================================================
 %%% AAE
 %%%===================================================================
@@ -181,6 +183,9 @@ init([Partition]) ->
 %%% General
 %%%===================================================================
 
+-type action() :: create | update | destroy.
+-spec insert(action(), binary(), binary(), binary(), pos_integer(), term(), state()) ->
+                    state().
 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, State) ->
     State1 = insert1(Action, Realm, OrgID, Resource, Timestamp, Metadata, State),
     {Res, State2} = for_resource(Realm, OrgID, Resource, State1),
@@ -278,7 +283,7 @@ handle_command({hashtree_pid, Node}, _, State) ->
     end;
 
 handle_command({rehash, {Realm, {OrgID, Resource}}}, _,
-               State=#vstate{hashtrees=HT}) when is_binary(Realm) ->
+               State=#state{hashtrees=HT}) when is_binary(Realm) ->
     case for_resource(Realm, OrgID, Resource, State) of
         {[], State1} ->
             %% Make sure hashtree isn't tracking deleted data
@@ -328,26 +333,25 @@ handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
         fun() ->
                 case file:list_dir(BasePath) of
                     {ok, Realms} when length(Realms) > 0 ->
-                        lists:foldl(
-                          fun(Realm, AccR) ->
-                                  RealmPath = filename:join([BasePath, Realm]),
-                                  case file:list_dir(RealmPath) of
-                                      {ok, Orgs} when length(Orgs) > 0 ->
-                                          lists:foldl(fun (Org, AccO) ->
-                                                              handle_org(RealmPath, Fun, Realm, Org, AccO)
-                                                      end, AccR, Orgs);
-                                      _ ->
-                                          AccR
-                                  end
-                          end, Acc0, Realms);
+                        R = lists:foldl(
+                              fun(Realm, AccR) ->
+                                      RealmPath = filename:join([BasePath, Realm]),
+                                      case file:list_dir(RealmPath) of
+                                          {ok, Orgs} when length(Orgs) > 0 ->
+                                              lists:foldl(
+                                                fun (Org, AccO) ->
+                                                        handle_org(RealmPath, Fun, Realm, Org, AccO)
+                                                end, AccR, Orgs);
+                                          _ ->
+                                              AccR
+                                      end
+                              end, Acc0, Realms),
+                        riak_core_vnode:reply(Sender, R);
                     _ ->
-                        Acc0
+                        riak_core_vnode:reply(Sender, Acc0)
                 end
         end,
-    FinishFun = fun(Acc) ->
-                        riak_core_vnode:reply(Sender, Acc)
-                end,
-    {async, {fold, AsyncWork, FinishFun}, Sender, State#state{dbs = #{}}}.
+    {async, AsyncWork, Sender, State#state{dbs = #{}}}.
 
 handle_org(RealmPath, Fun, Realm, Org, Acc) ->
     OrgPath = filename:join([RealmPath, Org]),
@@ -392,7 +396,11 @@ a2a(<<"destroy">>) -> destroy.
 handle_handoff_command(?FOLD_REQ{} = FR, Sender, State) ->
     handle_command(FR, Sender, State);
 
-handle_handoff_command({get, _ReqID, _Vm} = Req, Sender, State) ->
+
+handle_handoff_command({get, _ReqID, _Realm, _OrgID, _Resource} = Req, Sender, State) ->
+    handle_command(Req, Sender, State);
+
+handle_handoff_command({get, _ReqID, _Realm, _OrgID} = Req, Sender, State) ->
     handle_command(Req, Sender, State);
 
 handle_handoff_command(_Req, _Sender, State) ->
@@ -469,14 +477,10 @@ handle_coverage(list, _KeySpaces, Sender,
                         ok;
                     _ ->
                         ok
-                end
-        end,
-    FinishFun = fun(_Acc) ->
-                        riak_core_vnode:reply(Sender, {done, {P, node()}})
-
                 end,
-
-    {async, {fold, AsyncWork, FinishFun}, Sender, State#state{dbs = #{}}}.
+                riak_core_vnode:reply(Sender, {done, {P, node()}})
+        end,
+    {async, AsyncWork, Sender, State#state{dbs = #{}}}.
 
 handle_list(Sender, RealmPath, Realm, Org) ->
     OrgPath = filename:join([RealmPath, Org]),

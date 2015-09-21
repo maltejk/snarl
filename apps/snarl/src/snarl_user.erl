@@ -95,11 +95,6 @@ find_key(Realm, KeyID) ->
       {snarl, user, find_key},
       snarl_2i, get, [Realm, ?KEY_2i, KeyID]).
 
--spec auth(Realm::binary(), User::binary(), Passwd::binary(),
-           OTP::binary()|basic) ->
-                  not_found |
-                  {error, timeout} |
-                  {ok, User::fifo:user_id()}.
 
 auth(Realm, User, Passwd) ->
     case lookup(Realm, User) of
@@ -113,6 +108,13 @@ auth(Realm, User, Passwd) ->
         E ->
             E
     end.
+
+-spec auth(Realm::binary(), User::binary(), Passwd::binary(),
+           OTP::binary()|undefined) ->
+                  not_found |
+                  {otp_required, yubikey, UUID::binary()} |
+                  {error, timeout} |
+                  {ok, User::fifo:user_id()}.
 
 auth(Realm, User, Passwd, OTP) ->
     case lookup(Realm, User) of
