@@ -62,7 +62,7 @@ api_token(Realm, User, Scope, Comment) ->
                         Context),
                     snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
                                          Scope, Comment),
-                    {ok, TokenID, AccessToken};
+                    {ok, {TokenID, AccessToken}};
                 E ->
                     E
             end
