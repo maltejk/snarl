@@ -486,7 +486,7 @@ message({role, revoke_prefix, Realm, Role, Prefix}, State) ->
 
 message({oauth2, scope, Realm}, State) ->
     {reply,
-     snarl_oauth:scope(Realm),
+     {ok, snarl_oauth:scope(Realm)},
      State};
 
 message({oauth2, scope, Realm, Subscope}, State) ->

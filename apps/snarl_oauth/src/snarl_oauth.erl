@@ -14,7 +14,7 @@
              permissions => list()
             }.
 
--spec scope(binary()) -> [scope()].
+-spec scope(binary()) -> [fifo:scope_map()].
 scope(Realm) ->
     case riak_core_metadata:get({<<"oauth">>, Realm}, <<"scope">>) of
         undefined ->
@@ -23,7 +23,7 @@ scope(Realm) ->
             [update_scope(S) || S <- Ss]
     end.
 
--spec scope(binary(), binary()) -> [scope()].
+-spec scope(binary(), binary()) -> [fifo:scope_map()].
 
 scope(Realm, Subscope) ->
     Set = oauth2_priv_set:new(Subscope),
