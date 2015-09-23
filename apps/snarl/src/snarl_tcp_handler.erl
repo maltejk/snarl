@@ -491,7 +491,7 @@ message({oauth2, scope, Realm}, State) ->
 
 message({oauth2, scope, Realm, Subscope}, State) ->
     {reply,
-     snarl_oauth:scope(Realm, Subscope),
+     {ok, snarl_oauth:scope(Realm, Subscope)},
      State};
 
 %%-export([authorize_password/3]).
