@@ -1,18 +1,18 @@
-[0m├─ bcrypt─0.0.0+build.89.ref464e423
+[0m├─ bcrypt─0.5.0.3+build.5.ref464e423
 ├─ bitcask─1.7.0
 │  └─ otp_compat─1.0.0
-├─ clique─0.0.0+build.140.ref8067df5
-├─ cuttlefish─0.0.0+build.479.reff5f6fdc
+├─ clique─0.3.1+build.3.ref8067df5
+├─ cuttlefish─2.0.0rc2+build.69.reff5f6fdc
 │  ├─ getopt─0.4.3
-│  └─ neotoma─0.0.0+build.125.ref760928e
+│  └─ neotoma─1.7.3
 ├─ edown─0.7+build.6.refc770057
 ├─ eper─0.94.0
-├─ esqlite─0.1.0
+├─ esqlite─0.1.1
 ├─ fifo_db─0.1.7
-│  └─ eleveldb─0.0.0+build.494.refa36dbd6
-├─ fifo_dt─0.1.52
+│  └─ eleveldb─2.1.0.0
+├─ fifo_dt─0.1.54
 │  └─ riak_dt─0.0.0+build.307.reff7981d4
-├─ fifo_spec─0.1.20
+├─ fifo_spec─0.1.21
 ├─ fifo_utils─0.1.13
 ├─ folsom_ddb─0.1.16
 │  └─ ddb_client─0.1.12
@@ -32,18 +32,18 @@
 ├─ oauth2─0.6.0
 ├─ rankmatcher─0.1.2
 ├─ recon─2.2.1
-├─ riak_core─0.0.0+build.1790.refe41fba0
+├─ riak_core─fifo-0.4.4+build.305.ref088de5d
 │  ├─ basho_stats─1.0.3
 │  ├─ chash─0.1.1
-│  ├─ exometer_core─0.0.0+build.19.refb47a5d6
-│  │  ├─ folsom─0.0.0+build.292.ref7294452
-│  │  │  └─ bear─0.0.0+build.11.refda820a1
-│  │  ├─ parse_trans─0.0.0+build.106.ref82cc002
-│  │  └─ setup─0.0.0+build.79.ref51ee7c9
-│  ├─ pbkdf2─0.0.0+build.2676.ref7076584
-│  ├─ poolboy─0.0.0+build.124.ref8bb45fb
+│  ├─ exometer_core─1.0.0-basho2
+│  │  ├─ folsom─0.7.4p5
+│  │  │  └─ bear─0.1.3p1
+│  │  ├─ parse_trans─2.9
+│  │  └─ setup─1.4
+│  ├─ pbkdf2─2.0.0
+│  ├─ poolboy─0.8.1p3
 │  └─ riak_sysmon─2.0.0
-├─ riak_ensemble─0.0.0+build.159.refa62b0cc
+├─ riak_ensemble─2.1.1+build.26.refa62b0cc
 ├─ snarl─0.6.2
 ├─ snarl_oauth─0.1.0
 ├─ uuid─0.4.7
