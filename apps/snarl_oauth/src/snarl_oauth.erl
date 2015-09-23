@@ -14,7 +14,7 @@
              permissions => list()
             }.
 
--spec scope(binary()) -> [scope()].
+-spec scope(binary()) -> [fifo:scope_map()].
 scope(Realm) ->
     case riak_core_metadata:get({<<"oauth">>, Realm}, <<"scope">>) of
         undefined ->
@@ -23,7 +23,7 @@ scope(Realm) ->
             [update_scope(S) || S <- Ss]
     end.
 
--spec scope(binary(), binary()) -> [scope()].
+-spec scope(binary(), binary()) -> [fifo:scope_map()].
 
 scope(Realm, Subscope) ->
     Set = oauth2_priv_set:new(Subscope),
@@ -48,7 +48,8 @@ add_permission(Realm, Scope, Permission) ->
     case [S || S = #{scope := Name} <- Scopes, Name =:= Scope] of
         [] ->
             {error, not_found};
-        [{Scope, Description, Dflt, Permissions}] ->
+        [#{scope := Scope, desc := Description,
+           default := Dflt, permissions := Permissions}] ->
             Scopes1 = scopes_without(Scopes, Scope),
             Permissions2 = [Permission|Permissions],
             Scopes2 = [{Scope, Description, Dflt, Permissions2} | Scopes1],
@@ -74,7 +75,8 @@ default(Realm, Scope) ->
     case [S || S = #{scope := Name} <- Scopes, Name =:= Scope] of
         [] ->
             {error, not_found};
-        [{Scope, Description, Dflt, Permissions}] ->
+        [#{scope := Scope, desc := Description,
+           default := Dflt, permissions := Permissions}] ->
             Scopes1 = scopes_without(Scopes, Scope),
             Scopes2 = [{Scope, Description, not Dflt, Permissions} | Scopes1],
             riak_core_metadata:put({<<"oauth">>, Realm}, <<"scope">>, Scopes2)

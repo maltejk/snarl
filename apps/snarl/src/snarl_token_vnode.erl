@@ -292,9 +292,9 @@ handle_coverage({list, Realm, ReqID}, _KeySpaces, _Sender, State) ->
     %% at it.
     Ks1 = bitcask:fold(State#state.db,
                        fun (RK, V, Acc) ->
-                               case term_to_binary(RK) of
+                               case binary_to_term(RK) of
                                    {R, K} when R =:= Realm ->
-                                       Obj = term_to_binary(V),
+                                       Obj = binary_to_term(V),
                                        case ft_obj:val(Obj) of
                                            {Exp, _V} when Exp > T0 ->
                                                [K | Acc];
@@ -310,7 +310,7 @@ handle_coverage({list, Realm, ReqID}, _KeySpaces, _Sender, State) ->
     %% timeouts here.
     Ks = bitcask:fold_keys(State#state.api_db,
                            fun (RK, Acc) ->
-                                   case term_to_binary(RK) of
+                                   case binary_to_term(RK) of
                                        {R, K} when R =:= Realm ->
                                            [K | Acc];
                                        _ ->

@@ -24,7 +24,9 @@ init(Prot, []) ->
         fifo:snarl_user_message() |
         fifo:snarl_org_message() |
         fifo:snarl_role_message() |
-        fifo:snarl_token_message().
+        fifo:snarl_token_message() |
+        fifo:snarl_acc_message() |
+        fifo:snarl_oauth_message().
 
 -spec message(message(), #state{}) ->
                      {noreply, #state{}} |
@@ -484,7 +486,7 @@ message({role, revoke_prefix, Realm, Role, Prefix}, State) ->
 
 message({oauth2, scope, Realm}, State) ->
     {reply,
-     snarl_oauth:scope(Realm),
+     {ok, snarl_oauth:scope(Realm)},
      State};
 
 message({oauth2, scope, Realm, Subscope}, State) ->

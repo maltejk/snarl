@@ -158,34 +158,24 @@ waiting({ok, ReqID, IdxNode, Obj},
     SD = SD0#state{num_r=NumR,replies=Replies},
     if
         NumR >= R ->
-            SD1 = case merge(Replies) of
-                      not_found ->
-                          %% We do not want to return not_found unless we have all
-                          %% the replies
-                          %% TODO: is this a good idea?
-                          SD;
-                      Reply ->
-
-                          ?DT_READ_FOUND_RETURN(SD0#state.accounting, SD0#state.op),
-                          From ! {ReqID, ok, Reply},
-                          SD#state{has_send = true}
-                  end,
+            Reply = merge(Replies),
             if
                 %% If we have all repliesbut do not send yet it's not found
-                NumR =:= N andalso not SD1#state.has_send ->
-                    From ! {ReqID, ok, not_found},
-                    {next_state, finalize, SD1#state{has_send = true}, 0};
+                NumR =:= N andalso not SD#state.has_send ->
+                    ?DT_READ_FOUND_RETURN(SD0#state.accounting, SD0#state.op),
+                    From ! {ReqID, ok, Reply},
+                    {next_state, finalize, SD#state{has_send = true}, 0};
                 %% If we have all replies and also send we're good
                 NumR =:= N ->
-                    {next_state, finalize, SD1, 0};
+                    {next_state, finalize, SD, 0};
                 %% If we do not have all replies and not send yet we want
                 %% to keep waiting
-                not SD1#state.has_send ->
-                    {next_state, waiting, SD1};
+                not SD#state.has_send ->
+                    {next_state, waiting, SD};
                 %% If we have not all replies but already send the messag
                 %% on we've found a object and now can wait for the rest.
                 true ->
-                    {next_state, wait_for_n, SD1, Timeout}
+                    {next_state, wait_for_n, SD, Timeout}
             end;
         true ->
             {next_state, waiting, SD}
@@ -245,7 +235,7 @@ terminate(_Reason, _SN, _SD) ->
 %% @pure
 %%
 %% @doc Given a list of `Replies' return the merged value.
--spec merge([vnode_reply()]) -> fifo:obj() | not_found.
+-spec merge([vnode_reply()]) -> [term()].
 merge(Replies) ->
     Data = [Obj || {_,Obj} <- Replies],
     Flattened = lists:flatten(Data),
@@ -283,7 +273,7 @@ different(A) -> fun(B) -> (A =/= B) end.
 %%
 %% @doc Repair any vnodes that do not have the correct object.
 -spec repair({binary(), binary()}, [term()], [vnode_reply()], any()) -> ok.
-repair(_, _, [], _) -> io;
+repair(_, _, [], _) -> ok;
 
 repair(StatName, MObj, [{IdxNode,Obj}|T], Val) ->
     case MObj =:= Obj of
