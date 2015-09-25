@@ -112,9 +112,9 @@ get_ring([]) ->
     io:format("--------------------"
               "--------------------"
               "----------"
-              " ---------------~n", []),
+              " ------------------------------~n", []),
     lists:map(fun({K, H}) ->
-                      io:format("~50b ~-15s~n", [K, H])
+                      io:format("~50b ~-30s~n", [K, H])
               end, CHash),
     ok.
 
@@ -200,10 +200,10 @@ list_user([RealmS]) ->
     Realm = list_to_binary(RealmS),
     {ok, Users} = snarl_user:list(Realm),
     io:format("UUID                                 Name~n"),
-    io:format("------------------------------------ ---------------~n", []),
+    io:format("------------------------------------ ------------------------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_user:get(Realm, UUID),
-                      io:format("~36s ~-15s~n",
+                      io:format("~36s ~-30s~n",
                                 [UUID, ft_user:name(User)])
               end, Users),
     ok.
@@ -211,10 +211,10 @@ list_role([RealmS]) ->
     Realm = list_to_binary(RealmS),
     {ok, Users} = snarl_role:list(Realm),
     io:format("UUID                                 Name~n"),
-    io:format("------------------------------------ ---------------~n", []),
+    io:format("------------------------------------ ------------------------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_role:get(Realm, UUID),
-                      io:format("~36s ~-15s~n",
+                      io:format("~36s ~-30s~n",
                                 [UUID, ft_role:name(User)])
               end, Users),
     ok.
