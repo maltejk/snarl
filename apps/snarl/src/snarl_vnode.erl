@@ -398,7 +398,15 @@ reply(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
 
 get(Realm, UUID, State) ->
     Bucket = mk_pfx(Realm, State),
-    ?FM(fifo_db, get, [State#vstate.db, Bucket, UUID]).
+    try
+        ?FM(fifo_db, get, [State#vstate.db, Bucket, UUID])
+    catch
+        E1:E2 ->
+            lager:error("[fifo_db] Failed to get object ~s:~s/~s ~p:~p ~w",
+                        [Realm, State#vstate.bucket, UUID, E1, E2,
+                         erlang:get_stacktrace()]),
+            not_found
+    end.
 
 handle_info(retry_create_hashtree,
             State=#vstate{service=Srv, hashtrees=undefined, partition=Idx,
