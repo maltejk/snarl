@@ -14,10 +14,10 @@
 │  └─ riak_dt─0.0.0+build.307.reff7981d4
 ├─ fifo_spec─0.1.21
 ├─ fifo_utils─0.1.13
-├─ folsom_ddb─0.1.16
-│  └─ ddb_client─0.1.12
-│     ├─ dproto─0.1.9
-│     └─ mmath─0.1.7
+├─ folsom_ddb─0.1.18
+│  └─ ddb_client─0.1.14
+│     ├─ dproto─0.1.10
+│     └─ mmath─0.1.14
 ├─ jsx─1.4.5
 ├─ jsxd─0.1.10
 ├─ lager─3.0.1
