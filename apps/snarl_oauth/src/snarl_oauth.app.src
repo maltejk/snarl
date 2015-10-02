@@ -1,6 +1,6 @@
 {application, snarl_oauth,
  [
-  {description, ""},
+  {description, "Snarl OAuth backend"},
   {vsn, "0.1.0"},
   {registered, []},
   {applications, [
