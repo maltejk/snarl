@@ -44,7 +44,7 @@
 │  ├─ poolboy─0.8.1p3
 │  └─ riak_sysmon─2.0.0
 ├─ riak_ensemble─2.1.0+build.159.refa62b0cc
-├─ snarl─0.6.2
+├─ snarl─0.7.0
 ├─ snarl_oauth─0.1.0
 ├─ uuid─0.4.7
 └─ yubico─0.1.3
