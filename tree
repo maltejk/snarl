@@ -13,7 +13,7 @@
 ├─ fifo_dt─0.1.54
 │  └─ riak_dt─0.0.0+build.307.reff7981d4
 ├─ fifo_spec─0.1.21
-├─ fifo_utils─0.1.15
+├─ fifo_utils─0.1.16
 ├─ folsom_ddb─0.1.19
 │  └─ ddb_client─0.1.16
 │     ├─ dproto─0.1.12
