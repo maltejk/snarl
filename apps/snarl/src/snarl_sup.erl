@@ -120,7 +120,26 @@ init(_Args) ->
           permanent, 5000, worker, []},
          {snarl_sync_tree, {snarl_sync_tree, start_link, []},
           permanent, 5000, worker, []}],
+    spawn(fun delay_mdns_anouncement/0),
     {ok,
      {{one_for_one, 5, 10},
       VNodeMasters ++ FSMs ++ AAE ++ AdditionalServices
      }}.
+
+%% We delay the service anouncement, first we wait
+%% for sniffle to start to make sure the riak
+%% core services call returns all needed services
+%% then we'll go through each of the services
+%% wait for startup.
+%% Once they are started we enable the mdns.
+
+delay_mdns_anouncement() ->
+    riak_core:wait_for_application(snarl),
+    Services = riak_core_node_watcher:services(),
+    delay_mdns_anouncement(Services).
+delay_mdns_anouncement([]) ->
+    lager:info("[mdns] Enabling mDNS annoucements."),
+    mdns_server_fsm:start();
+delay_mdns_anouncement([S | R]) ->
+    riak_core:wait_for_service(S),
+    delay_mdns_anouncement(R).

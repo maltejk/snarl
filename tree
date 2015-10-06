@@ -24,8 +24,8 @@
 │  └─ goldrush─0.1.7
 ├─ lager_watchdog─0.1.10
 ├─ libsnarlmatch─0.1.6
-├─ mdns_server_lib─0.1.19
-│  ├─ mdns_server─0.1.1
+├─ mdns_server_lib─0.2.0
+│  ├─ mdns_server─0.2.0
 │  └─ ranch─1.1.0
 ├─ meck─0.8.2
 ├─ merklet─1.0.0
