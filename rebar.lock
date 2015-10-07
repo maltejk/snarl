@@ -83,7 +83,7 @@
   {git,"https://github.com/QBurstPoland/lager_logstash_backend.git",
        {ref,"069f5c803b5372fb7604789ee64bcbfef78e493a"}},
   1},
- {<<"lager_watchdog">>,{pkg,<<"lager_watchdog">>,<<"0.1.10">>},0},
+ {<<"lager_watchdog">>,{pkg,<<"lager_watchdog">>,<<"0.1.10">>},1},
  {<<"libsnarlmatch">>,{pkg,<<"libsnarlmatch">>,<<"0.1.6">>},0},
  {<<"mdns_server">>,{pkg,<<"mdns_server">>,<<"0.2.0">>},1},
  {<<"mdns_server_lib">>,{pkg,<<"mdns_server_lib">>,<<"0.2.0">>},0},
