@@ -11,10 +11,11 @@
 ├─ fifo_db─0.1.7
 │  └─ eleveldb─2.1.0.0
 ├─ fifo_dt─0.1.54
-│  └─ riak_dt─0.0.0+build.307.reff7981d4
+│  └─ riak_dt─2.1.0
 ├─ fifo_lager─0.1.0
 │  ├─ lager_graylog─1
-│  └─ lager_logstash_backend─0.0.2
+│  ├─ lager_logstash_backend─0.0.2
+│  └─ lager_watchdog─0.1.10
 ├─ fifo_spec─0.1.21
 ├─ fifo_utils─0.1.16
 ├─ folsom_ddb─0.1.19
@@ -23,9 +24,8 @@
 │     └─ mmath─0.1.15
 ├─ jsx─1.4.5
 ├─ jsxd─0.1.10
-├─ lager─3.0.1
-│  └─ goldrush─0.1.7
-├─ lager_watchdog─0.1.10
+├─ lager─2.1.1
+│  └─ goldrush─0.1.6
 ├─ libsnarlmatch─0.1.6
 ├─ mdns_server_lib─0.2.0
 │  ├─ mdns_server─0.2.0
