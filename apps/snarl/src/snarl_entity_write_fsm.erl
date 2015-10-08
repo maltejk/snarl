@@ -98,9 +98,6 @@ write({Node, VNode, System}, {Realm, Entity}, Op, Val) ->
         {ReqID, ok, Result} ->
             snarl_sync:sync_op(Node, VNode, System, Realm, Entity, Op, Val),
             {ok, Result}
-            %%;
-            %%Other ->
-            %%lager:error("Unknown write reply: ~p", [Other])
     after ?DEFAULT_TIMEOUT ->
             {error, timeout}
     end.
@@ -175,7 +172,6 @@ waiting({ok, ReqID, Reply},
         SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    lager:debug("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= W ->
             if
