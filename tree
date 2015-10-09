@@ -18,8 +18,8 @@
 │  └─ lager_watchdog─0.1.10
 ├─ fifo_spec─0.1.21
 ├─ fifo_utils─0.1.16
-├─ folsom_ddb─0.1.19
-│  └─ ddb_client─0.1.16
+├─ folsom_ddb─0.1.20
+│  └─ ddb_client─0.1.17
 │     ├─ dproto─0.1.12
 │     └─ mmath─0.1.15
 ├─ jsx─1.4.5
