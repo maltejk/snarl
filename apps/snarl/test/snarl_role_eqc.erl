@@ -71,7 +71,6 @@ command(S) ->
            {call, ?M, wipe, [maybe_a_uuid(S)]},
            {call, ?M, get, [maybe_a_uuid(S)]},
            {call, ?M, lookup, [maybe_a_uuid(S)]},
-           {call, ?M, lookup_, [maybe_a_uuid(S)]},
            {call, ?M, raw, [maybe_a_uuid(S)]},
 
            %% List
@@ -120,9 +119,6 @@ add(UUID, Role) ->
 
 lookup({N, _}) ->
     ?RO:lookup(?REALM, N).
-
-lookup_({N, _}) ->
-    ?RO:lookup_(?REALM, N).
 
 ?FWD2(grant).
 ?FWD2(revoke).
@@ -177,9 +173,6 @@ do_metadata(S = #state{metadata=Ms}, UUID, K, V) ->
                     end
             end
     end.
-
-dynamic_precondition(S, {call,snarl_role_eqc, lookup_, [{Name, UUID}]}) ->
-    dynamic_precondition(S, {call,snarl_role_eqc, lookup, [{Name, UUID}]});
 
 dynamic_precondition(S, {call,snarl_role_eqc, lookup, [{Name, UUID}]}) ->
     case lists:keyfind(Name, 1, S#state.added) of
@@ -247,12 +240,6 @@ postcondition(S, {call, _, lookup, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
 
 postcondition(S, {call, _, lookup, [{_, UUID}]}, {ok, Result}) ->
-    {ok, UUID} == jsxd:get(<<"uuid">>, Result) andalso has_uuid(S, UUID);
-
-postcondition(S, {call, _, lookup_, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, lookup_, [{_, UUID}]}, {ok, Result}) ->
     UUID == ft_role:uuid(Result) andalso has_uuid(S, UUID);
 
 postcondition(S, {call, _, raw, [{_, UUID}]}, not_found) ->

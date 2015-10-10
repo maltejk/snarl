@@ -1,12 +1,15 @@
 -module(snarl_token).
 -include("snarl.hrl").
+-include_lib("snarl_oauth/include/snarl_oauth.hrl").
+
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
 -export([
          get/2,
-         add/2,
+         add/2, add/3, add/4,
          delete/2,
-         reindex/2
+         reindex/2,
+         api_token/4
         ]).
 
 -ignore_xref([
@@ -20,33 +23,68 @@
           Mod, Fun, Args)).
 
 %% Public API
+reindex(_, _) -> ok.
+
 -spec get(binary(), fifo:token()) ->
                  not_found |
                  {ok, fifo:user_id()}.
-
-reindex(_, _) -> ok.
-
 get(Realm, Token) ->
     R = ?FM(get, snarl_entity_read_fsm, start,
             [{snarl_token_vnode, snarl_token}, get, {Realm, Token}]),
     case R of
         {ok, not_found} ->
-            lager:debug("[token:~s] ~s not found.", [Realm, Token]),
             not_found;
-        _ ->
-            lager:debug("[token:~s] ~s found.", [Realm, Token]),
-            R
+        {ok, {_Exp, Value}} ->
+            {ok, Value}
     end.
 
+
+api_token(Realm, User, Scope, Comment) ->
+    case snarl_oauth_backend:verify_scope(Realm, Scope) of
+        false ->
+            {error, bad_scope};
+        true ->
+            case snarl_user:get(Realm, User) of
+                {ok, _UserObj} ->
+                    %% This os mostly copied from snarl_oauth:associate_access_token/3
+                    AccessToken = oauth2_token:generate([]),
+                    TokenID = uuid:uuid4s(),
+                    Expiery = infinity,
+                    Client = undefined,
+                    Context = [{<<"client">>, Client},
+                               {<<"resource_owner">>, User},
+                               {<<"expiry_time">>, Expiery},
+                               {<<"scope">>, Scope}],
+                    Type = access,
+                    add(Realm,
+                        {?ACCESS_TOKEN_TABLE, AccessToken},
+                        Expiery,
+                        Context),
+                    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
+                                         Scope, Comment),
+                    {ok, {TokenID, AccessToken}};
+                E ->
+                    E
+            end
+    end.
+
+
 add(Realm, User) ->
-    case do_write(Realm, uuid:uuid4s(), add, User) of
+    add(Realm, oauth2_token:generate([]), default, User).
+
+
+add(Realm, Timeout, User) ->
+    add(Realm, oauth2_token:generate([]), Timeout, User).
+
+add(Realm, Token, Timeout, User) ->
+    case do_write(Realm, Token, add, {Timeout, User}) of
         {ok, Token} ->
-            lager:debug("[token:~s/~s] New token ~s.", [Realm, User, Token]),
             {ok, Token};
         E ->
-            lager:debug("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
+            lager:warning("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
             E
     end.
+
 
 delete(Realm, Token) ->
     lager:debug("[token:~s] deleted token ~s.", [Realm, Token]),

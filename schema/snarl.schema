@@ -1,23 +1,5 @@
 %% -*- erlang -*-
 
-%% @doc This section deals with Yubikey support a API key and
-%% client ID can be obtained from:
-%% https://upgrade.yubico.com/getapikey/
-
-%% @doc Yubico API client ID issued from the API key page,
-%% this shhould be a number
-{mapping, "yubico.client_id", "snarl.yubico_client_id",
- [{commented, "123"},
-  {datatype, string}]
-}.
-
-%% @doc The Secret key related that was issued along with
-%% the Yubico cleint ID.
-{mapping, "yubico.secret_key", "snarl.yubico_secret_key",
- [{commented, "..."},
-  {datatype, string}]
-}.
-
 %% @doc Datacenter Syncronisation settings, please keep in mind
 %% that for event replication only events from this server
 %% will be replicated, to replicate events from other servers
@@ -213,7 +195,7 @@
 %% the manual at http://bit.ly/1ciKRkS
 {mapping, "ring_size", "riak_core.ring_creation_size",
  [{datatype, integer},
-  {default, 8},
+  {default, 64},
   {commented, 64},
   {validators, ["ring_size"]}
  ]}.
@@ -284,5 +266,27 @@
 
 {mapping, "folsom_ddb.prefix", "folsom_ddb.prefix", [
     merge,
-    {default, "sniffle"}
+    {default, "snarl@127.0.0.1"}
+]}.
+
+%% @doc Schema directory
+{mapping, "schema_dir", "riak_core.schema_dirs",
+ [{default, "./share/schema"},
+  {datatype, string}]
+}.
+
+{translation,
+  "riak_core.schema_dirs",
+  fun(Conf) ->
+          D = cuttlefish:conf_get("schema_dir", Conf),
+          [D]
+  end
+}.
+
+%% @doc handoff.ip is the network address that Riak binds to for
+%% intra-cluster data handoff.
+{mapping, "handoff.ip", "riak_core.handoff_ip", [
+  {default, "127.0.0.1" },
+  {datatype, string},
+  {validators, ["valid_ipaddr"]}
 ]}.

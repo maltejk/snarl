@@ -98,7 +98,6 @@ command(S) ->
            {call, ?M, wipe, [maybe_a_uuid(S)]},
            {call, ?M, get, [maybe_a_uuid(S)]},
            {call, ?M, lookup, [maybe_a_uuid(S)]},
-           {call, ?M, lookup_, [maybe_a_uuid(S)]},
            {call, ?M, raw, [maybe_a_uuid(S)]},
            {call, ?M, passwd, [maybe_a_uuid(S), non_blank_string()]},
            {call, ?M, auth, [maybe_a_uuid(S), maybe_a_password(S)]},
@@ -171,9 +170,6 @@ add(UUID, User) ->
 
 lookup({N, _}) ->
     ?U:lookup(?REALM, N).
-
-lookup_({N, _}) ->
-    ?U:lookup_(?REALM, N).
 
 ?FWD2(grant).
 ?FWD2(revoke).
@@ -318,9 +314,6 @@ do_metadata(S = #state{metadata=Ms}, UUID, K, V) ->
                     end
             end
     end.
-
-dynamic_precondition(S, {call,snarl_user_eqc, lookup_, [{Name, UUID}]}) ->
-    dynamic_precondition(S, {call,snarl_user_eqc, lookup, [{Name, UUID}]});
 
 dynamic_precondition(S, {call,snarl_user_eqc, auth, [{Name, UUID}, _]}) ->
     dynamic_precondition(S, {call,snarl_user_eqc, lookup, [{Name, UUID}]});
@@ -501,13 +494,8 @@ postcondition(S, {call, _, lookup, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);
 
 postcondition(S, {call, _, lookup, [{_, UUID}]}, {ok, Result}) ->
-    {ok, UUID} == jsxd:get(<<"uuid">>, Result) andalso has_uuid(S, UUID);
-
-postcondition(S, {call, _, lookup_, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, lookup_, [{_, UUID}]}, {ok, Result}) ->
     UUID == ft_user:uuid(Result) andalso has_uuid(S, UUID);
+
 
 postcondition(S, {call, _, raw, [{_, UUID}]}, not_found) ->
     not has_uuid(S, UUID);

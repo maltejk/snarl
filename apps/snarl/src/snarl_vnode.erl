@@ -21,6 +21,7 @@
          hash_object/2,
          mk_reqid/0]).
 
+
 -ignore_xref([mkid/0, delete/2]).
 
 -define(FM(Mod, Fun, Args),
@@ -38,8 +39,7 @@ mkid(Actor) ->
     {mk_reqid(), Actor}.
 
 mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
+    erlang:system_time(nano_seconds).
 
 mk_bkt(#vstate{bucket = Bucket})
   when byte_size(Bucket) < 256 ->
@@ -73,7 +73,8 @@ init(Partition, Bucket, Service, VNode, StateMod) ->
     FoldWorkerPool = {pool, snarl_worker, WorkerPoolSize, []},
     {ok,
      #vstate{db=DB, hashtrees=HT, partition=Partition, node=node(),
-             service=Service, bucket=Bucket, state=StateMod, vnode=VNode},
+             service=Service, bucket=Bucket, state=StateMod, vnode=VNode,
+             sync_tree = snarl_sync_tree:get_tree(Service)},
      [FoldWorkerPool]}.
 
 list_keys(Realm, Sender, State = #vstate{db=DB}) ->
@@ -129,7 +130,8 @@ fold(Prefix, Fun, Acc0, Sender, State=#vstate{db=DB}) ->
 put(Realm, Key, Obj, State) when is_binary(Realm) ->
     Bucket = mk_pfx(Realm, State),
     ?FM(fifo_db, put, [State#vstate.db, Bucket, Key, Obj]),
-    snarl_sync_tree:update(State#vstate.service, {Realm, Key}, Obj),
+    snarl_sync_tree:update(State#vstate.sync_tree, State#vstate.service,
+                           {Realm, Key}, Obj),
     riak_core_aae_vnode:update_hashtree(
       Realm, Key, vc_bin(ft_obj:vclock(Obj)), State#vstate.hashtrees).
 
@@ -396,7 +398,15 @@ reply(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
 
 get(Realm, UUID, State) ->
     Bucket = mk_pfx(Realm, State),
-    ?FM(fifo_db, get, [State#vstate.db, Bucket, UUID]).
+    try
+        ?FM(fifo_db, get, [State#vstate.db, Bucket, UUID])
+    catch
+        E1:E2 ->
+            lager:error("[fifo_db] Failed to get object ~s:~s/~s ~p:~p ~w",
+                        [Realm, State#vstate.bucket, UUID, E1, E2,
+                         erlang:get_stacktrace()]),
+            not_found
+    end.
 
 handle_info(retry_create_hashtree,
             State=#vstate{service=Srv, hashtrees=undefined, partition=Idx,

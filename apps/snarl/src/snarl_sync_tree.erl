@@ -11,7 +11,8 @@
 -behaviour(gen_server).
 
 %% API
--export([start_link/0, insert/5, done/3, delete/3, get_tree/0, update/3]).
+-export([start_link/0, insert/5, done/3, delete/3, get_tree/0, update/4,
+         get_tree/1]).
 
 -ignore_xref([start_link/0]).
 
@@ -35,6 +36,9 @@
 %% @spec start_link() -> {ok, Pid} | ignore | {error, Error}
 %% @end
 %%--------------------------------------------------------------------
+get_tree(_Service) ->
+    whereis(snarl_sync_tree).
+
 start_link() ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [], []).
 
@@ -50,8 +54,8 @@ done(PID, System, Vsn) ->
 insert(PID, System, Vsn, ID, H) ->
     gen_server:cast(PID, {insert, System, Vsn, ID, H}).
 
-update(System, ID, Obj) ->
-    gen_server:cast(?SERVER, {update, System, ID, Obj}).
+update(PID, System, ID, Obj) ->
+    gen_server:cast(PID, {update, System, ID, Obj}).
 
 %%%===================================================================
 %%% gen_server callbacks
@@ -118,7 +122,6 @@ handle_cast({done, Sys, Version}, State = #state{tree = Tree}) ->
     Tree1 = [E || E = {{S, _}, {V, _}} <- Tree, V >= Version orelse S =/= Sys],
     {noreply, State#state{tree=Tree1}};
 handle_cast({insert, Sys, Vsn, ID, Hash}, State) ->
-    lager:debug("[sync] Insert: ~p(~p) <- ~p(~s)", [Sys, Vsn, ID, Hash]),
     {noreply, update_tree(Sys, ID, Hash, Vsn, State)};
 handle_cast(_Msg, State) ->
     {noreply, State}.
@@ -135,28 +138,32 @@ handle_cast(_Msg, State) ->
 %%--------------------------------------------------------------------
 handle_info(timeout, State = #state{version = Vsn}) ->
     Vsn1 = Vsn + 1,
-    Us = case snarl_user:list() of
-             {ok, UsX} ->
-                 UsX;
-             _ ->
-                 []
-         end,
-    Gs = case snarl_role:list() of
-             {ok, GsX} ->
-                 GsX;
-             _ ->
-                 ok
-         end,
-    Os = case snarl_org:list() of
-             {ok, OsX} ->
-                 OsX;
-             _ ->
-                 ok
-         end,
-    snarl_sync_read_fsm:update(snarl_user, Vsn1, Us, self()),
-    snarl_sync_read_fsm:update(snarl_role, Vsn1, Gs, self()),
-    snarl_sync_read_fsm:update(snarl_org, Vsn1, Os, self()),
+    case snarl_user:list() of
+        {ok, Us} ->
+            snarl_sync_read_fsm:update(snarl_user, Vsn1, Us, self());
+        _ ->
+            ok
+    end,
+    case snarl_role:list() of
+        {ok, Gs} ->
+            snarl_sync_read_fsm:update(snarl_role, Vsn1, Gs, self());
+        _ ->
+            ok
+    end,
+    case snarl_org:list() of
+        {ok, Os} ->
+            snarl_sync_read_fsm:update(snarl_org, Vsn1, Os, self());
+        _ ->
+            ok
+    end,
+    case snarl_accounting:list() of
+        {ok, Accs} ->
+            snarl_sync_read_fsm:update(snarl_accounting, Vsn1, Accs, self());
+        _ ->
+            ok
+    end,
     {noreply, State#state{version = Vsn1}};
+
 handle_info(_Info, State) ->
     {noreply, State}.
 
@@ -190,5 +197,4 @@ code_change(_OldVsn, State, _Extra) ->
 %%%===================================================================
 update_tree(Sys, ID, H, Vsn, State = #state{tree=Tree}) ->
     Tree1 = orddict:store({Sys, ID}, {Vsn, H}, Tree),
-    lager:debug("[sync] Tree is: ~p", [Tree1]),
     State#state{tree=Tree1}.

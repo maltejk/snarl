@@ -23,4 +23,13 @@ handle_work({fold, FoldFun, FinishFun}, _Sender, State) ->
         receiver_down -> ok;
         stop_fold -> ok
     end,
+    {noreply, State};
+
+handle_work(Fun, _Sender, State) when is_function(Fun) ->
+    try
+        Fun()
+    catch
+        receiver_down -> ok;
+        stop_fold -> ok
+    end,
     {noreply, State}.

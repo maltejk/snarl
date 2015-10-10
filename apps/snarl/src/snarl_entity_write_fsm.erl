@@ -48,7 +48,6 @@
                 entity :: string(),
                 op :: atom(),
                 vnode,
-                start,
                 system,
                 bucket,
                 w,
@@ -99,9 +98,6 @@ write({Node, VNode, System}, {Realm, Entity}, Op, Val) ->
         {ReqID, ok, Result} ->
             snarl_sync:sync_op(Node, VNode, System, Realm, Entity, Op, Val),
             {ok, Result}
-            %%;
-            %%Other ->
-            %%lager:error("Unknown write reply: ~p", [Other])
     after ?DEFAULT_TIMEOUT ->
             {error, timeout}
     end.
@@ -119,7 +115,6 @@ init([{Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val]) ->
                 entity=Entity,
                 op=Op,
                 vnode=VNode,
-                start=now(),
                 w = ?W,
                 n = ?N,
                 system=System,
@@ -161,7 +156,6 @@ execute(timeout, SD0=#state{req_id=ReqID,
 waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    lager:debug("Write(~p) ok", [NumW]),
     if
         NumW =:= W ->
             case From of
@@ -178,7 +172,6 @@ waiting({ok, ReqID, Reply},
         SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    lager:debug("Write(~p) reply: ~p", [NumW, Reply]),
     if
         NumW =:= W ->
             if

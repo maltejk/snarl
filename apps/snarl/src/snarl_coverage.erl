@@ -16,7 +16,7 @@
 -record(state, {replies, r, reqid, from}).
 
 start(VNodeMaster, NodeCheckService, Request) ->
-    ReqID = mk_reqid(),
+    ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, something_else},
       {VNodeMaster, NodeCheckService, Request}),
@@ -72,7 +72,3 @@ finish(How, State) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
-mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.

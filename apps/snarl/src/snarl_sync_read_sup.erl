@@ -55,10 +55,20 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    Element = {snarl_sync_read_fsm, {snarl_sync_read_fsm, start_link, []},
-               transient, infinity, worker, [snarl_sync_read_fsm]},
+    RestartStrategy = #{
+      strategy => simple_one_for_one,
+      intensity => 10,
+      period => 10
+     },
+    Element = #{
+      id => snarl_sync_read_fsm,
+      start => {snarl_sync_read_fsm, start_link, []},
+      restart => temporary,
+      shutdown => infinity,
+      type => worker,
+      modules => [snarl_sync_read_fsm]
+     },
     Children = [Element],
-    RestartStrategy = {simple_one_for_one, 5, 10},
     {ok, {RestartStrategy, Children}}.
 
 %%%===================================================================

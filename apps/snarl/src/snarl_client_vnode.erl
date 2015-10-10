@@ -1,4 +1,4 @@
--module(snarl_user_vnode).
+-module(snarl_client_vnode).
 -behaviour(riak_core_vnode).
 -behaviour(riak_core_aae_vnode).
 -include("snarl.hrl").
@@ -35,51 +35,42 @@
 %% Writes
 -export([
          add/4,
+         name/4,
          sync_repair/4,
-         import/4,
          repair/4,
-         add_key/4,
-         add_yubikey/4,
-         remove_yubikey/4,
+         add_uri/4,
+         remove_uri/4,
          delete/3,
          grant/4, revoke/4, revoke_prefix/4,
          join/4, leave/4,
-         passwd/4,
-         join_org/4, leave_org/4, select_org/4,
-         revoke_key/4,
-         set_metadata/4,
-         add_token/4,
-         remove_token/4
+         secret/4,
+         set_metadata/4
         ]).
 
 -ignore_xref([
-              add_yubikey/4,
-              remove_yubikey/4,
+              add_uri/4,
+              name/4,
+              remove_uri/4,
               add/4,
               sync_repair/4,
-              add_key/4,
-              find_key/3,
               delete/3,
               get/3,
               grant/4,
-              import/4,
               join/4,
               leave/4,
-              passwd/4,
+              secret/4,
               repair/4,
               revoke/4,
-              revoke_key/4,
               revoke_prefix/4,
               set_metadata/4,
               handle_info/2,
-              join_org/4, leave_org/4, select_org/4,
               start_vnode/1
              ]).
 
 
--define(SERVICE, snarl_user).
+-define(SERVICE, snarl_client).
 
--define(MASTER, snarl_user_vnode_master).
+-define(MASTER, snarl_client_vnode_master).
 
 %%%===================================================================
 %%% AAE
@@ -93,7 +84,7 @@ hash_object(Key, Obj) ->
 
 aae_repair(Realm, Key) ->
     lager:debug("AAE Repair: ~p", [Key]),
-    snarl_user:get(Realm, Key).
+    snarl_client:get(Realm, Key).
 
 %%%===================================================================
 %%% API
@@ -130,45 +121,21 @@ sync_repair(Preflist, ReqID, {Realm, UUID}, Obj) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add(Preflist, ReqID, {Realm, UUID}, User) ->
+add(Preflist, ReqID, {Realm, UUID}, Client) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, {Realm, UUID}, User},
+                                   {add, ReqID, {Realm, UUID}, Client},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-add_key(Preflist, ReqID, {Realm, UUID}, {KeyId, Key}) ->
+add_uri(Preflist, ReqID, {Realm, UUID}, URI) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add_key, ReqID, {Realm, UUID}, KeyId, Key},
+                                   {add_uri, ReqID, {Realm, UUID}, URI},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-revoke_key(Preflist, ReqID, {Realm, UUID}, KeyId) ->
+remove_uri(Preflist, ReqID, {Realm, UUID}, URI) ->
     riak_core_vnode_master:command(Preflist,
-                                   {revoke_key, ReqID, {Realm, UUID}, KeyId},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-add_yubikey(Preflist, ReqID, {Realm, UUID}, OTP) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {add_yubikey, ReqID, {Realm, UUID}, OTP},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-remove_yubikey(Preflist, ReqID, {Realm, UUID}, KeyId) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {remove_yubikey, ReqID, {Realm, UUID}, KeyId},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-add_token(Preflist, ReqID, {Realm, UUID}, Token) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {add_token, ReqID, {Realm, UUID}, Token},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-remove_token(Preflist, ReqID, {Realm, UUID}, Token) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {remove_token, ReqID, {Realm, UUID}, Token},
+                                   {remove_uri, ReqID, {Realm, UUID}, URI},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -178,24 +145,23 @@ set_metadata(Preflist, ReqID, {Realm, UUID}, Attributes) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-import(Preflist, ReqID, {Realm, UUID}, Import) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {import, ReqID, {Realm, UUID}, Import},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
 delete(Preflist, ReqID, E) ->
     riak_core_vnode_master:command(Preflist,
                                    {delete, ReqID, E},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-passwd(Preflist, ReqID, {Realm, UUID}, Val) ->
+secret(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
-                                   {password, ReqID, {Realm, UUID}, Val},
+                                   {secret, ReqID, {Realm, UUID}, Val},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
+name(Preflist, ReqID, {Realm, UUID}, Val) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {name, ReqID, {Realm, UUID}, Val},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
 
 join(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
@@ -209,23 +175,6 @@ leave(Preflist, ReqID, {Realm, UUID}, Val) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-join_org(Preflist, ReqID, {Realm, UUID}, Val) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {join_org, ReqID, {Realm, UUID}, Val},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-leave_org(Preflist, ReqID, {Realm, UUID}, Val) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {leave_org, ReqID, {Realm, UUID}, Val},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-select_org(Preflist, ReqID, {Realm, UUID}, Val) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {select_org, ReqID, {Realm, UUID}, Val},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
 grant(Preflist, ReqID, {Realm, UUID}, Val) ->
     riak_core_vnode_master:command(Preflist,
                                    {grant, ReqID, {Realm, UUID}, Val},
@@ -248,19 +197,19 @@ revoke_prefix(Preflist, ReqID, {Realm, UUID}, Val) ->
 %%% VNode
 %%%===================================================================
 init([Part]) ->
-    snarl_vnode:init(Part, <<"user">>, ?SERVICE, ?MODULE, ft_user).
+    snarl_vnode:init(Part, <<"client">>, ?SERVICE, ?MODULE, ft_client).
 
 %%%===================================================================
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, User}, _Sender, State) ->
-    User0 = ft_user:new(ID),
-    User1 = ft_user:name(ID, User, User0),
-    User2 = ft_user:uuid(ID, UUID, User1),
-    User3 = ft_user:grant(ID, [<<"users">>, UUID, <<"...">>], User2),
-    UserObj = ft_obj:new(User3, Coordinator),
-    snarl_vnode:put(Realm, UUID, UserObj, State),
+handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, ClientID}, _Sender, State) ->
+    Client0 = ft_client:new(ID),
+    Client1 = ft_client:client_id(ID, ClientID, Client0),
+    Client2 = ft_client:name(ID, ClientID, Client1),
+    Client3 = ft_client:uuid(ID, UUID, Client2),
+    ClientObj = ft_obj:new(Client3, Coordinator),
+    snarl_vnode:put(Realm, UUID, ClientObj, State),
     {reply, {ok, ReqID}, State};
 
 handle_command(Message, Sender, State) ->
@@ -303,32 +252,6 @@ is_empty(State) ->
 delete(State) ->
     snarl_vnode:delete(State).
 
-handle_coverage({find_key, Realm, KeyID}, _KeySpaces, Sender, State) ->
-    ID = snarl_vnode:mkid(findkey),
-    FoldFn = fun (UUID, O, [not_found]) ->
-                     U0 = ft_obj:val(O),
-                     U1 = ft_user:load(ID, U0),
-                     Ks = ft_user:keys(U1),
-                     try
-                         Ks1 = [key_to_id(K) || {_, K} <- Ks],
-                         case lists:member(KeyID, Ks1) of
-                             true ->
-                                 [UUID];
-                             _ ->
-                                 [not_found]
-                         end
-                     catch
-                         Exception:Reason ->
-                             lager:warning("[key_find:~s] ~p:~p -> ~p",
-                                           [UUID, Exception, Reason, Ks]),
-                             [not_found]
-                     end;
-                 (_U, _, Res) ->
-                     Res
-             end,
-    Prefix = snarl_vnode:mk_pfx(Realm, State),
-    snarl_vnode:fold(Prefix, FoldFn, [not_found], Sender, State);
-
 handle_coverage(Req, KeySpaces, Sender, State) ->
     snarl_vnode:handle_coverage(Req, KeySpaces, Sender, State).
 
@@ -344,24 +267,3 @@ handle_info(Msg, State) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
--ifndef(old_hash).
-key_to_id(Key) ->
-    case re:split(Key, " ") of
-        [_, ID0, _] ->
-            ID1 = base64:decode(ID0),
-            crypto:hash(md5,ID1);
-        _ ->
-            <<>>
-    end.
--else.
-key_to_id(Key) ->
-    case re:split(Key, " ") of
-        [_, ID0, _] ->
-            ID1 = base64:decode(ID0),
-            crypto:md5(ID1);
-        _ ->
-            <<>>
-    end.
--endif.
-

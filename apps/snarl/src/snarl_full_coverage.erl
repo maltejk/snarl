@@ -22,7 +22,7 @@ start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, false, _}) ->
     snarl_coverage:start(VNodeMaster, NodeCheckService, {list, Realm, Requirements});
 
 start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true, _}) ->
-    ReqID = mk_reqid(),
+    ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, Requirements},
       {VNodeMaster, NodeCheckService, Request}),
@@ -91,10 +91,6 @@ finish(How, State) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-
-mk_reqid() ->
-    {MegaSecs,Secs,MicroSecs} = erlang:now(),
-    (MegaSecs*1000000 + Secs)*1000000 + MicroSecs.
 
 raw_merge([{Score, V} | R]) ->
     raw_merge(R, Score, [V]).

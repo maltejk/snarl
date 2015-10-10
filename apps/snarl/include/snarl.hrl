@@ -7,7 +7,8 @@
           hashtrees,
           internal,
           state,
-          vnode
+          vnode,
+          sync_tree
          }).
 
 -define(N, application:get_env(snarl, n, 3)).

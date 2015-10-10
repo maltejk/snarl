@@ -13,7 +13,6 @@
          trigger/4,
          add_trigger/3, remove_trigger/3,
          remove_target/3,
-         resource_action/6,
          reindex/2,
          wipe/2
         ]).
@@ -77,9 +76,6 @@ trigger(Realm, Org, Event, Payload) ->
         R  ->
             R
     end.
-
-resource_action(Realm, Org, Resource, TimeStamp, Action, Opts) ->
-    do_write(Realm, Org,  resource_action, {Resource, TimeStamp, Action, Opts}).
 
 do_events(Realm, [{Event, Template}|Ts], Event, Payload, N) ->
     do_event(Realm, Template, Payload),

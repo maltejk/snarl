@@ -6,7 +6,7 @@
          sync_repair/3,
          list/0, list/1, list/3, list_/1,
          get/2, raw/2,
-         lookup/2, lookup_/2,
+         lookup/2,
          add/2, delete/2,
          grant/3, revoke/3,
          set_metadata/3,
@@ -55,22 +55,10 @@ import(Realm, Role, Data) ->
     do_write(Realm, Role, import, Data).
 
 -spec lookup(Realm::binary(), Role::binary()) ->
-                    not_found |
-                    {error, timeout} |
-                    {ok, Role::fifo:role()}.
-lookup(Realm, Role) ->
-    case lookup_(Realm, Role) of
-        {ok, Obj} ->
-            {ok, ft_role:to_json(Obj)};
-        R ->
-            R
-    end.
-
--spec lookup_(Realm::binary(), Role::binary()) ->
                      not_found |
                      {error, timeout} |
                      {ok, Role::fifo:role()}.
-lookup_(Realm, Role) ->
+lookup(Realm, Role) ->
     folsom_metrics:histogram_timed_update(
       {snarl, role, lookup},
       fun() ->
@@ -151,7 +139,7 @@ add(Realm, Role) ->
     create(Realm, UUID, Role).
 
 create(Realm, UUID, Role) ->
-    case snarl_role:lookup_(Realm, Role) of
+    case snarl_role:lookup(Realm, Role) of
         not_found ->
             ok = do_write(Realm, UUID, add, Role),
             snarl_2i:add(Realm, ?NAME_2i, Role, UUID),

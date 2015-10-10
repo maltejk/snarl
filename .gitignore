@@ -29,3 +29,5 @@ current_counterexample.eqc
 .rebar
 *.log
 *.log.?
+TEST-*
+_build
