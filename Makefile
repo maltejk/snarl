@@ -43,7 +43,7 @@ rel: update
 	sh generate_zabbix_template.sh
 	$(REBAR) as prod release
 
-package: deps rel
+package: rel
 	make -C rel/pkg package
 
 ###
