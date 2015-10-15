@@ -13,6 +13,7 @@
          aae_status/1,
          init_user/1
         ]).
+
 -export([add_role/1,
          delete_role/1,
          join_role/1,
@@ -122,7 +123,7 @@ db_get([CHashS, RealmS, BucketS, KeyS]) ->
     Realm = list_to_binary(RealmS),
     Bucket = list_to_binary(BucketS),
     Key = list_to_binary(KeyS),
-    Pfx = snarl_vnode:mk_pfx(Realm, Bucket),
+    Pfx = snarl_vnode:mk_pfx(Realm, #vstate{bucket = Bucket}),
     CHash = list_to_integer(CHashS),
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
     {_S, CHashs} = riak_core_ring:chash(RingData),
