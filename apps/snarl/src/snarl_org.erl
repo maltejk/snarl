@@ -40,7 +40,6 @@
 -type template() :: [binary()|placeholder].
 %% Public API
 
-
 -define(NAME_2i, {?MODULE, name}).
 
 reindex(Realm, UUID) ->
