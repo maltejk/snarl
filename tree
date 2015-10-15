@@ -10,7 +10,7 @@
 ├─ esqlite─0.1.1
 ├─ fifo_db─0.1.7
 │  └─ eleveldb─2.1.0.0
-├─ fifo_dt─0.1.54
+├─ fifo_dt─0.1.55
 │  └─ riak_dt─2.1.0
 ├─ fifo_lager─0.1.0
 │  ├─ lager_graylog─1
@@ -26,7 +26,7 @@
 ├─ jsxd─0.1.10
 ├─ lager─2.1.1
 │  └─ goldrush─0.1.6
-├─ libsnarlmatch─0.1.6
+├─ libsnarlmatch─0.1.7
 ├─ mdns_server_lib─0.2.0
 │  ├─ mdns_server─0.2.0
 │  └─ ranch─1.1.0
