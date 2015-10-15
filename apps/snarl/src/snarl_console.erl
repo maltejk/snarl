@@ -117,9 +117,12 @@ db_delete([CHashS, CatS, KeyS]) ->
             CHashA = list_to_atom(CHashS),
             fifo_db:delete(CHashA, Cat, Key)
     end.
-db_get([CHashS, CatS, KeyS]) ->
-    Cat = list_to_binary(CatS),
+
+db_get([CHashS, RealmS, BucketS, KeyS]) ->
+    Realm = list_to_binary(RealmS),
+    Bucket = list_to_binary(BucketS),
     Key = list_to_binary(KeyS),
+    Pfx = snarl_vnode:mk_pfx(Realm, Bucket),
     CHash = list_to_integer(CHashS),
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
     {_S, CHashs} = riak_core_ring:chash(RingData),
@@ -129,7 +132,7 @@ db_get([CHashS, CatS, KeyS]) ->
             error;
         _ ->
             CHashA = list_to_atom(CHashS),
-            case fifo_db:get(CHashA, Cat, Key) of
+            case fifo_db:get(CHashA, Pfx, Key) of
                 {ok, E} ->
                     io:format("~p~n", [E]);
                 _ ->
