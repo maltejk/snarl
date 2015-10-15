@@ -12,6 +12,7 @@
          import/3,
          trigger/4,
          add_trigger/3, remove_trigger/3,
+         resource_inc/4, resource_dec/4,
          remove_target/3,
          reindex/2,
          wipe/2
@@ -50,6 +51,12 @@ reindex(Realm, UUID) ->
         E ->
             E
     end.
+
+resource_inc(Realm, UUID, Resource, Val) ->
+    do_write(Realm, UUID, resource_inc, {Resource, Val}).
+
+resource_dec(Realm, UUID, Resource, Val) ->
+    do_write(Realm, UUID, resource_dec, {Resource, Val}).
 
 wipe(Realm, UUID) ->
     ?FM(wipe, snarl_coverage, start,
