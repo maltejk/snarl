@@ -11,7 +11,7 @@
 ├─ fifo_db─0.1.7
 │  └─ eleveldb─2.1.0.0
 ├─ fifo_dt─0.1.55
-│  └─ riak_dt─2.1.0
+│  └─ riak_dt─2.1.1
 ├─ fifo_lager─0.1.0
 │  ├─ lager_graylog─1
 │  ├─ lager_logstash_backend─0.0.2
@@ -25,7 +25,7 @@
 ├─ jsx─1.4.5
 ├─ jsxd─0.1.10
 ├─ lager─2.1.1
-│  └─ goldrush─0.1.6
+│  └─ goldrush─0.1.7
 ├─ libsnarlmatch─0.1.7
 ├─ mdns_server_lib─0.2.0
 │  ├─ mdns_server─0.2.0
@@ -46,8 +46,8 @@
 │  ├─ pbkdf2─2.0.0
 │  ├─ poolboy─0.8.1p3
 │  └─ riak_sysmon─2.0.0
-├─ riak_ensemble─2.1.0+build.159.refa62b0cc
-├─ snarl─0.7.0
+├─ riak_ensemble─2.1.0+build.161.reffe1e6c2
+├─ snarl─0.7.1
 ├─ snarl_oauth─0.1.0
 ├─ uuid─0.4.7
 └─ yubico─0.1.3
