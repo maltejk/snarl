@@ -74,6 +74,9 @@ message({org, resource, inc, Realm, Org, Res, Val}, State) ->
 message({org, resource, dec, Realm, Org, Res, Val}, State) ->
     {reply, snarl_org:resource_dec(Realm, Org, Res, Val), State};
 
+message({org, resource, remove, Realm, Org, Res}, State) ->
+    {reply, snarl_org:resource_remove(Realm, Org, Res), State};
+
 %%%===================================================================
 %%% User Functions
 %%%===================================================================
