@@ -118,16 +118,15 @@ resource_inc(Preflist, ReqID, UUID, {Resource, Value}) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-resource_remove(Preflist, ReqID, UUID, Resource) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {resource_remove, ReqID, UUID, Resource},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
-
-
 resource_dec(Preflist, ReqID, UUID, {Resource, Value}) ->
     riak_core_vnode_master:command(Preflist,
                                    {resource_dec, ReqID, UUID, Resource, Value},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+resource_remove(Preflist, ReqID, UUID, Resource) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {resource_remove, ReqID, UUID, Resource},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
