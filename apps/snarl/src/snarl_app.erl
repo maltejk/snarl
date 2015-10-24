@@ -79,7 +79,7 @@ init_folsom() ->
               delete, grant, revoke, revoke_prefix, set_metadata],
     OrgMs = [wipe, lookup, get, list, list_all, sync_repair, add_trigger,
              remove_target, remove_trigger, import, add, delete, set_metadata,
-             resource_inc, resource_dec],
+             resource_inc, resource_dec, resource_remove],
     S2i = [list, get, add, delete, sync_repair],
     TokenMs = [get, add, delete],
     AccMs = [create, update, destroy, get, get_range, list_all, sync_repair],
