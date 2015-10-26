@@ -236,7 +236,7 @@ handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Resource, Entries}, _Send
     {reply, {ok, ReqID}, State1};
 
 handle_command({repair, Realm, OrgID, Entries}, _Sender, State) ->
-    State1 = lists:foldl(fun({Resource, Timestamp, Action, Metadata}, SAcc) ->
+    State1 = lists:foldl(fun({Timestamp, Action, Resource, Metadata}, SAcc) ->
                                  insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
                          end, State, Entries),
     {noreply, State1};

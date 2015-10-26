@@ -368,8 +368,6 @@ handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
     {async, {fold, AsyncWork, FinishFun}, Sender, State};
 
 
-
-
 handle_command({Action, ID, {Realm, UUID}, Param1, Param2}, _Sender, State) ->
     change(Realm, UUID, Action, [Param1, Param2], ID, State);
 

@@ -12,6 +12,7 @@
          import/3,
          trigger/4,
          add_trigger/3, remove_trigger/3,
+         resource_inc/4, resource_dec/4, resource_remove/3,
          remove_target/3,
          reindex/2,
          wipe/2
@@ -39,7 +40,6 @@
 -type template() :: [binary()|placeholder].
 %% Public API
 
-
 -define(NAME_2i, {?MODULE, name}).
 
 reindex(Realm, UUID) ->
@@ -50,6 +50,15 @@ reindex(Realm, UUID) ->
         E ->
             E
     end.
+
+resource_inc(Realm, UUID, Resource, Val) ->
+    do_write(Realm, UUID, resource_inc, {Resource, Val}).
+
+resource_dec(Realm, UUID, Resource, Val) ->
+    do_write(Realm, UUID, resource_dec, {Resource, Val}).
+
+resource_remove(Realm, UUID, Resource) ->
+    do_write(Realm, UUID, resource_remove, Resource).
 
 wipe(Realm, UUID) ->
     ?FM(wipe, snarl_coverage, start,
