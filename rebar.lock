@@ -37,6 +37,7 @@
        {ref,"a36dbd609c742d9ad572c38c3464730da3419248"}},
   1},
  {<<"eper">>,{pkg,<<"eper">>,<<"0.94.0">>},0},
+ {<<"esel">>,{pkg,<<"esel">>,<<"0.1.0">>},0},
  {<<"esqlite">>,
   {git,"https://github.com/project-fifo/esqlite.git",
        {ref,"69fe3446101c9a9c1a1cc3f410b5e12bdd5eb6e2"}},

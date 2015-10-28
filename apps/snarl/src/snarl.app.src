@@ -26,7 +26,8 @@
      merklet,
      esqlite,
      yubico,
-     uuid
+     uuid,
+     esel
      ]},
   {mod, {snarl_app, []}},
   {env,
