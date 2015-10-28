@@ -296,4 +296,4 @@
 {mapping, "ssl.cert_validity", "snarl.cert_validity",
  [{default, "1y"},
   {commented, "1y"},
-  {datatype, {duration, days}}]}.
+  {datatype, {duration, d}}]}.
