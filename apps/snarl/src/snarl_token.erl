@@ -93,7 +93,7 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
                         Context),
                     snarl_user:add_token(Realm, User, TokenID, Type, Fingerprint, Expiery, Client,
                                          Scope, Comment),
-                    {ok, Cert};
+                    {ok, {TokenID, Cert}};
                 E ->
                     E
             end

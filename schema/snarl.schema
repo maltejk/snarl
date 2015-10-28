@@ -294,6 +294,6 @@
 %% @doc If a command is send to a sync partner and this trheashold
 %% is excided the connection will attempt to bounc and be reistablished.
 {mapping, "ssl.cert_validity", "snarl.cert_validity",
- [{default, "1y"},
-  {commented, "1y"},
+ [{default, "365d"},
+  {commented, "365d"},
   {datatype, {duration, d}}]}.
