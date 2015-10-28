@@ -137,7 +137,7 @@ message({user, sign_csr, Realm, User, Scope, Comment, CSR}, State) when
       is_binary(Realm),
       is_binary(User),
       is_list(Scope),
-      is_list(CSR),
+      is_binary(CSR),
       (is_binary(Comment) orelse Comment =:= undefined) ->
     {reply,
      snarl_token:ssl_cert_token(Realm, User, Scope, Comment, CSR),
