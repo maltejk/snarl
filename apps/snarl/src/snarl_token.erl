@@ -82,7 +82,7 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
                     Fingerprint = esel_cert:fingerprint(Cert),
                     Token = base64:encode(Fingerprint),
                     TokenID = uuid:uuid4s(),
-                    Expiery = Days*24*60*60,
+                    Expiery = Days*24*60*60 + erlang:system_time(seconds),
                     Client = undefined,
                     Context = [{<<"client">>, Client},
                                {<<"resource_owner">>, User},
