@@ -336,7 +336,7 @@ terminate(_Reason, #state{db=DBRef, api_db = APIDB}) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-get_api(Key, State = #state{api_tokens = Tokens0, db = DBRef}) ->
+get_api(Key, State = #state{api_tokens = Tokens0, api_db = DBRef}) ->
     case maps:find(Key, Tokens0) of
         error ->
             case bitcask:get(DBRef, Key) of
