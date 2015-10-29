@@ -80,7 +80,7 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
                     {ok, Days} = application:get_env(snarl, cert_validity),
                     {ok, Cert} = esel:sign_csr(Days, CSR),
                     Fingerprint = esel_cert:fingerprint(Cert),
-                    Token = base64:encode(Fingerprint),
+                    Token = Fingerprint,
                     TokenID = uuid:uuid4s(),
                     Expiery = Days*24*60*60 + erlang:system_time(seconds),
                     Client = undefined,
