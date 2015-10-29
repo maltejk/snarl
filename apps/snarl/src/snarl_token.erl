@@ -60,8 +60,9 @@ api_token(Realm, User, Scope, Comment) ->
                         {?ACCESS_TOKEN_TABLE, AccessToken},
                         Expiery,
                         Context),
-                    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
-                                         Scope, Comment),
+                    snarl_user:add_token(
+                      Realm, User, TokenID, Type, AccessToken, Expiery, Client,
+                      Scope, Comment),
                     {ok, {TokenID, AccessToken}};
                 E ->
                     E
@@ -79,6 +80,7 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
                     {ok, Days} = application:get_env(snarl, cert_validity),
                     {ok, Cert} = esel:sign_csr(Days, CSR),
                     Fingerprint = esel_cert:fingerprint(Cert),
+                    Token = base64:encode(Fingerprint),
                     TokenID = uuid:uuid4s(),
                     Expiery = Days*24*60*60,
                     Client = undefined,
@@ -88,11 +90,11 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
                                {<<"scope">>, Scope}],
                     Type = access,
                     add(Realm,
-                        {?ACCESS_TOKEN_TABLE, Fingerprint},
+                        {?ACCESS_TOKEN_TABLE, Token},
                         Expiery,
                         Context),
-                    snarl_user:add_token(Realm, User, TokenID, Type, Fingerprint, Expiery, Client,
-                                         Scope, Comment),
+                    snarl_user:add_token(Realm, User, TokenID, Type, Token,
+                                         Expiery, Client, Scope, Comment),
                     {ok, {TokenID, Cert}};
                 E ->
                     E
