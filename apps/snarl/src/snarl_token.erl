@@ -9,7 +9,8 @@
          add/2, add/3, add/4,
          delete/2,
          reindex/2,
-         api_token/4
+         api_token/4,
+         ssl_cert_token/5
         ]).
 
 -ignore_xref([
@@ -38,7 +39,6 @@ get(Realm, Token) ->
             {ok, Value}
     end.
 
-
 api_token(Realm, User, Scope, Comment) ->
     case snarl_oauth_backend:verify_scope(Realm, Scope) of
         false ->
@@ -60,14 +60,46 @@ api_token(Realm, User, Scope, Comment) ->
                         {?ACCESS_TOKEN_TABLE, AccessToken},
                         Expiery,
                         Context),
-                    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client,
-                                         Scope, Comment),
+                    snarl_user:add_token(
+                      Realm, User, TokenID, Type, AccessToken, Expiery, Client,
+                      Scope, Comment),
                     {ok, {TokenID, AccessToken}};
                 E ->
                     E
             end
     end.
 
+ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
+    case snarl_oauth_backend:verify_scope(Realm, Scope) of
+        false ->
+            {error, bad_scope};
+        true ->
+            case snarl_user:get(Realm, User) of
+                {ok, _UserObj} ->
+                    %% This os mostly copied from snarl_oauth:associate_access_token/3
+                    {ok, Days} = application:get_env(snarl, cert_validity),
+                    {ok, Cert} = esel:sign_csr(Days, CSR),
+                    Fingerprint = esel_cert:fingerprint(Cert),
+                    Token = Fingerprint,
+                    TokenID = uuid:uuid4s(),
+                    Expiery = Days*24*60*60 + erlang:system_time(seconds),
+                    Client = undefined,
+                    Context = [{<<"client">>, Client},
+                               {<<"resource_owner">>, User},
+                               {<<"expiry_time">>, Expiery},
+                               {<<"scope">>, Scope}],
+                    Type = access,
+                    add(Realm,
+                        {?ACCESS_TOKEN_TABLE, Token},
+                        Expiery,
+                        Context),
+                    snarl_user:add_token(Realm, User, TokenID, Type, Token,
+                                         Expiery, Client, Scope, Comment),
+                    {ok, {TokenID, Cert}};
+                E ->
+                    E
+            end
+    end.
 
 add(Realm, User) ->
     add(Realm, oauth2_token:generate([]), default, User).
@@ -84,7 +116,6 @@ add(Realm, Token, Timeout, User) ->
             lager:warning("[token:~s/~s] Erroor ~p.", [Realm, User, E]),
             E
     end.
-
 
 delete(Realm, Token) ->
     lager:debug("[token:~s] deleted token ~s.", [Realm, Token]),

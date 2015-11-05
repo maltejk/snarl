@@ -15,6 +15,7 @@
      folsom_ddb,
      mdns_server_lib,
      lager,
+     bugsnag,
      fifo_lager,
      libsnarlmatch,
      jsx,
@@ -26,7 +27,8 @@
      merklet,
      esqlite,
      yubico,
-     uuid
+     uuid,
+     esel
      ]},
   {mod, {snarl_app, []}},
   {env,
