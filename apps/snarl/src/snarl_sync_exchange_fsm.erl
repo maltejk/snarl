@@ -146,7 +146,7 @@ sync_diff(_, State = #state{
                 {error, E} ->
                     lager:error("[sync-exchange] Error: ~p", [E]),
                     lager:error("[sync-exchange] Skipping: ~p", [{Sys, {Realm, UUID}}]),
-                    {next_state, sync_diff, State#state{diff=R}, 0};
+                    {stop, recv_raw, State};
                 {ok, Bin} ->
                     case binary_to_term(Bin) of
                         {ok, RObj} ->
@@ -165,9 +165,13 @@ sync_diff(_, State = #state{
                                     case ordsets:subtract(LObj, RObj) of
                                         [] -> ok;
                                         RemoteMissing ->
-                                            remote_repair(Socket, Sys, Realm, UUID, RemoteMissing)
-                                    end,
-                                    {next_state, sync_diff, State#state{diff=R}, 0};
+                                            case remote_repair(Socket, Sys, Realm, UUID, RemoteMissing) of
+                                                ok ->
+                                                    {next_state, sync_diff, State#state{diff=R}, 0};
+                                                _ ->
+                                                    {stop, remote_repair, State}
+                                            end
+                                    end;
                                 _ ->
                                     {next_state, sync_diff, State#state{diff=R}, 0}
                             end;
@@ -178,7 +182,7 @@ sync_diff(_, State = #state{
         E ->
             lager:error("[sync-exchange] Error: ~p", [E]),
             lager:error("[sync-exchange] skipping: ~p", [{Sys, {Realm, UUID}}]),
-            {next_state, sync_diff, State#state{diff=R}, 0}
+            {stop, send_raw, State}
     end;
 
 %% This still goes for the rest
@@ -193,7 +197,7 @@ sync_diff(_, State = #state{
                 {error, E} ->
                     lager:error("[sync-exchange] Error: ~p", [E]),
                     lager:error("[sync-exchange] skipping: ~p", [{Sys, {Realm, UUID}}]),
-                    {next_state, sync_diff, State#state{diff=R}, 0};
+                    {stop, recv_raw, State};
                 {ok, Bin} ->
                     case binary_to_term(Bin) of
                         {ok, RObj} ->
@@ -203,8 +207,12 @@ sync_diff(_, State = #state{
                                     Merged = ft_obj:merge(snarl_entity_read_fsm, Objs),
                                     NVS = {{remote, node()}, vnode(Sys), Sys},
                                     snarl_entity_write_fsm:write(NVS, {Realm, UUID}, sync_repair, Merged),
-                                    remote_repair(Socket, Sys, Realm, UUID,  Merged),
-                                    {next_state, sync_diff, State#state{diff=R}, 0};
+                                    case remote_repair(Socket, Sys, Realm, UUID,  Merged) of
+                                        ok ->
+                                            {next_state, sync_diff, State#state{diff=R}, 0};
+                                        _ ->
+                                            {stop, recv_raw, State}
+                                    end;
                                 _ ->
                                     {next_state, sync_diff, State#state{diff=R}, 0}
                             end;
@@ -215,7 +223,7 @@ sync_diff(_, State = #state{
         E ->
             lager:error("[sync-exchange] Error: ~p", [E]),
             lager:error("[sync-exchange] skipping: ~p", [{Sys, {Realm, UUID}}]),
-            {next_state, sync_diff, State#state{diff=R}, 0}
+            {stop, send_raw, State}
     end;
 
 sync_diff(_, State = #state{diff=[]}) ->
@@ -361,6 +369,7 @@ remote_repair(Socket, Sys, Realm, UUID, Delta) ->
             ok;
         E ->
             lager:error("[sync-exchange] Error: ~p", [E]),
-            lager:error("[sync-exchange] skipping: ~p", [{Sys, {Realm, UUID}}])
+            lager:error("[sync-exchange] skipping: ~p", [{Sys, {Realm, UUID}}]),
+            error
     end.
 
