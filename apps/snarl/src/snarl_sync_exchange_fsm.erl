@@ -163,7 +163,8 @@ sync_diff(_, State = #state{
                                     %% Then we see if we miss something on the
                                     %% remote side.
                                     case ordsets:subtract(LObj, RObj) of
-                                        [] -> ok;
+                                        [] ->
+                                            {next_state, sync_diff, State#state{diff=R}, 0};
                                         RemoteMissing ->
                                             case remote_repair(Socket, Sys, Realm, UUID, RemoteMissing) of
                                                 ok ->
