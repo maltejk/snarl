@@ -14,12 +14,11 @@
 │  └─ eleveldb─2.1.0.0
 ├─ fifo_dt─0.1.57
 │  └─ riak_dt─2.1.1
-├─ fifo_lager─0.1.0
+├─ fifo_lager─0.1.1
 │  ├─ lager_graylog─1
-│  ├─ lager_logstash_backend─0.0.2
-│  └─ lager_watchdog─0.1.10
+│  └─ lager_logstash_backend─0.0.2
 ├─ fifo_spec─0.1.23
-├─ fifo_utils─0.1.16
+├─ fifo_utils─0.1.17
 ├─ folsom_ddb─0.1.20
 │  └─ ddb_client─0.1.17
 │     ├─ dproto─0.1.12

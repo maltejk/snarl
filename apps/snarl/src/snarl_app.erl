@@ -27,7 +27,6 @@ start(_StartType, _StartArgs) ->
     init_folsom(),
     case snarl_sup:start_link() of
         {ok, Pid} ->
-            lager_watchdog_srv:set_version(?VERSION),
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
             ?SRV_WITH_AAE(snarl_client_vnode, snarl_client),
             ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
