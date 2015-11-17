@@ -141,7 +141,8 @@ remove_uri(Preflist, ReqID, {Realm, UUID}, URI) ->
 
 set_metadata(Preflist, ReqID, {Realm, UUID}, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set_metadata, ReqID, {Realm, UUID}, Attributes},
+                                   {set_metadata, ReqID, {Realm, UUID},
+                                    Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -203,7 +204,8 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, ClientID}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, ClientID}, _Sender,
+               State) ->
     Client0 = ft_client:new(ID),
     Client1 = ft_client:client_id(ID, ClientID, Client0),
     Client2 = ft_client:name(ID, ClientID, Client1),

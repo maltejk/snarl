@@ -45,7 +45,8 @@ init(_Args) ->
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
     AccountingVMaster = {snarl_accounting_vnode_master,
-                         {riak_core_vnode_master, start_link, [snarl_accounting_vnode]},
+                         {riak_core_vnode_master, start_link,
+                          [snarl_accounting_vnode]},
                          permanent, 5000, worker, [riak_core_vnode_master]},
 
     S2iVMaster = {snarl_2i_vnode_master,
@@ -63,7 +64,8 @@ init(_Args) ->
 
     AccountingFSMs = {snarl_accounting_read_fsm_sup,
                       {snarl_accounting_read_fsm_sup, start_link, []},
-                      permanent, infinity, supervisor, [snarl_accounting_read_fsm_sup]},
+                      permanent, infinity, supervisor,
+                      [snarl_accounting_read_fsm_sup]},
 
     riak_core_entropy_info:create_table(),
 

@@ -60,13 +60,13 @@ process_results(_, State) ->
 
 process_results(_VNode, {partial, Realm, Org, UUIDs},
                 State = #state{replies = Replies}) ->
-    {_C, Replies1} = lists:foldl(fun ({UUID}, {I, M}) when (I rem 1000) == 0 ->
-                                         %%{I+1, dict:update_counter({Realm, {Org, UUID}}, 1, M)};
-                                         {I+1, inc({Realm, {Org, UUID}}, M)};
-                                     ({UUID}, {I, M}) ->
-                                         %% {I+1, dict:update_counter({Realm, {Org, UUID}}, 1, M)}
-                                         {I+1, inc({Realm, {Org, UUID}}, M)}
-                                 end, {0, Replies}, UUIDs),
+    {_C, Replies1} =
+        lists:foldl(fun
+                        %%({UUID}, {I, M}) when (I rem 1000) == 0 ->
+                        %%    {I+1, inc({Realm, {Org, UUID}}, M)};
+                        ({UUID}, {I, M}) ->
+                            {I+1, inc({Realm, {Org, UUID}}, M)}
+                    end, {0, Replies}, UUIDs),
     {ok, State#state{replies = Replies1}};
 
 process_results(VNode, {done, {_P, _N}}, State = #state{nodes = [VNode]}) ->

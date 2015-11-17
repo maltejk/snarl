@@ -70,7 +70,8 @@ init([System, Vsn, List, From]) ->
                    100
            end,
     lager:debug("[sync] updating ~p(~p) from ~p", [System, Vsn, List]),
-    {ok, read, #state{system=System, list=List, from=From, version=Vsn, delay=IVal}, 0}.
+    {ok, read, #state{system=System, list=List, from=From, version=Vsn,
+                      delay=IVal}, 0}.
 
 %%--------------------------------------------------------------------
 %% @private
@@ -90,7 +91,7 @@ init([System, Vsn, List, From]) ->
 read(_Event, State=#state{list=[{Realm, E} = RE|R], system=Sys, version=Vsn,
                           from=F, delay=D}) ->
     lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, E]),
-    case Sys:raw(Realm, E) of
+    case snarl_sync_element:raw(Sys, Realm, E) of
         {ok, O} ->
             lager:debug("[sync] updating ~p(~p) <- ~p", [Sys, Vsn, RE]),
             snarl_sync_tree:insert(F, Sys, Vsn, RE, snarl_sync:hash(RE, O));

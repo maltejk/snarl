@@ -1,7 +1,12 @@
 -module(snarl_user).
+
 -include_lib("snarl_oauth/include/snarl_oauth.hrl").
 
+-behaviour(snarl_indexed).
+-behaviour(snarl_sync_element).
+
 -export([
+         trigger/4,
          sync_repair/3,
          list/0,
          list/1,
@@ -33,9 +38,7 @@
 -ignore_xref([
               import/3,
               wipe/2,
-              list_/1,
-              raw/2, sync_repair/3,
-              reindex/2
+              list_/1
              ]).
 
 -define(TIMEOUT, 5000).
@@ -45,8 +48,8 @@
           {snarl, user, Met},
           Mod, Fun, Args)).
 
--define(NAME_2i, {snarl_user, name}).
--define(KEY_2i, {snarl_user, key}).
+-define(NAME_2I, {snarl_user, name}).
+-define(KEY_2I, {snarl_user, key}).
 
 %% Revokes a token by a given tokenID (not the token itself!)
 revoke_token(Realm, User, TokenID) ->
@@ -70,8 +73,8 @@ revoke_token(Realm, User, TokenID) ->
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
         {ok, O} ->
-            snarl_2i:add(Realm, ?NAME_2i, ft_user:name(O), UUID),
-            [snarl_2i:add(Realm, ?KEY_2i, key_to_id(K), UUID) ||
+            snarl_2i:add(Realm, ?NAME_2I, ft_user:name(O), UUID),
+            [snarl_2i:add(Realm, ?KEY_2I, key_to_id(K), UUID) ||
                 {_, K} <- ft_user:keys(O)],
             ok;
         E ->
@@ -93,7 +96,7 @@ sync_repair(Realm, UUID, Obj) ->
 find_key(Realm, KeyID) ->
     folsom_metrics:histogram_timed_update(
       {snarl, user, find_key},
-      snarl_2i, get, [Realm, ?KEY_2i, KeyID]).
+      snarl_2i, get, [Realm, ?KEY_2I, KeyID]).
 
 
 auth(Realm, User, Passwd) ->
@@ -152,25 +155,24 @@ check_yubikey(User, OTP) ->
         [] ->
             {ok, UUID};
         Ks ->
-            case snarl_yubico:id(OTP) of
-                <<>> ->
-                    {otp_required, yubikey, UUID};
-                YID  ->
-                    case lists:member(YID, Ks) of
-                        false ->
-                            not_found;
-                        true ->
-                            case snarl_yubico:verify(OTP) of
-                                {auth, ok} ->
-                                    {ok, ft_user:uuid(User)};
-                                _ ->
-                                    not_found
-                            end
-                    end
-            end
+            YID = snarl_yubico:id(OTP),
+            validate_key(UUID, OTP, YID, Ks)
     end.
 
-
+validate_key(UUID, _OTP, <<>>, _Ks) ->
+    {otp_required, yubikey, UUID};
+validate_key(UUID, OTP, YID, Ks) ->
+    case lists:member(YID, Ks) of
+        false ->
+            not_found;
+        true ->
+            case snarl_yubico:verify(OTP) of
+                {auth, ok} ->
+                    {ok, UUID};
+                _ ->
+                    not_found
+            end
+    end.
 
 -spec lookup(Realm::binary(), User::binary()) ->
                     not_found |
@@ -180,7 +182,7 @@ lookup(Realm, User) ->
     folsom_metrics:histogram_timed_update(
       {snarl, user, lookup},
       fun() ->
-              case snarl_2i:get(Realm, ?NAME_2i, User) of
+              case snarl_2i:get(Realm, ?NAME_2I, User) of
                   {ok, UUID} ->
                       snarl_user:get(Realm, UUID);
                   R ->
@@ -189,7 +191,8 @@ lookup(Realm, User) ->
       end).
 
 add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope) ->
-    add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope, undefined).
+    add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope,
+              undefined).
 
 add_token(Realm, User, TokenID, Type, Token, Expiery, Client, Scope, Comment) ->
     do_write(Realm, User, add_token,
@@ -224,13 +227,13 @@ allowed(Realm, User, Permission) ->
 
 add_key(Realm, User, KeyID, Key) ->
     SSHID = key_to_id(Key),
-    case snarl_2i:get(Realm, ?KEY_2i, SSHID) of
+    case snarl_2i:get(Realm, ?KEY_2I, SSHID) of
         {ok, _} ->
             {error, duplicate};
         _ ->
             case do_write(Realm, User, add_key, {KeyID, Key}) of
                 ok ->
-                    snarl_2i:add(Realm, ?KEY_2i, SSHID, User),
+                    snarl_2i:add(Realm, ?KEY_2I, SSHID, User),
                     ok;
                 E ->
                     E
@@ -243,7 +246,7 @@ revoke_key(Realm, User, KeyID) ->
             Ks = ft_user:keys(U),
             case jsxd:get(KeyID, Ks) of
                 {ok, Key} ->
-                    snarl_2i:delete(Realm, ?KEY_2i, key_to_id(Key)),
+                    snarl_2i:delete(Realm, ?KEY_2I, key_to_id(Key)),
                     do_write(Realm, User, revoke_key, KeyID);
                 _ ->
                     ok
@@ -268,21 +271,24 @@ remove_yubikey(Realm, User, KeyID) ->
 cache(Realm, User) ->
     case snarl_user:get(Realm, User) of
         {ok, UserObj} ->
-            {ok, lists:foldl(
-                   fun(Role, Permissions) ->
-                           case snarl_role:get(Realm, Role) of
-                               {ok, RoleObj} ->
-                                   GrPerms = ft_role:ptree(RoleObj),
-                                   libsnarlmatch_tree:merge(Permissions, GrPerms);
-                               _ ->
-                                   Permissions
-                           end
-                   end,
-                   ft_user:ptree(UserObj),
-                   ft_user:roles(UserObj))};
+            {ok, collect_permissions(Realm, UserObj)};
         E ->
             E
     end.
+
+collect_permissions(Realm, UserObj) ->
+    lists:foldl(
+      fun(Role, Permissions) ->
+              case snarl_role:get(Realm, Role) of
+                  {ok, RoleObj} ->
+                      GrPerms = ft_role:ptree(RoleObj),
+                      libsnarlmatch_tree:merge(Permissions, GrPerms);
+                  _ ->
+                      Permissions
+              end
+      end,
+      ft_user:ptree(UserObj),
+      ft_user:roles(UserObj)).
 
 -spec get(Realm::binary(), User::fifo:user_id()) ->
                  not_found |
@@ -369,29 +375,31 @@ add(Realm, undefined, User) ->
 add(Realm, Creator, User) when is_binary(Creator),
                                is_binary(User) ->
     case add(Realm, undefined, User) of
-        {ok, UUID} = R ->
-            case snarl_user:get(Realm, Creator) of
-                {ok, C} ->
-                    case ft_user:active_org(C) of
-                        <<>> ->
-                            lager:info("[~s:create] Creator ~s has no "
-                                       "active organisation.",
-                                       [UUID, Creator]),
-                            R;
-                        Org ->
-                            lager:info("[~s:create] Triggering org user "
-                                       "creation for organisation ~s",
-                                       [UUID, Org]),
-                            snarl_org:trigger(Realm, Org, user_create, UUID),
-                            R
-                    end;
-                E ->
-                    lager:warning("[~s:create] Failed to get creator ~s: ~p.",
-                                  [UUID, Creator, E]),
-                    R
-            end;
+        {ok, UUID} ->
+            trigger(Realm, Creator, user_create, UUID);
         E ->
             E
+    end.
+
+trigger(Realm, User, Action, UUID) ->
+    case snarl_user:get(Realm, User) of
+        {ok, C} ->
+            case ft_user:active_org(C) of
+                <<>> ->
+                    lager:info("[~s:create] Creator ~s has no "
+                               "active organisation.",
+                               [UUID, User]),
+                    {ok, UUID};
+                Org ->
+                    lager:info("[~s:create] Triggering ~s for organisation ~s",
+                                       [UUID, Action, Org]),
+                    snarl_org:trigger(Realm, Org, Action, UUID),
+                    {ok, UUID}
+            end;
+        E ->
+            lager:warning("[~s:create] Failed to get acting user ~s: ~p.",
+                          [UUID, User, E]),
+            {ok, UUID}
     end.
 
 add(Realm, User) ->
@@ -401,7 +409,7 @@ create(Realm, UUID, User) ->
     case lookup(Realm, User) of
         not_found ->
             ok = do_write(Realm, UUID, add, User),
-            snarl_2i:add(Realm, ?NAME_2i, User, UUID),
+            snarl_2i:add(Realm, ?NAME_2I, User, UUID),
             {ok, UUID};
         {ok, _UserObj} ->
             duplicate
@@ -510,8 +518,8 @@ leave_org(Realm, User, Org) ->
 delete(Realm, User) ->
     case ?MODULE:get(Realm, User) of
         {ok, O} ->
-            snarl_2i:delete(Realm, ?NAME_2i, ft_user:name(O)),
-            [snarl_2i:delete(Realm, ?KEY_2i, key_to_id(K)) ||
+            snarl_2i:delete(Realm, ?NAME_2I, ft_user:name(O)),
+            [snarl_2i:delete(Realm, ?KEY_2I, key_to_id(K)) ||
                 {_, K} <- ft_user:keys(O)],
             ok;
         E ->
@@ -617,23 +625,10 @@ check_pw(UserR, Passwd) ->
             false
     end.
 
--ifndef(old_hash).
 hash(Hash, Salt, Passwd) ->
     crypto:hash(Hash, [Salt, Passwd]).
--else.
-hash(sha512, Salt, Passwd) ->
-    crypto:sha512([Salt, Passwd]).
--endif.
 
-
--ifndef(old_hash).
 key_to_id(Key) ->
     [_, ID0, _] = re:split(Key, " "),
     ID1 = base64:decode(ID0),
-    crypto:hash(md5,ID1).
--else.
-key_to_id(Key) ->
-    [_, ID0, _] = re:split(Key, " "),
-    ID1 = base64:decode(ID0),
-    crypto:md5(ID1).
--endif.
+    crypto:hash(md5, ID1).

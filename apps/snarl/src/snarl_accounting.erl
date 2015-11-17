@@ -1,10 +1,12 @@
 -module(snarl_accounting).
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-behaviour(snarl_sync_element).
 
 -export([
          sync_repair/3,
          create/5,
          update/5,
+         delete/2,
          destroy/5,
          raw/2,
          get/2,
@@ -26,8 +28,12 @@
 
 -define(FM(Met, Mod, Fun, Args),
         folsom_metrics:histogram_timed_update(
-          {snarl,accounting, Met},
+          {snarl, accounting, Met},
           Mod, Fun, Args)).
+
+
+delete(_Realm, _Element) ->
+    lager:error("[acounting] Delete is not supported for accounting data").
 
 sync_repair(Realm, {Org, Elem}, Obj) ->
     do_write(Realm, Org, sync_repair, {Elem, Obj}).

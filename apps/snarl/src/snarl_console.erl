@@ -8,7 +8,6 @@
          db_get/1,
          db_delete/1,
          get_ring/1,
-         db_update/1,
          config/1,
          aae_status/1,
          init_user/1
@@ -41,7 +40,6 @@
               db_get/1,
               db_delete/1,
               get_ring/1,
-              db_update/1,
               delete_user/1,
               delete_role/1,
               aae_status/1,
@@ -65,25 +63,6 @@
               scope_toggle/1,
               init_user/1
              ]).
-
-db_update([]) ->
-    db_update(["default"]);
-
-db_update([Realm]) ->
-    [db_update([Realm, E]) || E <- ["users", "roles", "orgs"]],
-    ok;
-
-db_update([Realm, "users"]) ->
-    io:format("Updating users...~n"),
-    do_update(Realm, snarl_user, ft_user);
-
-db_update([Realm, "roles"]) ->
-    io:format("Updating roles...~n"),
-    do_update(Realm, snarl_role, ft_role);
-
-db_update([Realm, "orgs"]) ->
-    io:format("Updating orgs...~n"),
-    do_update(Realm, snarl_org, ft_org).
 
 get_ring([]) ->
     {ok, RingData} = riak_core_ring_manager:get_my_ring(),
@@ -186,7 +165,8 @@ list_user([RealmS]) ->
     Realm = list_to_binary(RealmS),
     {ok, Users} = snarl_user:list(Realm),
     io:format("UUID                                 Name~n"),
-    io:format("------------------------------------ ------------------------------~n", []),
+    io:format("------------------------------------ "
+              "------------------------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_user:get(Realm, UUID),
                       io:format("~36s ~-30s~n",
@@ -197,7 +177,8 @@ list_role([RealmS]) ->
     Realm = list_to_binary(RealmS),
     {ok, Users} = snarl_role:list(Realm),
     io:format("UUID                                 Name~n"),
-    io:format("------------------------------------ ------------------------------~n", []),
+    io:format("------------------------------------ "
+              "------------------------------~n", []),
     lists:map(fun(UUID) ->
                       {ok, User} = snarl_role:get(Realm, UUID),
                       io:format("~36s ~-30s~n",
@@ -236,22 +217,27 @@ init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
     ok = snarl_user:select_org(Realm, UserUUID, OrgUUID),
     io:format("Selected ~s as active org for ~s.~n", [Org, User]),
     {ok, RoleUUID} = snarl_role:add(Realm, Role),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"cloud">>, <<"status">>]),
+    RolePerms = [
+                 [<<"cloud">>, <<"cloud">>, <<"status">>],
 
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"datasets">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"networks">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"ipranges">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"packages">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"roles">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"orgs">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"users">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"list">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"hypervisors">>, <<"list">>]),
+                 [<<"cloud">>, <<"datasets">>, <<"list">>],
+                 [<<"cloud">>, <<"networks">>, <<"list">>],
+                 [<<"cloud">>, <<"ipranges">>, <<"list">>],
+                 [<<"cloud">>, <<"packages">>, <<"list">>],
+                 [<<"cloud">>, <<"roles">>, <<"list">>],
+                 [<<"cloud">>, <<"orgs">>, <<"list">>],
+                 [<<"cloud">>, <<"users">>, <<"list">>],
+                 [<<"cloud">>, <<"vms">>, <<"list">>],
+                 [<<"cloud">>, <<"hypervisors">>, <<"list">>],
 
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"cloud">>, <<"vms">>, <<"create">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"hypervisors">>, <<"_">>, <<"create">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"datasets">>, <<"_">>, <<"create">>]),
-    ok = snarl_role:grant(Realm, RoleUUID, [<<"roles">>, RoleUUID, <<"get">>]),
+                 [<<"cloud">>, <<"vms">>, <<"create">>],
+                 [<<"hypervisors">>, <<"_">>, <<"create">>],
+                 [<<"datasets">>, <<"_">>, <<"create">>],
+
+                 [<<"roles">>, RoleUUID, <<"get">>]
+                ],
+    [ok = snarl_role:grant(Realm, RoleUUID, P) ||
+        P <- RolePerms],
     io:format("Added default role ~s (~s).~n", [Role, RoleUUID]),
     snarl_opt:set([users, Realm, initial_role], RoleUUID),
     snarl_oauth:add_scope(Realm, <<"*">>, <<"Everything">>),
@@ -311,7 +297,8 @@ leave_role([RealmS, User, Role]) ->
                     ok = snarl_user:leave(Realm,
                                           ft_user:uuid(UserObj),
                                           ft_role:uuid(RoleObj)),
-                    io:format("User '~s' removed from role '~s'.~n", [User, Role]),
+                    io:format("User '~s' removed from role '~s'.~n",
+                              [User, Role]),
                     ok;
                 _ ->
                     io:format("Role does not exist.~n"),
@@ -330,7 +317,8 @@ passwd([RealmS, User, Pass]) ->
                                    ft_user:uuid(UserObj),
                                    list_to_binary(Pass)) of
                 ok ->
-                    io:format("Password successfully changed for user '~s'.~n", [User]),
+                    io:format("Password successfully changed for user '~s'.~n",
+                              [User]),
                     ok;
                 not_found ->
                     io:format("User '~s' not found.~n", [User]),
@@ -386,7 +374,7 @@ revoke_user([RealmS, User | P ]) ->
                                    ft_user:uuid(UserObj),
                                    build_permission(P)) of
                 ok ->
-                    io:format("Granted.~n", []),
+                    io:format("Revoked.~n", []),
                     ok;
                 not_found ->
                     io:format("User '~s' not found.~n", [User]),
@@ -553,35 +541,6 @@ scope_toggle([RealmS, ScopeS]) ->
 
 build_permission(P) ->
     lists:map(fun list_to_binary/1, P).
-
-do_update(RealmS, MainMod, StateMod) ->
-    Realm = list_to_binary(RealmS),
-    {ok, US} = MainMod:list_(undefined),
-    io:format("  Entries found: ~p~n", [length(US)]),
-    io:format("  Grabbing UUIDs"),
-    ID = snarl_vnode:mkid(),
-    US1 = [begin
-               io:format("."),
-               U1 = ft_obj:update(U),
-               {StateMod:uuid(StateMod:load(ID, ft_obj:val(U1))), U1}
-           end|| U <- US],
-    io:format(" done.~n"),
-
-    io:format("  Wipeing old entries"),
-    [begin
-         io:format("."),
-         MainMod:wipe(undefined, UUID)
-     end || {UUID, _} <- US1],
-    io:format(" done.~n"),
-
-    io:format("  Restoring entries"),
-    [begin
-         io:format("."),
-         MainMod:sync_repair(Realm, UUID, O)
-     end || {UUID, O} <- US1],
-    io:format(" done.~n"),
-    io:format("Update complete.~n"),
-    ok.
 
 fmt_perms(Perms) ->
     L1 = [fmt_perm(P) || P <- Perms],

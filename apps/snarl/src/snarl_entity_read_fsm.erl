@@ -5,6 +5,7 @@
 -behavior(gen_fsm).
 -include("snarl.hrl").
 
+
 -include("snarl_dtrace.hrl").
 
 %% API
@@ -53,19 +54,24 @@
                 preflist,
                 num_r=0,
                 size,
-                timeout=?DEFAULT_TIMEOUT,
+                timeout = 10000,
                 val,
                 vnode :: atom(),
                 bucket,
                 system :: atom(),
-                replies=[]}).
+                replies = []}).
+
+-type state() :: #state{}.
+
+
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 start_link(ReqID, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw], []).
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From,
+                                 {Realm, Entity}, Val, Raw], []).
 
 start(VNodeInfo, Op, {Realm, Entity}) ->
     start(VNodeInfo, Op, {Realm, Entity}, undefined).
@@ -91,6 +97,7 @@ start(VNodeInfo, Op, {Realm, Entity}, Val, Raw) ->
 %%% States
 %%%===================================================================
 
+-spec init(_) -> {ok, prepare, state(), 0}.
 init([ReqId, {VNode, System}, Op, From, {Realm, Entity}, Val, Raw]) when
       is_atom(VNode),
       is_atom(System) ->
@@ -156,13 +163,13 @@ waiting({ok, ReqID, IdxNode, Obj},
                    r=R, n = N, timeout=Timeout}) ->
     NumR = NumR0 + 1,
     Replies = [{IdxNode, Obj}|Replies0],
-    SD = SD0#state{num_r=NumR,replies=Replies},
+    SD = SD0#state{num_r=NumR, replies=Replies},
     if
         NumR >= R ->
             SD1 = case merge(Replies) of
                       not_found ->
-                          %% We do not want to return not_found unless we have all
-                          %% the replies
+                          %% We do not want to return not_found unless we have
+                          %% all the replies
                           %% TODO: is this a good idea?
                           SD;
                       Merged ->
@@ -230,13 +237,13 @@ finalize(timeout, SD=#state{
     end.
 
 handle_info(_Info, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 handle_event(_Event, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 handle_sync_event(_Event, _From, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 code_change(_OldVsn, StateName, State, _Extra) -> {ok, StateName, State}.
 
@@ -252,7 +259,7 @@ terminate(_Reason, _SN, _SD) ->
 %% @doc Given a list of `Replies' return the merged value.
 -spec merge([vnode_reply()]) -> fifo:obj() | not_found.
 merge(Replies) ->
-    Objs = [Obj || {_,Obj} <- Replies],
+    Objs = [Obj || {_, Obj} <- Replies],
     ft_obj:merge(snarl_entity_read_fsm, Objs).
 
 %% @pure
@@ -308,11 +315,11 @@ reconcile_org(_, Acc) ->
 %% determine if repair is needed.
 -spec needs_repair(any(), [vnode_reply()]) -> boolean().
 needs_repair(MObj, Replies) ->
-    Objs = [Obj || {_,Obj} <- Replies],
+    Objs = [Obj || {_, Obj} <- Replies],
     lists:any(different(MObj), Objs).
 
 %% @pure
-different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
+different(A) -> fun(B) -> not ft_obj:equal(A, B) end.
 
 %% @impure
 %%
@@ -320,7 +327,7 @@ different(A) -> fun(B) -> not ft_obj:equal(A,B) end.
 -spec repair(atom(), {binary(), binary()}, fifo:obj(), [vnode_reply()]) -> io.
 repair(_, _, _, []) -> io;
 
-repair(VNode, StatName, MObj, [{IdxNode,Obj}|T]) ->
+repair(VNode, StatName, MObj, [{IdxNode, Obj}|T]) ->
     case ft_obj:equal(MObj, Obj) of
         true ->
             repair(VNode, StatName, MObj, T);

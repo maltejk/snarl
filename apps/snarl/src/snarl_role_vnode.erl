@@ -156,7 +156,8 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Role}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Role},
+               _Sender, State) ->
     Role0 = ft_role:new(ID),
     Role1 = ft_role:name(ID, Role, Role0),
     Role2 = ft_role:uuid(ID, UUID, Role1),

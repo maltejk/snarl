@@ -46,7 +46,8 @@ api_token(Realm, User, Scope, Comment) ->
         true ->
             case snarl_user:get(Realm, User) of
                 {ok, _UserObj} ->
-                    %% This os mostly copied from snarl_oauth:associate_access_token/3
+                    %% This os mostly copied from:
+                    %% snarl_oauth:associate_access_token/3
                     AccessToken = oauth2_token:generate([]),
                     TokenID = uuid:uuid4s(),
                     Expiery = infinity,
@@ -76,7 +77,8 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
         true ->
             case snarl_user:get(Realm, User) of
                 {ok, _UserObj} ->
-                    %% This os mostly copied from snarl_oauth:associate_access_token/3
+                    %% This os mostly copied from:
+                    %% snarl_oauth:associate_access_token/3
                     {ok, Days} = application:get_env(snarl, cert_validity),
                     {ok, Cert} = esel:sign_csr(Days, CSR),
                     Fingerprint = esel_cert:fingerprint(Cert),

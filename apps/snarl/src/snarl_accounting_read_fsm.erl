@@ -3,8 +3,8 @@
 %% replica and wait until a quorum is met.
 -module(snarl_accounting_read_fsm).
 -behavior(gen_fsm).
--include("snarl.hrl").
 
+-include("snarl.hrl").
 -include("snarl_dtrace.hrl").
 
 %% API
@@ -53,19 +53,22 @@
                 preflist,
                 num_r=0,
                 size,
-                timeout=?DEFAULT_TIMEOUT,
+                timeout = 10000,
                 val,
                 vnode :: atom(),
                 bucket,
                 system :: atom(),
-                replies=[]}).
+                replies = []}).
+
+-type state() :: #state{}.
 
 %%%===================================================================
 %%% API
 %%%===================================================================
 
 start_link(ReqID, {VNode, System}, Op, From, {Realm, Accounting}, Val, Raw) ->
-    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From, {Realm, Accounting}, Val, Raw], []).
+    gen_fsm:start_link(?MODULE, [ReqID, {VNode, System}, Op, From,
+                                 {Realm, Accounting}, Val, Raw], []).
 
 start(VNodeInfo, Op, {Realm, Accounting}) ->
     start(VNodeInfo, Op, {Realm, Accounting}, undefined).
@@ -90,6 +93,8 @@ start(VNodeInfo, Op, {Realm, Accounting}, Val, Raw) ->
 %%%===================================================================
 %%% States
 %%%===================================================================
+
+-spec init(_) -> {ok, prepare, state(), 0}.
 
 init([ReqId, {VNode, System}, Op, From, {Realm, Accounting}, Val, Raw]) when
       is_atom(VNode),
@@ -155,7 +160,7 @@ waiting({ok, ReqID, IdxNode, Obj},
                    r=R, n = N, timeout=Timeout}) ->
     NumR = NumR0 + 1,
     Replies = [{IdxNode, Obj}|Replies0],
-    SD = SD0#state{num_r=NumR,replies=Replies},
+    SD = SD0#state{num_r=NumR, replies=Replies},
     if
         NumR >= R ->
             Reply = merge(Replies),
@@ -215,13 +220,13 @@ finalize(timeout, SD=#state{
     end.
 
 handle_info(_Info, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 handle_event(_Event, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 handle_sync_event(_Event, _From, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 code_change(_OldVsn, StateName, State, _Extra) -> {ok, StateName, State}.
 
@@ -237,7 +242,7 @@ terminate(_Reason, _SN, _SD) ->
 %% @doc Given a list of `Replies' return the merged value.
 -spec merge([vnode_reply()]) -> [term()].
 merge(Replies) ->
-    Data = [Obj || {_,Obj} <- Replies],
+    Data = [Obj || {_, Obj} <- Replies],
     Flattened = lists:flatten(Data),
     Unique = lists:usort(Flattened),
     Unique.
@@ -263,7 +268,7 @@ reconcile(Vs) ->
 %% determine if repair is needed.
 -spec needs_repair(any(), [vnode_reply()]) -> boolean().
 needs_repair(MObj, Replies) ->
-    Objs = [lists:usort(Obj) || {_,Obj} <- Replies],
+    Objs = [lists:usort(Obj) || {_, Obj} <- Replies],
     lists:any(different(MObj), Objs).
 
 %% @pure
@@ -275,7 +280,7 @@ different(A) -> fun(B) -> (A =/= B) end.
 -spec repair({binary(), binary()}, [term()], [vnode_reply()], any()) -> ok.
 repair(_, _, [], _) -> ok;
 
-repair(StatName, MObj, [{IdxNode,Obj}|T], Val) ->
+repair(StatName, MObj, [{IdxNode, Obj}|T], Val) ->
     case MObj =:= Obj of
         true ->
             repair(StatName, MObj, T, Val);

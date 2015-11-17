@@ -131,28 +131,32 @@ sync_repair(Preflist, ReqID, {Realm, {OrgID, Elem}}, Obj) ->
     sync_repair(Preflist, ReqID, {Realm, OrgID}, {Elem, Obj});
 
 sync_repair(Preflist, ReqID, {Realm, OrgID}, {Elem, Obj}) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {sync_repair, ReqID, Realm, OrgID, Elem, Obj},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
+    riak_core_vnode_master:command(
+      Preflist,
+      {sync_repair, ReqID, Realm, OrgID, Elem, Obj},
+      {fsm, undefined, self()},
+      ?MASTER).
 
 create(Preflist, ReqID, {Realm, OrgID}, {ResourceID, Timestamp, Metadata}) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {create, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
+    riak_core_vnode_master:command(
+      Preflist,
+      {create, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
+      {fsm, undefined, self()},
+      ?MASTER).
 
 update(Preflist, ReqID, {Realm, OrgID}, {ResourceID, Timestamp, Metadata}) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {update, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
+    riak_core_vnode_master:command(
+      Preflist,
+      {update, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
+      {fsm, undefined, self()},
+      ?MASTER).
 
 destroy(Preflist, ReqID, {Realm, OrgID}, {ResourceID, Timestamp, Metadata}) ->
-    riak_core_vnode_master:command(Preflist,
-                                   {destroy, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
-                                   {fsm, undefined, self()},
-                                   ?MASTER).
+    riak_core_vnode_master:command(
+      Preflist,
+      {destroy, ReqID, Realm, OrgID, ResourceID, Timestamp, Metadata},
+      {fsm, undefined, self()},
+      ?MASTER).
 
 %%%===================================================================
 %%% VNode
@@ -184,10 +188,12 @@ init([Partition]) ->
 %%%===================================================================
 
 -type action() :: create | update | destroy.
--spec insert(action(), binary(), binary(), binary(), pos_integer(), term(), state()) ->
+-spec insert(action(), binary(), binary(), binary(), pos_integer(), term(),
+             state()) ->
                     state().
 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, State) ->
-    State1 = insert1(Action, Realm, OrgID, Resource, Timestamp, Metadata, State),
+    State1 = insert1(Action, Realm, OrgID, Resource, Timestamp, Metadata,
+                     State),
     {Res, State2} = for_resource(Realm, OrgID, Resource, State1),
     Hash = hash_object({Realm, OrgID, Resource}, Res),
     snarl_sync_tree:update(State#state.sync_tree, snarl_accounting,
@@ -215,35 +221,41 @@ insert1(destroy, Relam, OrgID, Resource, Timestamp, Metadata, State) ->
                [Resource, Timestamp, term_to_binary(Metadata)], DB),
     State1.
 
-handle_command({create, {ReqID, _}, Relam, OrgID, Resource, Timestamp, Metadata},
-               _Sender, State) ->
+handle_command({create, {ReqID, _}, Relam, OrgID, Resource, Timestamp,
+                Metadata}, _Sender, State) ->
     State1 = insert(create, Relam, OrgID, Resource, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({update, {ReqID, _}, Relam, OrgID, Resource, Timestamp, Metadata},
-               _Sender, State) ->
+handle_command({update, {ReqID, _}, Relam, OrgID, Resource, Timestamp,
+                Metadata}, _Sender, State) ->
     State1 = insert(update, Relam, OrgID, Resource, Timestamp, Metadata, State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({destroy, {ReqID, _}, Relam, OrgID, Resource, Timestamp, Metadata}, _Sender, State) ->
-    State1 = insert(destroy, Relam, OrgID, Resource, Timestamp, Metadata, State),
+handle_command({destroy, {ReqID, _}, Relam, OrgID, Resource, Timestamp,
+                Metadata}, _Sender, State) ->
+    State1 = insert(destroy, Relam, OrgID, Resource, Timestamp, Metadata,
+                    State),
     {reply, {ok, ReqID}, State1};
 
-handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Resource, Entries}, _Sender, State) ->
+handle_command({sync_repair, {ReqID, _}, Realm, OrgID, Resource, Entries},
+               _Sender, State) ->
     State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
-                                 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
+                                 insert(Action, Realm, OrgID, Resource,
+                                        Timestamp, Metadata, SAcc)
                          end, State, Entries),
     {reply, {ok, ReqID}, State1};
 
 handle_command({repair, Realm, OrgID, Entries}, _Sender, State) ->
     State1 = lists:foldl(fun({Timestamp, Action, Resource, Metadata}, SAcc) ->
-                                 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
+                                 insert(Action, Realm, OrgID, Resource,
+                                        Timestamp, Metadata, SAcc)
                          end, State, Entries),
     {noreply, State1};
 
 handle_command({repair, Realm, OrgID, Resource, Entries}, _Sender, State) ->
     State1 = lists:foldl(fun({Timestamp, Action, Metadata}, SAcc) ->
-                                 insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, SAcc)
+                                 insert(Action, Realm, OrgID, Resource,
+                                        Timestamp, Metadata, SAcc)
                          end, State, Entries),
     {noreply, State1};
 
@@ -335,12 +347,15 @@ handle_command(?FOLD_REQ{foldfun=Fun, acc0=Acc0}, Sender,
                     {ok, Realms} when length(Realms) > 0 ->
                         R = lists:foldl(
                               fun(Realm, AccR) ->
-                                      RealmPath = filename:join([BasePath, Realm]),
+                                      RealmPath = filename:join([BasePath,
+                                                                 Realm]),
                                       case file:list_dir(RealmPath) of
                                           {ok, Orgs} when length(Orgs) > 0 ->
                                               lists:foldl(
                                                 fun (Org, AccO) ->
-                                                        handle_org(RealmPath, Fun, Realm, Org, AccO)
+                                                        handle_org(RealmPath,
+                                                                   Fun, Realm,
+                                                                   Org, AccO)
                                                 end, AccR, Orgs);
                                           _ ->
                                               AccR
@@ -397,7 +412,8 @@ handle_handoff_command(?FOLD_REQ{} = FR, Sender, State) ->
     handle_command(FR, Sender, State);
 
 
-handle_handoff_command({get, _ReqID, _Realm, _OrgID, _Resource} = Req, Sender, State) ->
+handle_handoff_command({get, _ReqID, _Realm, _OrgID, _Resource} = Req, Sender,
+                       State) ->
     handle_command(Req, Sender, State);
 
 handle_handoff_command({get, _ReqID, _Realm, _OrgID} = Req, Sender, State) ->
@@ -420,16 +436,16 @@ handle_handoff_data(Data, State) ->
     {{Realm, {Org, Resource}}, Entries} = binary_to_term(Data),
     {DB, State1} = get_db(Realm, Org, State),
     lists:map(fun ({Time, create, Meta}) ->
-                      esqlite3:q("INSERT INTO `create` (uuid, time, metadata) VALUES "
-                                 "(?1, ?2, ?3)",
+                      esqlite3:q("INSERT INTO `create` (uuid, time, metadata) "
+                                 "VALUES (?1, ?2, ?3)",
                                  [Resource, Time, term_to_binary(Meta)], DB);
                   ({Time, update, Meta}) ->
-                      esqlite3:q("INSERT INTO `update` (uuid, time, metadata) VALUES "
-                                 "(?1, ?2, ?3)",
+                      esqlite3:q("INSERT INTO `update` (uuid, time, metadata) "
+                                 "VALUES (?1, ?2, ?3)",
                                  [Resource, Time, term_to_binary(Meta)], DB);
                   ({Time, destroy, Meta}) ->
-                      esqlite3:q("INSERT INTO `destroy` (uuid, time, metadata) VALUES "
-                                 "(?1, ?2, ?3)",
+                      esqlite3:q("INSERT INTO `destroy` (uuid, time, metadata) "
+                                 "VALUES (?1, ?2, ?3)",
                                  [Resource, Time, term_to_binary(Meta)], DB)
               end, Entries),
     {reply, ok, State1}.
@@ -437,8 +453,8 @@ handle_handoff_data(Data, State) ->
 encode_handoff_item(Org, Data) ->
     term_to_binary({Org, Data}).
 
-is_empty(State  = #state{partition = P, db_path = Path}) ->
-    BasePath = filename:join([Path, integer_to_list(P), "accounting"]),
+is_empty(State) ->
+    BasePath = base_path(State),
     case file:list_dir(BasePath) of
         {ok, [_ | _]} ->
             {false, State};
@@ -446,38 +462,38 @@ is_empty(State  = #state{partition = P, db_path = Path}) ->
             {true, State}
     end.
 
-delete(State = #state{partition = P, db_path = Path, dbs = DBs}) ->
+delete(State = #state{dbs = DBs}) ->
     [esqlite3:close(DB) || DB <- maps:values(DBs)],
-    BasePath = filename:join([Path, integer_to_list(P), "accounting"]),
+    BasePath = base_path(State),
     del_dir(BasePath),
     {ok, State#state{dbs = #{}}}.
 
 handle_coverage(list, _KeySpaces, Sender,
-                State=#state{partition = P, db_path = Path, dbs = DBs}) ->
+                State=#state{dbs = DBs, partition = P}) ->
     [esqlite3:close(DB) || DB <- maps:values(DBs)],
-    BasePath = filename:join([Path, integer_to_list(P), "accounting"]),
+    BasePath = base_path(State),
     AsyncWork =
         fun() ->
-                case file:list_dir(BasePath) of
-                    {ok, Realms} ->
-                        [begin
-                             RealmPath = filename:join([BasePath, Realm]),
-                             case file:list_dir(RealmPath) of
-                                 {ok, Orgs} ->
-                                     [handle_list(
-                                        Sender,
-                                        RealmPath,
-                                        Realm,
-                                        Org) || Org <- Orgs],
-                                     ok;
-                                 _ ->
-                                     ok
-                             end
-                         end || Realm <- Realms],
-                        ok;
-                    _ ->
-                        ok
-                end,
+                Realms = case file:list_dir(BasePath) of
+                             {ok, RealmsX} ->
+                                 RealmsX;
+                             _ ->
+                                 []
+                         end,
+                [begin
+                     RealmPath = filename:join([BasePath, Realm]),
+                     case file:list_dir(RealmPath) of
+                         {ok, Orgs} ->
+                             [handle_list(
+                                Sender,
+                                RealmPath,
+                                Realm,
+                                Org) || Org <- Orgs],
+                             ok;
+                         _ ->
+                             ok
+                     end
+                 end || Realm <- Realms],
                 riak_core_vnode:reply(Sender, {done, {P, node()}})
         end,
     {async, AsyncWork, Sender, State#state{dbs = #{}}}.
@@ -503,7 +519,9 @@ terminate(_Reason, #state{dbs = DBs}) ->
 handle_info(retry_create_hashtree,
             State=#state{hashtrees=undefined, partition=Idx}) ->
     lager:debug("snarl_accounting/~p retrying to create a hash tree.", [Idx]),
-    HT = riak_core_aae_vnode:maybe_create_hashtrees(snarl_accounting, Idx, snarl_accounting_vnode, undefined),
+    HT = riak_core_aae_vnode:maybe_create_hashtrees(snarl_accounting, Idx,
+                                                    snarl_accounting_vnode,
+                                                    undefined),
     {ok, State#state{hashtrees = HT}};
 
 handle_info(retry_create_hashtree, State) ->
@@ -529,14 +547,12 @@ get_db(Realm, Org, State = #state{partition = P, dbs = DBs, db_path = Path}) ->
         error ->
             Realms = binary_to_list(Realm),
             Orgs = binary_to_list(Org),
-            BasePath = filename:join([Path, integer_to_list(P),
-                                      "accounting", Realms]),
+            BasePath = base_path(State, [Realms]),
             file:make_dir(filename:join([Path])),
             file:make_dir(filename:join([Path, integer_to_list(P)])),
             file:make_dir(filename:join([Path, integer_to_list(P),
                                          "accounting"])),
-            file:make_dir(filename:join([Path, integer_to_list(P),
-                                         "accounting", Realms])),
+            file:make_dir(BasePath),
             DBFile = filename:join([BasePath, Orgs]),
             {ok, DB} = esqlite3:open(DBFile),
             init_db(DB),
@@ -573,15 +589,7 @@ del_all_files([], EmptyDirs) ->
 del_all_files([Dir | T], EmptyDirs) ->
     case file:list_dir(Dir) of
         {ok, FilesInDir}  ->
-            {Files, Dirs} = lists:foldl(fun(F, {Fs, Ds}) ->
-                                                Path = Dir ++ "/" ++ F,
-                                                case filelib:is_dir(Path) of
-                                                    true ->
-                                                        {Fs, [Path | Ds]};
-                                                    false ->
-                                                        {[Path | Fs], Ds}
-                                                end
-                                        end, {[],[]}, FilesInDir),
+            {Files, Dirs} = path_or_dir(Dir, FilesInDir),
             lists:foreach(fun(F) ->
                                   ok = file:delete(F)
                           end, Files),
@@ -589,6 +597,17 @@ del_all_files([Dir | T], EmptyDirs) ->
         _ ->
             del_all_files(T, EmptyDirs)
     end.
+
+path_or_dir(Dir, FilesInDir) ->
+    lists:foldl(fun(F, {Fs, Ds}) ->
+                        Path = Dir ++ "/" ++ F,
+                        case filelib:is_dir(Path) of
+                            true ->
+                                {Fs, [Path | Ds]};
+                            false ->
+                                {[Path | Fs], Ds}
+                        end
+                end, {[], []}, FilesInDir).
 
 for_resource(Realm, OrgID, Resource, State) ->
     {DB, State1} = get_db(Realm, OrgID, State),
@@ -602,3 +621,10 @@ for_resource(Realm, OrgID, Resource, State) ->
                {T, M} <- esqlite3:q("SELECT time, metadata FROM `destroy` "
                                     "WHERE uuid=?", [Resource], DB)],
     {ResC ++ ResU ++ ResD, State1}.
+
+base_path(State) ->
+    base_path(State, []).
+
+base_path(#state{partition = Partition, db_path = Path}, Addition) ->
+    filename:join([Path, integer_to_list(Partition), "accounting"] ++ Addition).
+

@@ -55,7 +55,8 @@ start_link() ->
 %% @end
 %%--------------------------------------------------------------------
 init([]) ->
-    Element = {snarl_sync_exchange_fsm, {snarl_sync_exchange_fsm, start_link, []},
+    Element = {snarl_sync_exchange_fsm,
+               {snarl_sync_exchange_fsm, start_link, []},
                transient, infinity, worker, [snarl_sync_exchange_fsm]},
     Children = [Element],
     RestartStrategy = {simple_one_for_one, 5, 10},

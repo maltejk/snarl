@@ -1,6 +1,9 @@
 -module(snarl_client).
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
+-behaviour(snarl_indexed).
+-behaviour(snarl_sync_element).
+
 -export([
          sync_repair/3,
          list/0,
@@ -26,9 +29,7 @@
 
 -ignore_xref([
               wipe/2,
-              list_/1,
-              raw/2, sync_repair/3,
-              reindex/2
+              list_/1
              ]).
 
 -define(TIMEOUT, 5000).
@@ -38,12 +39,12 @@
           {snarl, client, Met},
           Mod, Fun, Args)).
 
--define(ID_2i, {snarl_client, id}).
+-define(ID_2I, {snarl_client, id}).
 
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
         {ok, O} ->
-            snarl_2i:add(Realm, ?ID_2i, ft_client:client_id(O), UUID),
+            snarl_2i:add(Realm, ?ID_2I, ft_client:client_id(O), UUID),
             ok;
         E ->
             E
@@ -83,7 +84,7 @@ lookup(Realm, Client) ->
     folsom_metrics:histogram_timed_update(
       {snarl, client, lookup},
       fun() ->
-              case snarl_2i:get(Realm, ?ID_2i, Client) of
+              case snarl_2i:get(Realm, ?ID_2I, Client) of
                   {ok, UUID} ->
                       snarl_client:get(Realm, UUID);
                   R ->
@@ -143,8 +144,8 @@ get(Realm, Client) ->
 
 raw(Realm, Client) ->
     case ?FM(get, snarl_entity_read_fsm, start,
-             [{snarl_client_vnode, snarl_client}, get, {Realm, Client}, undefined,
-              true]) of
+             [{snarl_client_vnode, snarl_client}, get, {Realm, Client},
+              undefined, true]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -213,27 +214,8 @@ add(Realm, undefined, Client) ->
 add(Realm, Creator, Client) when is_binary(Creator),
                                  is_binary(Client) ->
     case add(Realm, undefined, Client) of
-        {ok, UUID} = R ->
-            case snarl_user:get(Realm, Creator) of
-                {ok, C} ->
-                    case ft_user:active_org(C) of
-                        <<>> ->
-                            lager:info("[~s:create] Creator ~s has no "
-                                       "active organisation.",
-                                       [UUID, Creator]),
-                            R;
-                        Org ->
-                            lager:info("[~s:create] Triggering org client "
-                                       "creation for organisation ~s",
-                                       [UUID, Org]),
-                            snarl_org:trigger(Realm, Org, client_create, UUID),
-                            R
-                    end;
-                E ->
-                    lager:warning("[~s:create] Failed to get creator ~s: ~p.",
-                                  [UUID, Creator, E]),
-                    R
-            end;
+        {ok, UUID}->
+            snarl_user:trigger(Realm, Creator, client_create, UUID);
         E ->
             E
     end.
@@ -245,7 +227,7 @@ create(Realm, UUID, Client) ->
     case lookup(Realm, Client) of
         not_found ->
             ok = do_write(Realm, UUID, add, Client),
-            snarl_2i:add(Realm, ?ID_2i, Client, UUID),
+            snarl_2i:add(Realm, ?ID_2I, Client, UUID),
             {ok, UUID};
         {ok, _ClientObj} ->
             duplicate
@@ -311,7 +293,7 @@ leave(Realm, Client, Role) ->
 delete(Realm, Client) ->
     case ?MODULE:get(Realm, Client) of
         {ok, O} ->
-            snarl_2i:delete(Realm, ?ID_2i, ft_client:client_id(O)),
+            snarl_2i:delete(Realm, ?ID_2I, ft_client:client_id(O)),
             ok;
         E ->
             E

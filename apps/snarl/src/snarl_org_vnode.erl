@@ -175,7 +175,8 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org},
+               _Sender, State) ->
     Org0 = ft_org:new(ID),
     Org1 = ft_org:name(ID, Org, Org0),
     Org2 = ft_org:uuid(ID, UUID, Org1),
@@ -185,7 +186,8 @@ handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, St
 
 handle_command({resource_action, ID, {Realm, UUID},
                 Resource, TimeStamp, Action, Opts}, _Sender, State) ->
-    snarl_vnode:change(Realm, UUID, resource_action, [Resource, TimeStamp, Action, Opts],
+    snarl_vnode:change(Realm, UUID, resource_action,
+                       [Resource, TimeStamp, Action, Opts],
                        ID, State);
 
 handle_command(Message, Sender, State) ->
