@@ -147,11 +147,10 @@ sync_diff(_, State = #state{
                 {error, E} ->
                     error_stop(recv, E, State);
                 {ok, RBin} ->
-                    repair_acc(Socket, Sys, Realm, UUID, RBin, R, State);
-
-                not_found ->
-                    {next_state, sync_diff, State#state{diff=R}, 0}
-            end
+                    repair_acc(Socket, Sys, Realm, UUID, RBin, R, State)
+            end;
+        E ->
+            error_stop(send_raw, E, State)
     end;
 
 %% This still goes for the rest
@@ -332,6 +331,8 @@ repair_acc(Socket, Sys, Realm, UUID, RBin, R, State) ->
                 _ ->
                     {next_state, sync_diff, State#state{diff=R}, 0}
             end;
+        not_found ->
+            {next_state, sync_diff, State#state{diff=R}, 0};
         E ->
             error_stop(send_raw, E, State)
     end.

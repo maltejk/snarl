@@ -2,15 +2,17 @@
 
 -export([raw/3, repair/4, delete/3]).
 
--callback raw(Realm::binary(), E::binary()) ->
+-callback raw(Realm::binary(), Element::binary() | {binary(), binary()}) ->
     not_found |
     {ok, term()}.
 
--callback sync_repair(Realm::binary(), UUID::binary(), Obj::term()) ->
+-callback sync_repair(Realm::binary(),
+                      Element::binary() | {binary(), binary()},
+                      Obj::term()) ->
     ok.
 
 -callback delete(Realm::binary(), UUID::binary()) ->
-    ok.
+    ok | {error, _} | not_found.
 
 raw(System, Realm, Element) ->
     System:raw(Realm, Element).
