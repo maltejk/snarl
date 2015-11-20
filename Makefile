@@ -1,5 +1,4 @@
 REBAR = $(shell pwd)/rebar3
-ELVIS = $(shell pwd)/elvis
 
 .PHONY: rel stagedevrel package version all tree
 
