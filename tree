@@ -28,7 +28,7 @@
 ├─ lager─2.1.1
 │  └─ goldrush─0.1.7
 ├─ libsnarlmatch─0.1.7
-├─ mdns_server_lib─0.2.1
+├─ mdns_server_lib─0.2.2
 │  ├─ mdns_server─0.2.0
 │  └─ ranch─1.1.0
 ├─ meck─0.8.2

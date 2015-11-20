@@ -101,7 +101,7 @@
  {<<"mdns_server">>,{pkg,<<"mdns_server">>,<<"0.2.0">>},1},
  {<<"mdns_server_lib">>,
   {git,"https://github.com/Licenser/mdns_server_lib.git",
-       {ref,"fb6401c99a53dc8874409f53c4b505d8b12317b1"}},
+       {ref,"d7323937b5bffe16c607e2dda3108cebf9015df0"}},
   0},
  {<<"meck">>,
   {git,"https://github.com/basho/meck.git",
