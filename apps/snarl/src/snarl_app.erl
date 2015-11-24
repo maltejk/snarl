@@ -5,7 +5,7 @@
 -include("snarl_version.hrl").
 
 %% Application callbacks
--export([start/2, stop/1, init_folsom/0, reindex/0]).
+-export([start/2, stop/1, init_folsom/0]).
 
 -ignore_xref([init_folsom/0]).
 
@@ -27,7 +27,6 @@ start(_StartType, _StartArgs) ->
     init_folsom(),
     case snarl_sup:start_link() of
         {ok, Pid} ->
-            lager_watchdog_srv:set_version(?VERSION),
             ?SRV_WITH_AAE(snarl_user_vnode, snarl_user),
             ?SRV_WITH_AAE(snarl_client_vnode, snarl_client),
             ?SRV_WITH_AAE(snarl_role_vnode, snarl_role),
@@ -47,16 +46,15 @@ start(_StartType, _StartArgs) ->
             case application:get_env(snarl, sync) of
                 {ok, on} ->
                     {ok, {IP, Port}} = application:get_env(snarl, sync_ip),
-                    [A, B, C, D] = [list_to_integer(binary_to_list(P)) || P <- re:split(IP, "[.]")],
                     {ok, _} = ranch:start_listener(
                                 snarl, 100, ranch_tcp,
-                                [{port, Port}, {ip, {A,B,C,D}}],
+                                [{port, Port}, {ip, IP}],
                                 snarl_sync_protocol, []);
                 _ ->
                     ok
             end,
             timer:apply_after(2000, snarl_opt, update, []),
-            spawn(?MODULE, reindex, []),
+            spawn(snarl_indexed, reindex, []),
             {ok, Pid};
         {error, Reason} ->
             {error, Reason}
@@ -94,38 +92,3 @@ init_folsom() ->
             [{snarl, accounting, M} || M <- AccMs] ++
             [{snarl, token, M} || M <- TokenMs]
     ].
-
-reindex() ->
-    lager:info("[reindex] Starting reindex, giving the cluste 5s for the "
-               "cluster to start up."),
-    timer:sleep(5000),
-    Start = erlang:monotonic_time(micro_seconds),
-    lager:info("[reindex] Gathering elements to reindex..."),
-    {ok, Users} = snarl_user:list(),
-    Users1 = [{snarl_user, U} || U <- Users],
-    {ok, Clients} = snarl_client:list(),
-    Clients1 = [{snarl_client, U} || U <- Clients],
-    {ok, Orgs} = snarl_org:list(),
-    Orgs1 = [{snarl_org, O} || O <- Orgs],
-    {ok, Roles} = snarl_role:list(),
-    Roles1 = [{snarl_role, R} || R <- Roles],
-    All = lists:flatten([Clients1, Orgs1, Roles1], Users1),
-    Cnt = length(All),
-    lager:info("[reindex] A total of ~p elements are going to be reindexed...",
-               [Cnt]),
-    lists:foldl(fun do_index/2, {0, 0, Cnt}, All),
-    End = erlang:monotonic_time(micro_seconds),
-    lager:info("[reindex] Reindex completed after ~.2fms...",
-               [(End - Start)/1000]).
-
-do_index({Mod, {Realm, UUID}}, {P, Cnt, Max}) ->
-    timer:sleep(100),
-    Mod:reindex(Realm, UUID),
-    Cnt1 = Cnt + 1,
-    case trunc((Cnt1 / Max) * 10) of
-        P1 when P1 > P ->
-            lager:info("[reindex] ~p% (~p)", [P1*10, Cnt1]),
-            {P1, Cnt1, Max};
-        _ ->
-            {P, Cnt1, Max}
-    end.

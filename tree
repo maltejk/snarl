@@ -6,20 +6,19 @@
 ├─ cuttlefish─2.0.0+build.479.reff5f6fdc
 │  ├─ getopt─0.4.3
 │  └─ neotoma─1.7.2
-├─ edown─0.7+build.149.refb012490
+├─ edown─0.7+build.151.ref2f6d4d4
 ├─ eper─0.94.0
 ├─ esel─0.1.0
 ├─ esqlite─0.1.1
 ├─ fifo_db─0.1.7
 │  └─ eleveldb─2.1.0.0
-├─ fifo_dt─0.1.57
+├─ fifo_dt─0.1.58
 │  └─ riak_dt─2.1.1
-├─ fifo_lager─0.1.0
+├─ fifo_lager─0.1.1
 │  ├─ lager_graylog─1
-│  ├─ lager_logstash_backend─0.0.2
-│  └─ lager_watchdog─0.1.10
-├─ fifo_spec─0.1.23
-├─ fifo_utils─0.1.16
+│  └─ lager_logstash_backend─0.0.2
+├─ fifo_spec─0.1.24
+├─ fifo_utils─0.1.17
 ├─ folsom_ddb─0.1.20
 │  └─ ddb_client─0.1.17
 │     ├─ dproto─0.1.12
@@ -29,7 +28,7 @@
 ├─ lager─2.1.1
 │  └─ goldrush─0.1.7
 ├─ libsnarlmatch─0.1.7
-├─ mdns_server_lib─0.2.0
+├─ mdns_server_lib─0.2.2
 │  ├─ mdns_server─0.2.0
 │  └─ ranch─1.1.0
 ├─ meck─0.8.2
@@ -37,7 +36,7 @@
 ├─ oauth2─0.6.0
 ├─ rankmatcher─0.1.2
 ├─ recon─2.2.1
-├─ riak_core─fifo-0.4.4+build.1799.ref088de5d
+├─ riak_core─fifo-0.4.4+build.1802.reffdf5dd7
 │  ├─ basho_stats─1.0.3
 │  ├─ chash─0.1.1
 │  ├─ exometer_core─1.0.0-basho2

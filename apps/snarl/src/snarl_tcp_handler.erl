@@ -12,6 +12,8 @@
 
 -record(state, {port}).
 
+-type state() :: #state{}.
+
 init(Prot, []) ->
     {ok, #state{port = Prot}}.
 
@@ -28,9 +30,9 @@ init(Prot, []) ->
         fifo:snarl_acc_message() |
         fifo:snarl_oauth_message().
 
--spec message(message(), #state{}) ->
-                     {noreply, #state{}} |
-                     {reply, term(), #state{}}.
+-spec message(message(), state()) ->
+                     {noreply, state()} |
+                     {reply, term(), state()}.
 message(version, State) ->
     {reply, {ok, ?VERSION}, State};
 
@@ -424,21 +426,24 @@ message({accounting, create, Realm, Org, Resource, Time, Metadata}, State)
        is_binary(Org),
        is_binary(Resource),
        is_integer(Time), Time > 0 ->
-    {reply, snarl_accounting:create(Realm, Org, Resource, Time, Metadata), State};
+    R = snarl_accounting:create(Realm, Org, Resource, Time, Metadata),
+    {reply, R, State};
 
 message({accounting, update, Realm, Org, Resource, Time, Metadata}, State)
   when is_binary(Realm),
        is_binary(Org),
        is_binary(Resource),
        is_integer(Time), Time > 0 ->
-    {reply, snarl_accounting:update(Realm, Org, Resource, Time, Metadata), State};
+    R = snarl_accounting:update(Realm, Org, Resource, Time, Metadata),
+    {reply, R, State};
 
 message({accounting, destroy, Realm, Org, Resource, Time, Metadata}, State)
   when is_binary(Realm),
        is_binary(Org),
        is_binary(Resource),
        is_integer(Time), Time > 0 ->
-    {reply, snarl_accounting:destroy(Realm, Org, Resource, Time, Metadata), State};
+    R = snarl_accounting:destroy(Realm, Org, Resource, Time, Metadata),
+    {reply, R, State};
 
 message({accounting, get, Realm, Org}, State)
   when is_binary(Realm),
@@ -559,9 +564,8 @@ message(
   {oauth2, authorize_code_request, Realm, User, Client, RedirUri, Scope},
   State) ->
     Ctx = #{realm => Realm},
-    {reply,
-     oauth_reply(oauth2:authorize_code_request(User, Client, RedirUri, Scope, Ctx)),
-     State};
+    R = oauth2:authorize_code_request(User, Client, RedirUri, Scope, Ctx),
+    {reply, oauth_reply(R), State};
 
 %% -export([issue_code/2]).
 message(
@@ -645,26 +649,21 @@ status() ->
                    {[], []} ->
                        [];
                    {[], L} ->
-                       W = jsxd:from_list(
-                             [{<<"category">>, <<"snarl">>},
-                              {<<"element">>, <<"handoff">>},
-                              {<<"type">>, <<"info">>},
-                              {<<"message">>, bin_fmt("~b handofs pending.",
-                                                      [length(L)])}]),
-                       [W];
+                       [handoff_msg(length(L))];
                    {S, []} ->
                        server_errors(S);
                    {S, L} ->
-                       W = jsxd:from_list(
-                             [{<<"category">>, <<"snarl">>},
-                              {<<"element">>, <<"handoff">>},
-                              {<<"type">>, <<"info">>},
-                              {<<"message">>, bin_fmt("~b handofs pending.",
-                                                      [length(L)])}]),
-                       [W | server_errors(S)]
+                       [handoff_msg(length(L)) | server_errors(S)]
                end,
     {ok, {[], ordsets:from_list(Warnings)}}.
 
+
+handoff_msg(Pending) ->
+    jsxd:from_list(
+      [{<<"category">>, <<"snarl">>},
+       {<<"element">>, <<"handoff">>},
+       {<<"type">>, <<"info">>},
+       {<<"message">>, bin_fmt("~b handofs pending.", [Pending])}]).
 
 server_errors(Servers) ->
     lists:map(fun (Server) ->
@@ -672,7 +671,8 @@ server_errors(Servers) ->
                         [{<<"category">>, <<"snarl">>},
                          {<<"element">>, list_to_binary(atom_to_list(Server))},
                          {<<"type">>, <<"critical">>},
-                         {<<"message">>, bin_fmt("Snarl server ~s down.", [Server])}])
+                         {<<"message">>, bin_fmt("Snarl server ~s down.",
+                                                 [Server])}])
               end, Servers).
 
 bin_fmt(F, L) ->

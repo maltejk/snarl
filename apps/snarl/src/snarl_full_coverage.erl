@@ -16,12 +16,15 @@
 -record(state, {replies, r, reqid, from, reqs, raw = false}).
 
 start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, Full}) ->
-    start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, Full, false});
+    start(VNodeMaster, NodeCheckService,
+          {list, Realm, Requirements, Full, false});
 
 start(VNodeMaster, NodeCheckService, {list, Realm, Requirements, false, _}) ->
-    snarl_coverage:start(VNodeMaster, NodeCheckService, {list, Realm, Requirements});
+    snarl_coverage:start(VNodeMaster, NodeCheckService,
+                         {list, Realm, Requirements});
 
-start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true, _}) ->
+start(VNodeMaster, NodeCheckService,
+      Request = {list, _Realm, Requirements, true, _}) ->
     ReqID = snarl_vnode:mk_reqid(),
     snarl_entity_coverage_fsm_sup:start_coverage(
       ?MODULE, {self(), ReqID, Requirements},
@@ -36,7 +39,8 @@ start(VNodeMaster, NodeCheckService, Request = {list, _Realm, Requirements, true
     end.
 
 %% The first is the vnode service used
-init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService, {Cmd, Realm, Requirements, Full, Raw}}) ->
+init({From, ReqID, Requirements}, {VNodeMaster, NodeCheckService,
+                                   {Cmd, Realm, Requirements, Full, Raw}}) ->
     NVal = ?N,
     R = ?R,
     %% all - full coverage; allup - partial coverage
@@ -66,20 +70,17 @@ process_results(Result, State) ->
 
 finish(clean, State = #state{replies = Replies,
                              from = From, r = R}) ->
-    MergedReplies = dict:fold(fun(_Key, Es, Res)->
-                                      case length(Es) of
-                                          _L when _L < R ->
-                                              Res;
-                                          _ ->
-                                              Mgd = case State#state.raw of
-                                                        false ->
-                                                            merge(Es);
-                                                        true ->
-                                                            raw_merge(Es)
-                                                    end,
-                                              lager:debug("Merged: ~p-> ~p", [Es, Mgd]),
-                                              [Mgd | Res]
-                                      end
+    MergedReplies = dict:fold(fun(_Key, Es, Res) when length(Es) < R->
+                                      Res;
+                                 (_Key, Es, Res) ->
+                                      Mgd = case State#state.raw of
+                                                false ->
+                                                    merge(Es);
+                                                true ->
+                                                    raw_merge(Es)
+                                            end,
+                                      lager:debug("Merged: ~p-> ~p", [Es, Mgd]),
+                                      [Mgd | Res]
                               end, [], Replies),
     From ! {ok, MergedReplies},
     {stop, normal, State};

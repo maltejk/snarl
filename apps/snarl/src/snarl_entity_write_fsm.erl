@@ -57,6 +57,8 @@
                 preflist :: riak_core_apl:preflist2(),
                 num_w = 0 :: non_neg_integer()}).
 
+-type state() :: #state{}.
+
 %%%===================================================================
 %%% API
 %%%===================================================================
@@ -65,7 +67,8 @@ start_link({VNode, System}, ReqID, From, {Realm, Entity}, Op) ->
     start_link({node(), VNode, System}, ReqID, From, {Realm, Entity}, Op);
 
 start_link({Node, VNode, System}, ReqID, From, {Realm, Entity}, Op) ->
-    start_link({Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, undefined).
+    start_link({Node, VNode, System}, ReqID, From, {Realm, Entity}, Op,
+               undefined).
 
 start_link({VNode, System}, ReqID, From, {Realm, Entity}, Op, Val) ->
     start_link({node(), VNode, System}, ReqID, From, {Realm, Entity}, Op, Val);
@@ -86,11 +89,13 @@ write({VNode, System}, {Realm, Entity}, Op, Val) ->
 write({{remote, Node}, VNode, System}, {Realm, Entity}, Op, Val) ->
     lager:debug("[sync-write:~p] executing sync write", [System]),
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, undefined, {Realm, Entity}, Op, Val]);
+    snarl_entity_write_fsm_sup:start_write_fsm(
+      [{Node, VNode, System}, ReqID, undefined, {Realm, Entity}, Op, Val]);
 
 write({Node, VNode, System}, {Realm, Entity}, Op, Val) ->
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_write_fsm_sup:start_write_fsm([{Node, VNode, System}, ReqID, self(), {Realm, Entity}, Op, Val]),
+    snarl_entity_write_fsm_sup:start_write_fsm(
+      [{Node, VNode, System}, ReqID, self(), {Realm, Entity}, Op, Val]),
     receive
         {ReqID, ok} ->
             snarl_sync:sync_op(Node, VNode, System, Realm, Entity, Op, Val),
@@ -107,7 +112,7 @@ write({Node, VNode, System}, {Realm, Entity}, Op, Val) ->
 %%%===================================================================
 
 %% @doc Initialize the state data.
-
+-spec init(_) -> {ok, prepare, state(), 0}.
 init([{Node, VNode, System}, ReqID, From, {Realm, Entity}, Op, Val]) ->
     SD = #state{req_id=ReqID,
                 from=From,
@@ -156,8 +161,8 @@ execute(timeout, SD0=#state{req_id=ReqID,
 waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    if
-        NumW =:= W ->
+    case NumW of
+        W ->
             case From of
                 undefined ->
                     ok;
@@ -165,33 +170,34 @@ waiting({ok, ReqID}, SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
                     From ! {ReqID, ok}
             end,
             {stop, normal, SD};
-        true -> {next_state, waiting, SD}
+        _ -> {next_state, waiting, SD}
     end;
 
 waiting({ok, ReqID, Reply},
         SD0=#state{from=From, num_w=NumW0, req_id=ReqID, w = W}) ->
     NumW = NumW0 + 1,
     SD = SD0#state{num_w=NumW},
-    if
-        NumW =:= W ->
-            if
-                is_pid(From) ->
-                    From ! {ReqID, ok, Reply};
-                true -> ok
+    case NumW of
+        W ->
+            case From of
+                undefined ->
+                    ok;
+                _ ->
+                    From ! {ReqID, ok, Reply}
             end,
             {stop, normal, SD};
 
-        true -> {next_state, waiting, SD}
+        _ -> {next_state, waiting, SD}
     end.
 
 handle_info(_Info, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 handle_event(_Event, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 handle_sync_event(_Event, _From, _StateName, StateData) ->
-    {stop,badmsg,StateData}.
+    {stop, badmsg, StateData}.
 
 code_change(_OldVsn, StateName, State, _Extra) ->
     {ok, StateName, State}.

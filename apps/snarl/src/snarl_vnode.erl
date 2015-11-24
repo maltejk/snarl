@@ -22,6 +22,7 @@
          mk_reqid/0]).
 
 
+                                                %-callback
 -ignore_xref([mkid/0, delete/2]).
 
 -define(FM(Mod, Fun, Args),
@@ -83,7 +84,7 @@ list_keys(Realm, Sender, State = #vstate{db=DB}) ->
                      [K|L]
              end,
     AsyncWork = fun() ->
-                        ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []])
+                        fold_keys(DB, Bucket, FoldFn)
                 end,
     FinishFun = fun(Data) ->
                         reply(Data, Sender, State)
@@ -92,9 +93,9 @@ list_keys(Realm, Sender, State = #vstate{db=DB}) ->
 
 list_keys(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
     Prefix = mk_pfx(Realm, State),
-    ID = snarl_vnode:mkid(list),
+    ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
-                     E1 = ft_obj:update(SM:load(ID, ft_obj:val(E)), list, E),
+                     E1 = load_obj(ID, SM, E),
                      case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
@@ -108,7 +109,7 @@ list(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
     Prefix = mk_pfx(Realm, State),
     ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
-                     E1 = ft_obj:update(SM:load(ID, ft_obj:val(E)), list, E),
+                     E1 = load_obj(ID, SM, E),
                      case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
@@ -154,7 +155,8 @@ change(Realm, UUID, Action, Vals, {ReqID, Coordinator} = ID,
             snarl_vnode:put(Realm, UUID, Obj, State),
             {reply, {ok, ReqID}, State};
         R ->
-            lager:error("[~s:~s] Tried to write to a non existing element: ~p => ~p",
+            lager:error("[~s:~s] Tried to write to a non existing element: "
+                        "~p => ~p",
                         [State#vstate.bucket, Action, UUID, R]),
             {reply, {ok, ReqID, not_found}, State}
     end.
@@ -169,17 +171,12 @@ is_empty(State=#vstate{db=DB}) ->
 
 delete(State=#vstate{db=DB}) ->
     Bucket = mk_bkt(State),
-    FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
-    Trans = ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []]),
-    ?FM(fifo_db, transact, [State#vstate.db, Trans]),
+    do_delete(DB, Bucket),
     {ok, State}.
-
 
 delete(Realm, State=#vstate{db=DB}) ->
     Bucket = mk_pfx(Realm, State),
-    FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
-    Trans = ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []]),
-    ?FM(fifo_db, transact, [State#vstate.db, Trans]),
+    do_delete(DB, Bucket),
     {ok, State}.
 
 handle_coverage({wipe, Realm, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
@@ -187,7 +184,8 @@ handle_coverage({wipe, Realm, UUID}, _KeySpaces, {_, ReqID, _}, State) ->
     ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     {reply, {ok, ReqID}, State};
 
-handle_coverage({lookup, Realm, Name}, _KeySpaces, Sender, State=#vstate{state=Mod}) ->
+handle_coverage({lookup, Realm, Name}, _KeySpaces, Sender,
+                State=#vstate{state=Mod}) ->
     Bucket = mk_pfx(Realm, State),
     ID = mkid(lookup),
     FoldFn = fun (U, O, [not_found]) ->
@@ -213,13 +211,15 @@ handle_coverage(list, _KeySpaces, Sender, State) ->
 handle_coverage({list, Realm}, _KeySpaces, Sender, State) ->
     list_keys(Realm, Sender, State);
 
-handle_coverage({list, Realm, Requirements}, _KeySpaces, Sender, State) ->
-    handle_coverage({list, Realm, Requirements, false}, _KeySpaces, Sender, State);
+handle_coverage({list, Realm, Requirements}, KeySpaces, Sender, State) ->
+    handle_coverage({list, Realm, Requirements, false}, KeySpaces, Sender,
+                    State);
 
-handle_coverage({list, undefined, [], true}, _KeySpaces, Sender, State=#vstate{bucket = Bucket, state=SM}) ->
+handle_coverage({list, undefined, [], true}, _KeySpaces, Sender,
+                State=#vstate{bucket = Bucket, state=SM}) ->
     ID = mkid(),
     FoldFn = fun(K, O, Acc) ->
-                     O1 = ft_obj:update(SM:load(ID, ft_obj:val(O)), node(), O),
+                     O1 = load_obj(ID, SM, O),
                      [{0, {K, O1}} | Acc]
              end,
     fold(Bucket, FoldFn, [], Sender, State);
@@ -292,20 +292,22 @@ handle_command({get, ReqID, {Realm, UUID}}, _Sender, State) ->
     NodeIdx = {State#vstate.partition, State#vstate.node},
     {reply, {ok, ReqID, NodeIdx, Res}, State};
 
-handle_command({delete, {ReqID, _Coordinator}, {undefined, UUID}}, _Sender, State) ->
+handle_command({delete, {ReqID, _Coordinator}, {undefined, UUID}}, _Sender,
+               State) ->
     Bucket = State#vstate.bucket,
     ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     {reply, {ok, ReqID}, State};
 
-handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender, State) ->
+handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender,
+               State) ->
     Bucket = mk_pfx(Realm, State),
     ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     riak_core_index_hashtree:delete(
       {Realm, UUID}, State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
 
-handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data}, _Sender,
-               State=#vstate{state=Mod}) ->
+handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data},
+               _Sender, State=#vstate{state=Mod}) ->
     H1 = Mod:load(ID, Data),
     H2 = Mod:uuid(ID, UUID, H1),
     case get(Realm, UUID, State) of
@@ -436,3 +438,11 @@ load_obj({T, ID}, Mod, Obj) ->
 
 vc_bin(VClock) ->
     term_to_binary(lists:sort(VClock)).
+
+do_delete(DB, Bucket) ->
+    FoldFn = fun (K, A) -> [{delete, <<Bucket/binary, K/binary>>} | A] end,
+    Trans = fold_keys(DB, Bucket, FoldFn),
+    ?FM(fifo_db, transact, [DB, Trans]).
+
+fold_keys(DB, Bucket, FoldFn) ->
+    ?FM(fifo_db, fold_keys, [DB, Bucket, FoldFn, []]).
