@@ -26,7 +26,7 @@
          terminate/2, code_change/3]).
 
 -define(SERVER, ?MODULE).
--define(CON_OPTS, [binary, {active,false}, {packet,4}]).
+-define(CON_OPTS, [binary, {active, false}, {packet, 4}]).
 
 -define(SYNC_IVAL, 1000*60*15).
 
@@ -50,7 +50,8 @@ start_link(IP, Port) ->
     gen_server:start_link({local, ?SERVER}, ?MODULE, [IP, Port], []).
 
 sync_op(Node, VNode, System, Bucket, User, Op, Val) ->
-    gen_server:abcast(?SERVER, {write, Node, VNode, System, Bucket, User, Op, Val}).
+    gen_server:abcast(?SERVER,
+                      {write, Node, VNode, System, Bucket, User, Op, Val}).
 
 reconnect() ->
     reconnect(self()).
@@ -145,7 +146,8 @@ handle_cast({write, Node, VNode, System, Bucket, ID, Op, Val},
                  E ->
                      lager:error("[sync] Error: ~p", [E]),
                      reconnect(),
-                     dyntrace:p(?DT_SYNC, ?DT_RETURN, ?DT_FAIL, SystemS, ID, OpS),
+                     dyntrace:p(?DT_SYNC, ?DT_RETURN, ?DT_FAIL, SystemS, ID,
+                                OpS),
                      State#state{socket=undefined}
              end,
     {noreply, State0};

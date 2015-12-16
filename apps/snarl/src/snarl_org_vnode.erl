@@ -35,7 +35,7 @@
          set_metadata/4,
          import/4,
          delete/3,
-         resource_action/4,
+         resource_inc/4, resource_dec/4, resource_remove/4,
          add_trigger/4, remove_trigger/4,
          remove_target/4,
          repair/4, sync_repair/4
@@ -47,7 +47,7 @@
               get/3,
               add/4,
               delete/3,
-              resource_action/4,
+              resource_inc/4, resource_dec/4, resource_remove/4,
               add_trigger/4, remove_trigger/4,
               remove_target/4,
               set_metadata/4,
@@ -112,9 +112,21 @@ set_metadata(Preflist, ReqID, UUID, Attributes) ->
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
-resource_action(Preflist, ReqID, UUID, {Resource, TimeStamp, Action, Opts}) ->
+resource_inc(Preflist, ReqID, UUID, {Resource, Value}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {resource_action, ReqID, UUID, Resource, TimeStamp, Action, Opts},
+                                   {resource_inc, ReqID, UUID, Resource, Value},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+resource_dec(Preflist, ReqID, UUID, {Resource, Value}) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {resource_dec, ReqID, UUID, Resource, Value},
+                                   {fsm, undefined, self()},
+                                   ?MASTER).
+
+resource_remove(Preflist, ReqID, UUID, Resource) ->
+    riak_core_vnode_master:command(Preflist,
+                                   {resource_remove, ReqID, UUID, Resource},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -163,7 +175,8 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org},
+               _Sender, State) ->
     Org0 = ft_org:new(ID),
     Org1 = ft_org:name(ID, Org, Org0),
     Org2 = ft_org:uuid(ID, UUID, Org1),
@@ -173,7 +186,8 @@ handle_command({add, {ReqID, Coordinator} = ID, {Realm, UUID}, Org}, _Sender, St
 
 handle_command({resource_action, ID, {Realm, UUID},
                 Resource, TimeStamp, Action, Opts}, _Sender, State) ->
-    snarl_vnode:change(Realm, UUID, resource_action, [Resource, TimeStamp, Action, Opts],
+    snarl_vnode:change(Realm, UUID, resource_action,
+                       [Resource, TimeStamp, Action, Opts],
                        ID, State);
 
 handle_command(Message, Sender, State) ->

@@ -103,7 +103,8 @@ get(Preflist, ReqID, Token) ->
 
 add(Preflist, ReqID, Token, {default, User}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, Token, {expiery(?TIMEOUT), User}},
+                                   {add, ReqID, Token,
+                                    {expiery(?TIMEOUT), User}},
                                    {fsm, undefined, self()},
                                    ?MASTER);
 add(Preflist, ReqID, Token, {infinity, User}) ->
@@ -113,7 +114,8 @@ add(Preflist, ReqID, Token, {infinity, User}) ->
                                    ?MASTER);
 add(Preflist, ReqID, Token, {Timeout, User}) ->
     riak_core_vnode_master:command(Preflist,
-                                   {add, ReqID, Token, {expiery(Timeout), User}},
+                                   {add, ReqID, Token,
+                                    {expiery(Timeout), User}},
                                    {fsm, undefined, self()},
                                    ?MASTER);
 
@@ -159,42 +161,14 @@ handle_command({repair, {Realm, Token}, _, Obj}, _Sender, State) ->
             {noreply, State}
     end;
 
-handle_command({get, ReqID, {Realm, Token}}, _Sender,
-               #state{tokens = Tokens0, db = DBRef} = State) ->
+handle_command({get, ReqID, {Realm, Token}}, _Sender, State) ->
     NodeIdx = {State#state.partition, State#state.node},
     Key = term_to_binary({Realm, Token}),
-    case get_api(Key, State) of
+    case get_key(Key, State) of
         {ok, Res, State1} ->
             {reply, {ok, ReqID, NodeIdx, Res}, State1};
-        _ ->
-            T0 = erlang:system_time(seconds),
-            {Tokens1, Res} =
-                case maps:find(Key, Tokens0) of
-                    error ->
-                        case bitcask:get(DBRef, Key) of
-                            {ok, V} ->
-                                Obj = binary_to_term(V),
-                                case ft_obj:val(Obj) of
-                                    {Exp, _V} when Exp > T0->
-                                        {maps:put(Key, Obj, Tokens0), Obj};
-                                    _ ->
-                                        bitcask:delete(DBRef, Key),
-                                        {Tokens0, not_found}
-                                end;
-                            _ ->
-                                {Tokens0, not_found}
-                        end;
-                    {ok, Obj} ->
-                        case ft_obj:val(Obj) of
-                            {Exp, _V} when Exp > T0->
-                                {Tokens0, Obj};
-                            _ ->
-                                bitcask:delete(DBRef, Key),
-                                {maps:remove(Key, Tokens0),
-                                 not_found}
-                        end
-                end,
-            {reply, {ok, ReqID, NodeIdx, Res}, State#state{tokens = Tokens1}}
+        {not_found, State1} ->
+            {reply, {ok, ReqID, NodeIdx, not_found}, State1}
     end;
 
 handle_command({delete, {ReqID, _Coordinator}, {Realm, Token}}, _Sender,
@@ -217,11 +191,11 @@ handle_command({add, {ReqID, Coordinator}, {Realm, Token}, {Exp, Value}},
 
     Ts0 = maps:put(Key, TObject, State1#state.tokens),
     bitcask:put(State1#state.db, Key, term_to_binary(TObject)),
-    {reply, {ok, ReqID, Token},State1#state{
-                                 tokens = Ts0,
-                                 access_cnt = State1#state.access_cnt + 1,
-                                 cnt = State1#state.cnt + 1
-                                }};
+    {reply, {ok, ReqID, Token}, State1#state{
+                                  tokens = Ts0,
+                                  access_cnt = State1#state.access_cnt + 1,
+                                  cnt = State1#state.cnt + 1
+                                 }};
 
 handle_command({add_api, {ReqID, Coordinator}, {Realm, Token}, Value},
                _Sender, State) ->
@@ -285,6 +259,21 @@ delete(State) ->
     {ok, State1#state{tokens = #{},
                       api_tokens = #{}}}.
 
+expire_obj(DB, T0, Realm, RK, V, Acc) ->
+    case binary_to_term(RK) of
+        {R, K} when R =:= Realm ->
+            Obj = binary_to_term(V),
+            case ft_obj:val(Obj) of
+                {Exp, _V} when Exp > T0 ->
+                    [K | Acc];
+                _ ->
+                    bitcask:delete(DB, RK),
+                    Acc
+            end;
+        _ ->
+            Acc
+    end.
+
 handle_coverage({list, Realm, ReqID}, _KeySpaces, _Sender, State) ->
     T0 = erlang:system_time(seconds),
     DB = State#state.db,
@@ -292,19 +281,7 @@ handle_coverage({list, Realm, ReqID}, _KeySpaces, _Sender, State) ->
     %% at it.
     Ks1 = bitcask:fold(State#state.db,
                        fun (RK, V, Acc) ->
-                               case binary_to_term(RK) of
-                                   {R, K} when R =:= Realm ->
-                                       Obj = binary_to_term(V),
-                                       case ft_obj:val(Obj) of
-                                           {Exp, _V} when Exp > T0 ->
-                                               [K | Acc];
-                                           _ ->
-                                               bitcask:delete(DB, RK),
-                                               Acc
-                                       end;
-                                   _ ->
-                                       Acc
-                               end
+                               expire_obj(DB, T0, Realm, RK, V, Acc)
                        end, []),
     %% Add the api keys, it's simpler since we don't need to do
     %% timeouts here.
@@ -336,20 +313,6 @@ terminate(_Reason, #state{db=DBRef, api_db = APIDB}) ->
 %%%===================================================================
 %%% Internal Functions
 %%%===================================================================
-get_api(Key, State = #state{api_tokens = Tokens0, api_db = DBRef}) ->
-    case maps:find(Key, Tokens0) of
-        error ->
-            case bitcask:get(DBRef, Key) of
-                {ok, V} ->
-                    Obj = binary_to_term(V),
-                    Tokens1 = maps:put(Key, Obj, Tokens0),
-                    {ok, Obj, State#state{api_tokens = Tokens1}};
-                _ ->
-                    not_found
-            end;
-        {ok, Obj} ->
-            {ok, Obj, State}
-    end.
 
 db_dirs(#state{partition = Partition}) ->
     PString = integer_to_list(Partition),
@@ -393,7 +356,8 @@ expire(#state{tokens = Tokens, db = DBRef} = State) ->
                                 true;
                             _->
                                 {Realm, Token} = binary_to_term(Key),
-                                lager:debug("[token:~p] Expiering: ~p", [Realm, Token]),
+                                lager:debug("[token:~p] Expiering: ~p",
+                                            [Realm, Token]),
                                 bitcask:delete(DBRef, Key),
                                 false
                         end
@@ -447,8 +411,71 @@ del_all_files([Dir | T], EmptyDirs) ->
                                             false ->
                                                 {[Path | Fs], Ds}
                                         end
-                                end, {[],[]}, FilesInDir),
+                                end, {[], []}, FilesInDir),
     lists:foreach(fun(F) ->
                           ok = file:delete(F)
                   end, Files),
     del_all_files(T ++ Dirs, [Dir | EmptyDirs]).
+
+
+get_key(Key, State) ->
+    T0 = erlang:system_time(seconds),
+    get_mem(T0, Key, State).
+
+get_mem(T0, Key, State = #state{tokens = Tokens0, db = DBRef}) ->
+    case maps:find(Key, Tokens0) of
+        error ->
+            %% if we don't find a normal memory token we
+            %% check for a memory cached aPI token first
+            get_api_mem(T0, Key, State);
+        {ok, Obj} ->
+            case ft_obj:val(Obj) of
+                {Exp, _V} when Exp > T0->
+                    {ok, Obj, State};
+                _ ->
+                    bitcask:delete(DBRef, Key),
+                    Tokens1 = maps:remove(Key, Tokens0),
+                    %% We know this is an expired token,
+                    %% we don't need to look further
+                    {not_found, State#state{tokens = Tokens1}}
+            end
+    end.
+
+get_api_mem(T0, Key, State = #state{api_tokens = Tokens0}) ->
+    case maps:find(Key, Tokens0) of
+        error ->
+            %% If we do not have it in the memory cache,
+            %% we'll look for a non api token first
+            %% since they are more common.
+            get_db(T0, Key, State);
+        {ok, Obj} ->
+            {ok, Obj, State}
+    end.
+
+get_db(T0, Key, State = #state{tokens = Tokens0, db = DBRef}) ->
+    case bitcask:get(DBRef, Key) of
+        {ok, V} ->
+            Obj = binary_to_term(V),
+            case ft_obj:val(Obj) of
+                {Exp, _V} when Exp > T0->
+                    Tokens1 = maps:put(Key, Obj, Tokens0),
+                    {ok, Obj, State#state{tokens = Tokens1}};
+                _ ->
+                    bitcask:delete(DBRef, Key),
+                    %% We know this is an expired token,
+                    %% we don't need to look further
+                    {not_found, State}
+            end;
+        _ ->
+            get_api_db(Key, State)
+    end.
+
+get_api_db(Key, State = #state{api_tokens = Tokens0, api_db = DBRef}) ->
+    case bitcask:get(DBRef, Key) of
+        {ok, V} ->
+            Obj = binary_to_term(V),
+            Tokens1 = maps:put(Key, Obj, Tokens0),
+            {ok, Obj, State#state{api_tokens = Tokens1}};
+        _ ->
+            {not_found, State}
+    end.

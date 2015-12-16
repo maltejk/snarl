@@ -156,7 +156,8 @@ add_yubikey(Preflist, ReqID, {Realm, UUID}, OTP) ->
 
 remove_yubikey(Preflist, ReqID, {Realm, UUID}, KeyId) ->
     riak_core_vnode_master:command(Preflist,
-                                   {remove_yubikey, ReqID, {Realm, UUID}, KeyId},
+                                   {remove_yubikey, ReqID, {Realm, UUID},
+                                    KeyId},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -174,7 +175,8 @@ remove_token(Preflist, ReqID, {Realm, UUID}, Token) ->
 
 set_metadata(Preflist, ReqID, {Realm, UUID}, Attributes) ->
     riak_core_vnode_master:command(Preflist,
-                                   {set_metadata, ReqID, {Realm, UUID}, Attributes},
+                                   {set_metadata, ReqID, {Realm, UUID},
+                                    Attributes},
                                    {fsm, undefined, self()},
                                    ?MASTER).
 
@@ -254,7 +256,8 @@ init([Part]) ->
 %%% General
 %%%===================================================================
 
-handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, User}, _Sender, State) ->
+handle_command({add, {ReqID, Coordinator}=ID, {Realm, UUID}, User}, _Sender,
+               State) ->
     User0 = ft_user:new(ID),
     User1 = ft_user:name(ID, User, User0),
     User2 = ft_user:uuid(ID, UUID, User1),
@@ -345,23 +348,11 @@ handle_info(Msg, State) ->
 %%% Internal Functions
 %%%===================================================================
 
--ifndef(old_hash).
 key_to_id(Key) ->
     case re:split(Key, " ") of
         [_, ID0, _] ->
             ID1 = base64:decode(ID0),
-            crypto:hash(md5,ID1);
+            crypto:hash(md5, ID1);
         _ ->
             <<>>
     end.
--else.
-key_to_id(Key) ->
-    case re:split(Key, " ") of
-        [_, ID0, _] ->
-            ID1 = base64:decode(ID0),
-            crypto:md5(ID1);
-        _ ->
-            <<>>
-    end.
--endif.
-

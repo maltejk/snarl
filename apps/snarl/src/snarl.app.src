@@ -1,7 +1,7 @@
 %% -*- erlang -*-
 {application, snarl,
  [{description, "AAA Server"},
-  {vsn, "0.7.0p6"},
+  {vsn, "0.7.1"},
   {registered, []},
   {applications,
     [kernel,
@@ -15,6 +15,7 @@
      folsom_ddb,
      mdns_server_lib,
      lager,
+     bugsnag,
      fifo_lager,
      libsnarlmatch,
      jsx,
@@ -26,7 +27,8 @@
      merklet,
      esqlite,
      yubico,
-     uuid
+     uuid,
+     esel
      ]},
   {mod, {snarl_app, []}},
   {env,

@@ -16,14 +16,14 @@
 
 %% Internal exports
 
--define(status_col, 4).
+-define(STATUS_COL, 4).
 
--define(active, 1).
--define(notInService, 2).
--define(notReady, 3).
--define(createAndGo, 4).   % Action; written, not read
--define(createAndWait, 5). % Action; written, not read
--define(destroy, 6).       % Action; written, not read
+-define(ACTIVE, 1).
+-define(NOT_IN_SERVICE, 2).
+-define(NOT_READY, 3).
+-define(CREATE_AND_GO, 4).   % Action; written, not read
+-define(CREATE_AND_WAIT, 5). % Action; written, not read
+-define(DESTROY, 6).       % Action; written, not read
 
 
 
@@ -119,19 +119,19 @@ percentile_get(What, Prefix, Roleing) ->
 
 %% TODO: this is a dummy now
 generate_percentile(_Prefix, _Roleing) ->
- [{observations,12},
-  {min,15986},
-  {median,17581},
-  {mean,17796.416666666668},
-  {max,19912},
-  {sd,1135.098911055232},
-  {sum,213557},
-  {sum2,3814722299},
-  {p25,16831},
-  {p75,17995},
-  {p95,19912},
-  {p99,19912},
-  {p999,19912}]. 
+    [{observations,  12},
+     {min, 15986},
+     {median, 17581},
+     {mean, 17796.416666666668},
+     {max, 19912},
+     {sd, 1135.098911055232},
+     {sum, 213557},
+     {sum2, 3814722299},
+     {p25, 16831},
+     {p75, 17995},
+     {p95, 19912},
+     {p99, 19912},
+     {p999, 19912}].
 
 %%    L = byte_size(Prefix),
 %%    {ok, Data} = statman_aggregator:get_window(60),
@@ -166,5 +166,3 @@ generate_percentile(_Prefix, _Roleing) ->
 %% {p95,19912},
 %% {p99,19912},
 %% {p999,19912}]
-
-

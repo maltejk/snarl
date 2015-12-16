@@ -116,7 +116,8 @@ associate_access_token(AccessToken, Context,
     {ok, User} = jsxd:get(<<"resource_owner">>, Context),
     {ok, Client} = jsxd:get(<<"client">>, Context),
     {ok, Scope} = jsxd:get(<<"scope">>, Context),
-    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery, Client, Scope),
+    snarl_user:add_token(Realm, User, TokenID, Type, AccessToken, Expiery,
+                         Client, Scope),
     {ok, AppContext}.
 
 resolve_access_token(AccessToken, AppContext = #{realm := Realm}) ->
@@ -163,7 +164,8 @@ associate_refresh_token(RefreshToken, Context,
     {ok, Client} = jsxd:get(<<"client">>, Context),
     {ok, Expiery} = jsxd:get(<<"expiry_time">>, Context),
     {ok, Scope} = jsxd:get(<<"scope">>, Context),
-    snarl_user:add_token(Realm, User, TokenID, Type, RefreshToken, Expiery, Client, Scope),
+    snarl_user:add_token(Realm, User, TokenID, Type, RefreshToken, Expiery,
+                         Client, Scope),
     {ok, AppContext}.
 
 resolve_refresh_token(RefreshToken, AppContext = #{realm := Realm}) ->
@@ -219,13 +221,6 @@ verify_client_scope(_Client, Scope, AppContext = #{realm := Realm}) ->
     RealmScope = [S || #{scope := S} <-
                            snarl_oauth:scope(Realm)],
     verify_scope(RealmScope, Scope, AppContext).
-%%verify_client_scope({Client, _Secret}, Scope, AppContext) ->
-    %% case snarl_user:lookup(AppContext#oauth_state.realm, <<"client:", Client/binary>>) of
-    %%     {ok, ClientID} ->
-
-    %%     _E ->
-    %%         {error, badscope}
-    %% end.
 
 verify_resowner_scope(_UserID, Scope, AppContext = #{realm := Realm}) ->
     RealmScope = [S || #{scope := S} <-

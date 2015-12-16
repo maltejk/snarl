@@ -1,6 +1,7 @@
 -module(snarl_role).
-
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+
+-behaviour(snarl_indexed).
 
 -export([
          sync_repair/3,
@@ -20,8 +21,7 @@
               wipe/2,
               list_/1,
               create/3, raw/2, sync_repair/3,
-              import/3, lookup/2,
-              reindex/2
+              import/3, lookup/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -33,12 +33,12 @@
 
 %% Public API
 
--define(NAME_2i, {?MODULE, name}).
+-define(NAME_2I, {?MODULE, name}).
 
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
         {ok, O} ->
-            snarl_2i:add(Realm, ?NAME_2i, ft_role:name(O), UUID),
+            snarl_2i:add(Realm, ?NAME_2I, ft_role:name(O), UUID),
             ok;
         E ->
             E
@@ -55,14 +55,14 @@ import(Realm, Role, Data) ->
     do_write(Realm, Role, import, Data).
 
 -spec lookup(Realm::binary(), Role::binary()) ->
-                     not_found |
-                     {error, timeout} |
-                     {ok, Role::fifo:role()}.
+                    not_found |
+                    {error, timeout} |
+                    {ok, Role::fifo:role()}.
 lookup(Realm, Role) ->
     folsom_metrics:histogram_timed_update(
       {snarl, role, lookup},
       fun() ->
-              case snarl_2i:get(Realm, ?NAME_2i, Role) of
+              case snarl_2i:get(Realm, ?NAME_2I, Role) of
                   {ok, UUID} ->
                       ?MODULE:get(Realm, UUID);
                   R ->
@@ -85,7 +85,8 @@ get(Realm, Role) ->
 
 raw(Realm, Role) ->
     case ?FM(get, snarl_entity_read_fsm, start,
-             [{snarl_role_vnode, snarl_role}, get, {Realm, Role}, undefined, true]) of
+             [{snarl_role_vnode, snarl_role}, get,
+              {Realm, Role}, undefined, true]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -142,7 +143,7 @@ create(Realm, UUID, Role) ->
     case snarl_role:lookup(Realm, Role) of
         not_found ->
             ok = do_write(Realm, UUID, add, Role),
-            snarl_2i:add(Realm, ?NAME_2i, Role, UUID),
+            snarl_2i:add(Realm, ?NAME_2I, Role, UUID),
             {ok, UUID};
         {ok, _RoleObj} ->
             duplicate
@@ -156,7 +157,7 @@ create(Realm, UUID, Role) ->
 delete(Realm, Role) ->
     case ?MODULE:get(Realm, Role) of
         {ok, O} ->
-            snarl_2i:delete(Realm, ?NAME_2i, ft_role:name(O)),
+            snarl_2i:delete(Realm, ?NAME_2I, ft_role:name(O)),
             ok;
         E ->
             E

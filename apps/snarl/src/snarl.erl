@@ -1,7 +1,7 @@
 -module(snarl).
 -include("snarl.hrl").
 
--export([]).  
+-export([]).
 
 %%%===================================================================
 %%% Internal Functions

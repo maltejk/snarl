@@ -1,6 +1,9 @@
 -module(snarl_org).
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 
+-behaviour(snarl_indexed).
+-behaviour(snarl_sync_element).
+
 -export([
          sync_repair/3,
          list/0, list/1, list_/1, list/3,
@@ -12,6 +15,7 @@
          import/3,
          trigger/4,
          add_trigger/3, remove_trigger/3,
+         resource_inc/4, resource_dec/4, resource_remove/3,
          remove_target/3,
          reindex/2,
          wipe/2
@@ -23,10 +27,7 @@
               create/3,
               import/3,
               list_/1,
-              raw/2,
-              sync_repair/3,
-              wipe/2,
-              reindex/2
+              wipe/2
              ]).
 
 -define(TIMEOUT, 5000).
@@ -39,17 +40,25 @@
 -type template() :: [binary()|placeholder].
 %% Public API
 
-
--define(NAME_2i, {?MODULE, name}).
+-define(NAME_2I, {?MODULE, name}).
 
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
         {ok, O} ->
-            snarl_2i:add(Realm, ?NAME_2i, ft_org:name(O), UUID),
+            snarl_2i:add(Realm, ?NAME_2I, ft_org:name(O), UUID),
             ok;
         E ->
             E
     end.
+
+resource_inc(Realm, UUID, Resource, Val) ->
+    do_write(Realm, UUID, resource_inc, {Resource, Val}).
+
+resource_dec(Realm, UUID, Resource, Val) ->
+    do_write(Realm, UUID, resource_dec, {Resource, Val}).
+
+resource_remove(Realm, UUID, Resource) ->
+    do_write(Realm, UUID, resource_remove, Resource).
 
 wipe(Realm, UUID) ->
     ?FM(wipe, snarl_coverage, start,
@@ -88,8 +97,10 @@ do_events(_Realm, [], _Event, _Payload, N) ->
     N.
 
 -spec do_event(Realm::binary(),
-               Action::{grant, role, Role::fifo:role_id(), Template::template()} |
-                       {grant, user, User::fifo:user_id(), Template::template()} |
+               Action::{grant, role, Role::fifo:role_id(),
+                        Template::template()} |
+                       {grant, user, User::fifo:user_id(),
+                        Template::template()} |
                        {join, role, Role::fifo:role_id()} |
                        {join, org, Org::fifo:org_id()},
                Payload::template()) ->
@@ -132,7 +143,7 @@ lookup(Realm, OrgName) ->
     folsom_metrics:histogram_timed_update(
       {snarl, role, lookup},
       fun() ->
-              case snarl_2i:get(Realm, ?NAME_2i, OrgName) of
+              case snarl_2i:get(Realm, ?NAME_2I, OrgName) of
                   {ok, UUID} ->
                       ?MODULE:get(Realm, UUID);
                   R ->
@@ -207,7 +218,7 @@ create(Realm, UUID, Org) ->
     case ?MODULE:lookup(Realm, Org) of
         not_found ->
             ok = do_write(Realm, UUID, add, Org),
-            snarl_2i:add(Realm, ?NAME_2i, Org, UUID),
+            snarl_2i:add(Realm, ?NAME_2I, Org, UUID),
             {ok, UUID};
         {ok, _OrgObj} ->
             duplicate
@@ -221,7 +232,7 @@ create(Realm, UUID, Org) ->
 delete(Realm, Org) ->
     case ?MODULE:get(Realm, Org) of
         {ok, O} ->
-            snarl_2i:delete(Realm, ?NAME_2i, ft_org:name(O)),
+            snarl_2i:delete(Realm, ?NAME_2I, ft_org:name(O)),
             ok;
         E ->
             E
@@ -243,7 +254,8 @@ delete(Realm, Org) ->
 
 
 
--spec set_metadata(Realm::binary(), Org::fifo:org_id(), Attirbutes::fifo:attr_list()) ->
+-spec set_metadata(Realm::binary(), Org::fifo:org_id(),
+                   Attirbutes::fifo:attr_list()) ->
                           not_found |
                           {error, timeout} |
                           ok.

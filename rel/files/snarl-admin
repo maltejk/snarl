@@ -872,7 +872,7 @@ case "$1" in
         echo "               db update [<section>]                      - lists db entries."
         echo "               db list [-p <prefix>]                      - lists db entries."
         echo "               db list <hash> [<prefix>]                  - lists db entries for a hash."
-        echo "               db get <hash> <prefix> <key>               - gets raw data from the db."
+        echo "               db get <hash> <realm> <bucket> <key>       - gets raw data from the db."
         echo "               db delete <hash> <prefix> <key>            - deletes directly from db."
         echo "               config show                                - shows global config options."
         echo "               config show <realm>                        - shows relm related config options."
