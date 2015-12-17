@@ -8,7 +8,7 @@
 │  └─ neotoma─1.7.2
 ├─ edown─0.7+build.151.ref2f6d4d4
 ├─ eper─0.94.0
-├─ esel─0.1.1
+├─ esel─0.1.2
 ├─ esqlite─0.1.1
 ├─ fifo_db─0.1.7
 │  └─ eleveldb─2.1.0.0
