@@ -320,7 +320,7 @@ raw(Realm, User) ->
                   {error, timeout} |
                   {ok, Users::[fifo:user_id()]}.
 list(Realm) ->
-    ?FM(list, snarl_coverage, start,
+    ?FM(list, snarl_coverage , start,
         [snarl_user_vnode_master, snarl_user, {list, Realm}]).
 
 list() ->
@@ -342,7 +342,7 @@ list(Realm, Requirements, Full) ->
     {ok, Res} =
         ?FM(list, snarl_coverage, full,
             [snarl_user_vnode_master, snarl_user,
-             {list, Realm, Requirements, Full}]),
+             Realm, Requirements]),
     Res1 = rankmatcher:apply_scales(Res),
     Res2 = case Full of
                true ->

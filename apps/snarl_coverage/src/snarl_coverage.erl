@@ -96,7 +96,12 @@ base_init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
     %% We timeout after 5s
     Timeout = 5000,
     %% The second element is always the realm
-    [_, Realm | _] = tuple_to_list(Request),
+    Realm = case Request of
+                list -> <<>>;
+                {wipe, Rlm, _UUID} -> Rlm;
+                {list, Rlm} -> Rlm;
+                {list, Rlm, _Requirements, _Full} -> Rlm
+            end,
     State = #state{r = R, from = From, reqid = ReqID, realm = Realm},
     {Request, VNodeSelector, N, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
