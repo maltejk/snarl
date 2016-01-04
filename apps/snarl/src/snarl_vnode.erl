@@ -21,14 +21,16 @@
          hash_object/2,
          mk_reqid/0]).
 
-
-                                                %-callback
+%%-callback
 -ignore_xref([mkid/0, delete/2]).
 
 -define(FM(Mod, Fun, Args),
         folsom_metrics:histogram_timed_update(
           {Mod, Fun},
           Mod, Fun, Args)).
+
+
+-define(PARTIAL_SIZE, 10).
 
 hash_object(Key, Obj) ->
     term_to_binary(erlang:phash2({Key, Obj})).
@@ -81,7 +83,14 @@ init(Partition, Bucket, Service, VNode, StateMod) ->
 list_keys(Realm, Sender, State = #vstate{db=DB}) ->
     Bucket = mk_pfx(Realm, State),
     FoldFn = fun (K, L) ->
-                     [K|L]
+                     L1 = [K|L],
+                     case length(L1) of
+                         ?PARTIAL_SIZE ->
+                             partial(L1, Sender, State),
+                             [];
+                         _ ->
+                             L1
+                     end
              end,
     AsyncWork = fun() ->
                         fold_keys(DB, Bucket, FoldFn)
@@ -96,11 +105,18 @@ list_keys(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
     ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
                      E1 = load_obj(ID, SM, E),
-                     case rankmatcher:match(E1, Getter, Requirements) of
-                         false ->
-                             C;
-                         Pts ->
-                             [{Pts, Key} | C]
+                     C1 = case rankmatcher:match(E1, Getter, Requirements) of
+                              false ->
+                                  C;
+                              Pts ->
+                                  [{Pts, Key} | C]
+                          end,
+                     case length(C1) of
+                         ?PARTIAL_SIZE ->
+                             partial(C1, Sender, State),
+                             [];
+                         _ ->
+                             C1
                      end
              end,
     fold(Prefix, FoldFn, [], Sender, State).
@@ -110,11 +126,18 @@ list(Realm, Getter, Requirements, Sender, State=#vstate{state=SM}) ->
     ID = mkid(list),
     FoldFn = fun (Key, E, C) ->
                      E1 = load_obj(ID, SM, E),
-                     case rankmatcher:match(E1, Getter, Requirements) of
+                     C1 = case rankmatcher:match(E1, Getter, Requirements) of
                          false ->
                              C;
                          Pts ->
                              [{Pts, {Key, E1}} | C]
+                     end,
+                     case length(C1) of
+                         ?PARTIAL_SIZE ->
+                             partial(C1, Sender, State),
+                             [];
+                         _ ->
+                             C1
                      end
              end,
     fold(Prefix, FoldFn, [], Sender, State).
@@ -393,6 +416,10 @@ handle_handoff_data(Data, State=#vstate{state=SM}) ->
            end,
     snarl_vnode:put(Realm, UUID, Obj1, State),
     {reply, ok, State}.
+
+partial(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
+    riak_core_vnode:reply(Sender, {partial, ReqID, {P, N}, Reply}).
+
 reply(Reply, {_, ReqID, _} = Sender, #vstate{node=N, partition=P}) ->
     riak_core_vnode:reply(Sender, {ok, ReqID, {P, N}, Reply}).
 
