@@ -97,7 +97,7 @@ base_init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
     Timeout = 5000,
     %% The second element is always the realm
     Realm = case Request of
-                list -> <<>>;
+                list -> undefined;
                 {wipe, Rlm, _UUID} -> Rlm;
                 {list, Rlm} -> Rlm;
                 {list, Rlm, _Requirements, _Full} -> Rlm
