@@ -24,6 +24,7 @@
      bcrypt,
      bitcask,
      snarl_oauth,
+     snarl_coverage,
      merklet,
      esqlite,
      yubico,

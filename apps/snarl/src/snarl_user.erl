@@ -12,6 +12,7 @@
          list/1,
          list_/1,
          list/3,
+         list/4,
          auth/4,
          auth/3,
          reindex/2,
@@ -42,14 +43,16 @@
              ]).
 
 -define(TIMEOUT, 5000).
+-define(MASTER, snarl_user_vnode_master).
+-define(SERVICE, snarl_user).
 
 -define(FM(Met, Mod, Fun, Args),
         folsom_metrics:histogram_timed_update(
           {snarl, user, Met},
           Mod, Fun, Args)).
 
--define(NAME_2I, {snarl_user, name}).
--define(KEY_2I, {snarl_user, key}).
+-define(NAME_2I, {?SERVICE, name}).
+-define(KEY_2I,  {?SERVICE, key}).
 
 %% Revokes a token by a given tokenID (not the token itself!)
 revoke_token(Realm, User, TokenID) ->
@@ -326,23 +329,34 @@ list() ->
 
 list_(Realm) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
+        ?FM(list, snarl_coverage, raw,
             [snarl_user_vnode_master, snarl_user,
-             {list, Realm, [], true, true}]),
+             Realm, []]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
 -spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
-                  {error, timeout} | {ok, [fifo:uuid()]}.
+                  {error, timeout} | {ok, [fifo:uuid() | ft_user:user()]}.
 
-list(Realm, Requirements, Full)
-  when Full == true orelse Full == false ->
+list(Realm, Requirements, Full) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
+        ?FM(list, snarl_coverage, full,
             [snarl_user_vnode_master, snarl_user,
              {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)}.
+    Res2 = case Full of
+               true ->
+                   Res1;
+               false ->
+                   [{P, ft_user:uuid(O)} || {P, O} <- Res1]
+           end,
+    {ok,  lists:sort(Res2)}.
+
+list(Realm, Requirements, FoldFn, Acc0) ->
+    ?FM(list_all, snarl_coverage, full,
+        [?MASTER, ?SERVICE, Realm, Requirements, FoldFn, Acc0]).
+
+
 
 -spec add(Realm::binary(), Creator::fifo:user_id(),
           UserName::binary()) ->
