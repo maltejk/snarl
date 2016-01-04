@@ -21,7 +21,6 @@
                 from :: pid(),
                 reqs :: list(),
                 raw :: boolean(),
-                realm :: binary(),
                 merge_fn = fun([E | _]) -> E  end :: fun( ([Type]) -> Type),
                 completed = [] :: [binary()]}).
 
@@ -79,8 +78,7 @@ init(Req,
                 false ->
                     fun merge/1
             end,
-    State2 = State1#state{reqs = Requirements, raw = Raw, merge_fn = Merge,
-                          realm = Realm},
+    State2 = State1#state{reqs = Requirements, raw = Raw, merge_fn = Merge},
     {Request, VNodeSelector, N, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State2};
 
@@ -95,14 +93,7 @@ base_init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
     PrimaryVNodeCoverage = R,
     %% We timeout after 5s
     Timeout = 5000,
-    %% The second element is always the realm
-    Realm = case Request of
-                list -> undefined;
-                {wipe, Rlm, _UUID} -> Rlm;
-                {list, Rlm} -> Rlm;
-                {list, Rlm, _Requirements, _Full} -> Rlm
-            end,
-    State = #state{r = R, from = From, reqid = ReqID, realm = Realm},
+    State = #state{r = R, from = From, reqid = ReqID},
     {Request, VNodeSelector, N, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
