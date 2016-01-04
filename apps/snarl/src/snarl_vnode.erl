@@ -227,7 +227,14 @@ handle_coverage({lookup, Realm, Name}, _KeySpaces, Sender,
 handle_coverage(list, _KeySpaces, Sender, State) ->
     Bucket = mk_bkt(State),
     FoldFn = fun(<<_RS:8/integer, Realm:_RS/binary, K/binary>>, _V, Acc) ->
-                     [{Realm, K} | Acc]
+                     L1 = [{Realm, K} | Acc],
+                     case length(L1) of
+                         ?PARTIAL_SIZE ->
+                             partial(L1, Sender, State),
+                             [];
+                         _ ->
+                             L1
+                     end
              end,
     fold(Bucket, FoldFn, [], Sender, State);
 
