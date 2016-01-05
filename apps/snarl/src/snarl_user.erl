@@ -336,7 +336,8 @@ list_(Realm) ->
     {ok,  Res1}.
 
 -spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
-                  {error, timeout} | {ok, [fifo:uuid() | ft_user:user()]}.
+                  {error, timeout} |
+                  {ok, [{integer(), fifo:uuid() | ft_user:user()}]}.
 
 list(Realm, Requirements, Full) ->
     {ok, Res} =
@@ -359,8 +360,6 @@ list(Realm, Requirements, Full) ->
 list(Realm, Requirements, FoldFn, Acc0) ->
     ?FM(list_all, ?COVERAGE, full,
         [?MASTER, ?MODULE, Realm, Requirements, FoldFn, Acc0]).
-
-
 
 -spec add(Realm::binary(), Creator::fifo:user_id(),
           UserName::binary()) ->
