@@ -97,6 +97,9 @@ base_init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
     {Request, VNodeSelector, N, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
+update(Key, State) when is_binary(Key) ->
+    update1({Key, Key}, State);
+
 update({Bucket, Key} = BK, State) when is_binary(Key), is_binary(Bucket) ->
     update1({BK, BK}, State);
 
