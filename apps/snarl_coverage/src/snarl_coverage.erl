@@ -97,26 +97,26 @@ base_init({From, ReqID, _}, {VNodeMaster, NodeCheckService, Request}) ->
     {Request, VNodeSelector, N, PrimaryVNodeCoverage,
      NodeCheckService, VNodeMaster, Timeout, State}.
 
-update(Key, State) when is_binary(Key) ->
-    update({Key, Key}, State);
+update({Bucket, Key} = BK, State) when is_binary(Key), is_binary(Bucket) ->
+    update1({BK, BK}, State);
 
 update({Pts, {Key, V}}, State) when not is_binary(Pts) ->
-    update({Key, {Pts, V}}, State);
+    update1({Key, {Pts, V}}, State).
 
-update({Key, Value}, State = #state{seen = Seen}) ->
+update1({Key, Value}, State = #state{seen = Seen}) ->
     case sets:is_element(Key, Seen) of
         true ->
             State;
         false ->
-            update1({Key, Value}, State)
+            update2({Key, Value}, State)
     end.
 
-update1({Key, Value}, State = #state{r = R, completed = Competed, seen = Seen})
+update2({Key, Value}, State = #state{r = R, completed = Competed, seen = Seen})
   when R < 2 ->
     Seen1 = sets:add_element(Key, Seen),
     State#state{seen = Seen1, completed = [Value | Competed]};
 
-update1({Key, Value},
+update2({Key, Value},
         State = #state{r = R, completed = Competed, seen = Seen,
                        merge_fn = Merge, replies = Replies}) ->
     case maps:find(Key, Replies) of
