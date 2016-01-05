@@ -1,15 +1,13 @@
 -module(snarl_client).
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include("snarl_ent.hrl").
 
 -behaviour(snarl_indexed).
 -behaviour(snarl_sync_element).
 
 -export([
          sync_repair/3,
-         list/0,
-         list/1,
-         list_/1,
-         list/3,
+         list/0, list/1, list/3, list/4, list_/1,
          auth/3,
          name/3,
          type/3,
@@ -33,13 +31,15 @@
              ]).
 
 -define(TIMEOUT, 5000).
+-define(MASTER,  snarl_client_vnode_master).
+-define(VNODE,   snarl_client_vnode).
 
 -define(FM(Met, Mod, Fun, Args),
         folsom_metrics:histogram_timed_update(
           {snarl, client, Met},
           Mod, Fun, Args)).
 
--define(ID_2I, {snarl_client, id}).
+-define(ID_2I, {?MODULE, id}).
 
 reindex(Realm, UUID) ->
     case ?MODULE:get(Realm, UUID) of
@@ -52,8 +52,8 @@ reindex(Realm, UUID) ->
 
 %% Public API
 wipe(Realm, UUID) ->
-    ?FM(wipe, snarl_coverage, start,
-        [snarl_client_vnode_master, snarl_client, {wipe, Realm, UUID}]).
+    ?FM(wipe, ?COVERAGE, start,
+        [?MASTER, ?MODULE, {wipe, Realm, UUID}]).
 
 sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
@@ -64,7 +64,7 @@ sync_repair(Realm, UUID, Obj) ->
                   {ok, Client::fifo:client_id()}.
 
 auth(Realm, Client, Secret) ->
-    case snarl_client:lookup(Realm, Client) of
+    case ?MODULE:lookup(Realm, Client) of
         {ok, ClientR} ->
             case check_pw(ClientR, Secret) of
                 true ->
@@ -86,7 +86,7 @@ lookup(Realm, Client) ->
       fun() ->
               case snarl_2i:get(Realm, ?ID_2I, Client) of
                   {ok, UUID} ->
-                      snarl_client:get(Realm, UUID);
+                      ?MODULE:get(Realm, UUID);
                   R ->
                       R
               end
@@ -108,7 +108,7 @@ revoke_prefix(Realm, Client, Prefix) ->
                      {error, timeout} |
                      true | false.
 allowed(Realm, Client, Permission) ->
-    case snarl_client:get(Realm, Client) of
+    case ?MODULE:get(Realm, Client) of
         {ok, ClientObj} ->
             test_client(Realm, ClientObj, Permission);
         E ->
@@ -122,7 +122,7 @@ remove_uri(Realm, Client, KeyID) ->
     do_write(Realm, Client, remove_uri, KeyID).
 
 uris(Realm, Client) ->
-    case snarl_client:get(Realm, Client) of
+    case ?MODULE:get(Realm, Client) of
         {ok, ClientObj} ->
             {ok, ft_client:uris(ClientObj)};
         E ->
@@ -134,8 +134,8 @@ uris(Realm, Client) ->
                   {error, timeout} |
                   {ok, Client::fifo:client()}.
 get(Realm, Client) ->
-    case ?FM(get, snarl_entity_read_fsm, start,
-             [{snarl_client_vnode, snarl_client}, get, {Realm, Client}]) of
+    case ?FM(get, ?READ_FSM, start,
+             [{?VNODE, ?MODULE}, get, {Realm, Client}]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -143,8 +143,8 @@ get(Realm, Client) ->
     end.
 
 raw(Realm, Client) ->
-    case ?FM(get, snarl_entity_read_fsm, start,
-             [{snarl_client_vnode, snarl_client}, get, {Realm, Client},
+    case ?FM(get, ?READ_FSM, start,
+             [{?VNODE, ?MODULE}, get, {Realm, Client},
               undefined, true]) of
         {ok, not_found} ->
             not_found;
@@ -152,36 +152,51 @@ raw(Realm, Client) ->
             R
     end.
 
+list() ->
+    ?FM(list_all, ?COVERAGE, start,
+        [?MASTER, ?MODULE, list]).
+
 -spec list(Realm::binary()) ->
                   {error, timeout} |
                   {ok, Clients::[fifo:client_id()]}.
 list(Realm) ->
-    ?FM(list, snarl_coverage, start,
-        [snarl_client_vnode_master, snarl_client, {list, Realm}]).
-
-list() ->
-    ?FM(list_all, snarl_coverage, start,
-        [snarl_client_vnode_master, snarl_client, list]).
+    ?FM(list, ?COVERAGE, start,
+        [?MASTER, ?MODULE, {list, Realm}]).
 
 list_(Realm) ->
     {ok, Res} =
         ?FM(list, snarl_full_coverage, start,
-            [snarl_client_vnode_master, snarl_client,
+            [?MASTER, ?MODULE,
              {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
 -spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
-                  {error, timeout} | {ok, [fifo:uuid()]}.
+                  {error, timeout} |
+                  {ok, [{integer(), fifo:uuid() | ft_client:client()}]}.
 
-list(Realm, Requirements, Full)
-  when Full == true orelse Full == false ->
+list(Realm, Requirements, Full) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
-            [snarl_client_vnode_master, snarl_client,
-             {list, Realm, Requirements, Full}]),
+        ?FM(list, ?COVERAGE, full,
+            [?MASTER, ?MODULE,
+             Realm, Requirements]),
     Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)}.
+    Res2 = case Full of
+               true ->
+                   Res1;
+               false ->
+                   [{P, ft_client:uuid(O)} || {P, O} <- Res1]
+           end,
+    {ok,  lists:sort(Res2)}.
+
+-spec list(Realm::binary(), [fifo:matcher()],
+           FoldFn::snal_coverage:fold_fun(), Acc0::term()) ->
+                  {error, timeout} | {ok, term()}.
+
+list(Realm, Requirements, FoldFn, Acc0) ->
+    ?FM(list_all, ?COVERAGE, full,
+        [?MASTER, ?MODULE, Realm, Requirements, FoldFn, Acc0]).
+
 
 -spec add(Realm::binary(), Creator::fifo:client_id(),
           ClientID::binary()) ->
@@ -301,8 +316,8 @@ delete(Realm, Client) ->
     spawn(
       fun () ->
               Prefix = [<<"clients">>, Client],
-              {ok, Clients} = snarl_client:list(Realm),
-              [snarl_client:revoke_prefix(Realm, U, Prefix) || U <- Clients],
+              {ok, Clients} = ?MODULE:list(Realm),
+              [?MODULE:revoke_prefix(Realm, U, Prefix) || U <- Clients],
               {ok, Roles} = snarl_role:list(Realm),
               [snarl_role:revoke_prefix(Realm, R, Prefix) || R <- Roles]
       end),
@@ -329,8 +344,8 @@ revoke(Realm, Client, Permission) ->
 %%%===================================================================
 
 do_write(Realm, Client, Op) ->
-    case ?FM(Op, snarl_entity_write_fsm, write,
-             [{snarl_client_vnode, snarl_client}, {Realm, Client}, Op]) of
+    case ?FM(Op, ?WRITE_FSM, write,
+             [{?VNODE, ?MODULE}, {Realm, Client}, Op]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -338,8 +353,8 @@ do_write(Realm, Client, Op) ->
     end.
 
 do_write(Realm, Client, Op, Val) ->
-    case ?FM(Op, snarl_entity_write_fsm, write,
-             [{snarl_client_vnode, snarl_client}, {Realm, Client}, Op, Val]) of
+    case ?FM(Op, ?WRITE_FSM, write,
+             [{?VNODE, ?MODULE}, {Realm, Client}, Op, Val]) of
         {ok, not_found} ->
             not_found;
         R ->
