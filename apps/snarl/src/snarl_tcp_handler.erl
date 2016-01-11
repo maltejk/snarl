@@ -40,6 +40,16 @@ message(version, State) ->
 %%% Org Functions
 %%%===================================================================
 
+message({org, stream, Realm, Requirements}, State) when
+      is_list(Requirements) ->
+    Fn = fun(Send) ->
+                 Fold = fun(Es, _) ->
+                                Send(Es)
+                        end,
+                 snarl_org:list(Realm, Requirements, Fold, ok)
+         end,
+    {stream, Fn, State};
+
 message({org, list, Realm}, State) ->
     {reply, snarl_org:list(Realm), State};
 
@@ -82,6 +92,16 @@ message({org, resource, remove, Realm, Org, Res}, State) ->
 %%%===================================================================
 %%% User Functions
 %%%===================================================================
+
+message({user, stream, Realm, Requirements}, State) when
+      is_list(Requirements) ->
+    Fn = fun(Send) ->
+                 Fold = fun(Es, _) ->
+                                Send(Es)
+                        end,
+                 snarl_user:list(Realm, Requirements, Fold, ok)
+         end,
+    {stream, Fn, State};
 
 message({user, list, Realm}, State) ->
     {reply, snarl_user:list(Realm), State};
@@ -317,6 +337,16 @@ message({token, add, Realm, Token, Timeout, Data}, State) when
 %%% Client Functions
 %%%===================================================================
 
+message({client, stream, Realm, Requirements}, State) when
+      is_list(Requirements) ->
+    Fn = fun(Send) ->
+                 Fold = fun(Es, _) ->
+                                Send(Es)
+                        end,
+                 snarl_client:list(Realm, Requirements, Fold, ok)
+         end,
+    {stream, Fn, State};
+
 message({client, list, Realm}, State) ->
     {reply, snarl_client:list(Realm), State};
 
@@ -469,6 +499,16 @@ message({accounting, get, Realm, Org, Start, End}, State)
 %%%===================================================================
 %%% Role Functions
 %%%===================================================================
+
+message({role, stream, Realm, Requirements}, State) when
+      is_list(Requirements) ->
+    Fn = fun(Send) ->
+                 Fold = fun(Es, _) ->
+                                Send(Es)
+                        end,
+                 snarl_role:list(Realm, Requirements, Fold, ok)
+         end,
+    {stream, Fn, State};
 
 message({role, list, Realm}, State) ->
     {reply, snarl_role:list(Realm), State};

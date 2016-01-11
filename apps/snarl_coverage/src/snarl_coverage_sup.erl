@@ -1,9 +1,7 @@
-%% @doc Supervise the rts_write FSM.
--module(snarl_entity_coverage_fsm_sup).
+%% @doc Supervise the coverage supervisor.
+-module(snarl_coverage_sup).
 
 -behavior(supervisor).
-
--include("snarl.hrl").
 
 -export([start_coverage/2,
          start_coverage/3,

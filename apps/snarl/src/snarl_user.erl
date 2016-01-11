@@ -1,6 +1,6 @@
 -module(snarl_user).
-
 -include_lib("snarl_oauth/include/snarl_oauth.hrl").
+-include("snarl_ent.hrl").
 
 -behaviour(snarl_indexed).
 -behaviour(snarl_sync_element).
@@ -12,6 +12,7 @@
          list/1,
          list_/1,
          list/3,
+         list/4,
          auth/4,
          auth/3,
          reindex/2,
@@ -42,19 +43,21 @@
              ]).
 
 -define(TIMEOUT, 5000).
+-define(MASTER,  snarl_user_vnode_master).
+-define(VNODE,   snarl_user_vnode).
 
 -define(FM(Met, Mod, Fun, Args),
         folsom_metrics:histogram_timed_update(
           {snarl, user, Met},
           Mod, Fun, Args)).
 
--define(NAME_2I, {snarl_user, name}).
--define(KEY_2I, {snarl_user, key}).
+-define(NAME_2I, {?MODULE, name}).
+-define(KEY_2I,  {?MODULE, key}).
 
 %% Revokes a token by a given tokenID (not the token itself!)
 revoke_token(Realm, User, TokenID) ->
     Ctx = #{realm => Realm, user => User},
-    case snarl_user:get(Realm, User) of
+    case ?MODULE:get(Realm, User) of
         {ok, U} ->
             case ft_user:get_token_by_id(TokenID, U) of
                 #{token := T, type := access} ->
@@ -83,8 +86,8 @@ reindex(Realm, UUID) ->
 
 %% Public API
 wipe(Realm, UUID) ->
-    ?FM(wipe, snarl_coverage, start,
-        [snarl_user_vnode_master, snarl_user, {wipe, Realm, UUID}]).
+    ?FM(wipe, ?COVERAGE, start,
+        [?MASTER, ?MODULE, {wipe, Realm, UUID}]).
 
 sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
@@ -133,7 +136,7 @@ auth(Realm, User, Passwd, OTP) ->
     end.
 
 check_yubikey(Realm, UUID, OTP) ->
-    case snarl_user:get(Realm, UUID) of
+    case ?MODULE:get(Realm, UUID) of
         {ok, User} ->
             check_yubikey(User, OTP);
         E ->
@@ -184,7 +187,7 @@ lookup(Realm, User) ->
       fun() ->
               case snarl_2i:get(Realm, ?NAME_2I, User) of
                   {ok, UUID} ->
-                      snarl_user:get(Realm, UUID);
+                      ?MODULE:get(Realm, UUID);
                   R ->
                       R
               end
@@ -218,7 +221,7 @@ revoke_prefix(Realm, User, Prefix) ->
                      {error, timeout} |
                      true | false.
 allowed(Realm, User, Permission) ->
-    case snarl_user:get(Realm, User) of
+    case ?MODULE:get(Realm, User) of
         {ok, UserObj} ->
             test_user(Realm, UserObj, Permission);
         E ->
@@ -269,7 +272,7 @@ remove_yubikey(Realm, User, KeyID) ->
                    {error, timeout} |
                    {ok, Perms::[fifo:permission()]}.
 cache(Realm, User) ->
-    case snarl_user:get(Realm, User) of
+    case ?MODULE:get(Realm, User) of
         {ok, UserObj} ->
             {ok, collect_permissions(Realm, UserObj)};
         E ->
@@ -295,8 +298,8 @@ collect_permissions(Realm, UserObj) ->
                  {error, timeout} |
                  {ok, User::fifo:user()}.
 get(Realm, User) ->
-    case ?FM(get, snarl_entity_read_fsm, start,
-             [{snarl_user_vnode, snarl_user}, get, {Realm, User}]) of
+    case ?FM(get, ?READ_FSM, start,
+             [{?VNODE, ?MODULE}, get, {Realm, User}]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -304,8 +307,8 @@ get(Realm, User) ->
     end.
 
 raw(Realm, User) ->
-    case ?FM(get, snarl_entity_read_fsm, start,
-             [{snarl_user_vnode, snarl_user}, get, {Realm, User}, undefined,
+    case ?FM(get, ?READ_FSM, start,
+             [{?VNODE, ?MODULE}, get, {Realm, User}, undefined,
               true]) of
         {ok, not_found} ->
             not_found;
@@ -313,36 +316,50 @@ raw(Realm, User) ->
             R
     end.
 
+list() ->
+    ?FM(list_all, ?COVERAGE, start,
+        [?MASTER, ?MODULE, list]).
+
 -spec list(Realm::binary()) ->
                   {error, timeout} |
                   {ok, Users::[fifo:user_id()]}.
 list(Realm) ->
-    ?FM(list, snarl_coverage, start,
-        [snarl_user_vnode_master, snarl_user, {list, Realm}]).
-
-list() ->
-    ?FM(list_all, snarl_coverage, start,
-        [snarl_user_vnode_master, snarl_user, list]).
+    ?FM(list, ?COVERAGE , start,
+        [?MASTER, ?MODULE, {list, Realm}]).
 
 list_(Realm) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
-            [snarl_user_vnode_master, snarl_user,
-             {list, Realm, [], true, true}]),
+        ?FM(list, ?COVERAGE, raw,
+            [?MASTER, ?MODULE,
+             Realm, []]),
     Res1 = [R || {_, R} <- Res],
     {ok,  Res1}.
 
 -spec list(Realm::binary(), [fifo:matcher()], boolean()) ->
-                  {error, timeout} | {ok, [fifo:uuid()]}.
+                  {error, timeout} |
+                  {ok, [{integer(), fifo:uuid() | ft_user:user()}]}.
 
-list(Realm, Requirements, Full)
-  when Full == true orelse Full == false ->
+list(Realm, Requirements, Full) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
-            [snarl_user_vnode_master, snarl_user,
-             {list, Realm, Requirements, Full}]),
+        ?FM(list, ?COVERAGE, full,
+            [?MASTER, ?MODULE,
+             Realm, Requirements]),
     Res1 = rankmatcher:apply_scales(Res),
-    {ok,  lists:sort(Res1)}.
+    Res2 = case Full of
+               true ->
+                   Res1;
+               false ->
+                   [{P, ft_user:uuid(O)} || {P, O} <- Res1]
+           end,
+    {ok,  lists:sort(Res2)}.
+
+-spec list(Realm::binary(), [fifo:matcher()],
+           FoldFn::snal_coverage:fold_fun(), Acc0::term()) ->
+                  {error, timeout} | {ok, term()}.
+
+list(Realm, Requirements, FoldFn, Acc0) ->
+    ?FM(list_all, ?COVERAGE, full,
+        [?MASTER, ?MODULE, Realm, Requirements, FoldFn, Acc0]).
 
 -spec add(Realm::binary(), Creator::fifo:user_id(),
           UserName::binary()) ->
@@ -382,7 +399,7 @@ add(Realm, Creator, User) when is_binary(Creator),
     end.
 
 trigger(Realm, User, Action, UUID) ->
-    case snarl_user:get(Realm, User) of
+    case ?MODULE:get(Realm, User) of
         {ok, C} ->
             case ft_user:active_org(C) of
                 <<>> ->
@@ -480,7 +497,7 @@ join_org(Realm, User, Org) ->
                         {error, timeout} |
                         ok.
 select_org(Realm, User, Org) ->
-    case snarl_user:get(Realm, User) of
+    case ?MODULE:get(Realm, User) of
         {ok, UserObj} ->
             Orgs = ft_user:orgs(UserObj),
             case lists:member(Org, Orgs) of
@@ -498,7 +515,7 @@ select_org(Realm, User, Org) ->
                        {error, timeout} |
                        ok.
 leave_org(Realm, User, Org) ->
-    case snarl_user:get(Realm, User) of
+    case ?MODULE:get(Realm, User) of
         {ok, UserObj} ->
             case ft_user:active_org(UserObj) of
                 Org ->
@@ -528,8 +545,8 @@ delete(Realm, User) ->
     spawn(
       fun () ->
               Prefix = [<<"users">>, User],
-              {ok, Users} = snarl_user:list(Realm),
-              [snarl_user:revoke_prefix(Realm, U, Prefix) || U <- Users],
+              {ok, Users} = ?MODULE:list(Realm),
+              [?MODULE:revoke_prefix(Realm, U, Prefix) || U <- Users],
               {ok, Roles} = snarl_role:list(Realm),
               [snarl_role:revoke_prefix(Realm, R, Prefix) || R <- Roles],
               {ok, Orgs} = snarl_org:list(Realm),
@@ -558,8 +575,8 @@ revoke(Realm, User, Permission) ->
 %%%===================================================================
 
 do_write(Realm, User, Op) ->
-    case ?FM(Op, snarl_entity_write_fsm, write,
-             [{snarl_user_vnode, snarl_user}, {Realm, User}, Op]) of
+    case ?FM(Op, ?WRITE_FSM, write,
+             [{?VNODE, ?MODULE}, {Realm, User}, Op]) of
         {ok, not_found} ->
             not_found;
         R ->
@@ -567,8 +584,8 @@ do_write(Realm, User, Op) ->
     end.
 
 do_write(Realm, User, Op, Val) ->
-    case ?FM(Op, snarl_entity_write_fsm, write,
-             [{snarl_user_vnode, snarl_user}, {Realm, User}, Op, Val]) of
+    case ?FM(Op, ?WRITE_FSM, write,
+             [{?VNODE, ?MODULE}, {Realm, User}, Op, Val]) of
         {ok, not_found} ->
             not_found;
         R ->

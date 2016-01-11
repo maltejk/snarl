@@ -1,0 +1,12 @@
+{application, snarl_coverage,
+ [
+  {description, "Coverage FSM's for snarl"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {applications, [
+                  kernel,
+                  stdlib
+                 ]},
+  {mod, { snarl_coverage_app, []}},
+  {env, []}
+ ]}.
