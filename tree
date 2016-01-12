@@ -12,7 +12,7 @@
 ├─ esqlite─0.1.1
 ├─ fifo_db─0.1.7
 │  └─ eleveldb─2.1.0.0
-├─ fifo_dt─0.1.59
+├─ fifo_dt─0.1.60
 │  └─ riak_dt─2.1.1
 ├─ fifo_lager─0.1.1
 │  ├─ lager_graylog─1
