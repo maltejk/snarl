@@ -244,7 +244,7 @@ revoke_key(Realm, User, KeyID) ->
     case ?MODULE:get(Realm, User) of
         {ok, U} ->
             Ks = ft_user:keys(U),
-            case jsxd:get(KeyID, Ks) of
+            case jsxd:get([KeyID], Ks) of
                 {ok, Key} ->
                     snarl_2i:delete(Realm, ?KEY_2I, key_to_id(Key)),
                     do_write(Realm, User, revoke_key, KeyID);
