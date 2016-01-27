@@ -53,11 +53,6 @@ init(_Args) ->
                   {riak_core_vnode_master, start_link, [snarl_2i_vnode]},
                   permanent, 5000, worker, [riak_core_vnode_master]},
 
-    CoverageFSMs = {snarl_entity_coverage_fsm_sup,
-                    {snarl_entity_coverage_fsm_sup, start_link, []},
-                    permanent, infinity, supervisor,
-                    [snarl_entity_coverage_fsm_sup]},
-
     ReadFSMs = {snarl_entity_read_fsm_sup,
                 {snarl_entity_read_fsm_sup, start_link, []},
                 permanent, infinity, supervisor, [snarl_entity_read_fsm_sup]},
@@ -108,7 +103,7 @@ init(_Args) ->
 
     VNodeMasters = [RoleVMaster, UserVMaster, TokenVMaster, OrgVMaster,
                     S2iVMaster, ClientVMaster, AccountingVMaster],
-    FSMs = [ReadFSMs, WriteFSMs, CoverageFSMs, AccountingFSMs],
+    FSMs = [ReadFSMs, WriteFSMs, AccountingFSMs],
     AAE = [EntropyManagerUser, EntropyManagerRole, EntropyManagerOrg,
            EntropyManagerClient, EntropyManagerS2i, EntropyManagerAccounting],
     AdditionalServices =

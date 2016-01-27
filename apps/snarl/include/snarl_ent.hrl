@@ -1,0 +1,3 @@
+-define(READ_FSM,  snarl_entity_read_fsm).
+-define(WRITE_FSM, snarl_entity_write_fsm).
+-define(COVERAGE,  snarl_coverage).

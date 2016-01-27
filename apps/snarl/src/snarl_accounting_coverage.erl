@@ -23,7 +23,7 @@
 
 start(VNodeMaster, NodeCheckService, Request) ->
     ReqID = snarl_vnode:mk_reqid(),
-    snarl_entity_coverage_fsm_sup:start_coverage(
+    snarl_coverage_sup:start_coverage(
       ?MODULE, {self(), ReqID, something_else},
       {VNodeMaster, NodeCheckService, Request}),
     receive
