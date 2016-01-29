@@ -492,7 +492,8 @@ join_org(Realm, User, Org) ->
             E
     end.
 
--spec select_org(Realm::binary(), User::fifo:user_id(), Org::fifo:org_id()) ->
+-spec select_org(Realm::binary(), User::fifo:user_id(),
+                 Org::fifo:org_id() | <<>>) ->
                         not_found |
                         {error, timeout} |
                         ok.
