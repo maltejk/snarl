@@ -80,6 +80,9 @@ message({org, trigger, remove, Realm, Org, Trigger}, State) ->
 message({org, trigger, execute, Realm, Org, Event, Payload}, State) ->
     {reply, snarl_org:trigger(Realm, Org, Event, Payload), State};
 
+message({org, trigger, reverse, Realm, Org, Event, Payload}, State) ->
+    {reply, snarl_org:reverse_trigger(Realm, Org, Event, Payload), State};
+
 message({org, resource, inc, Realm, Org, Res, Val}, State) ->
     {reply, snarl_org:resource_inc(Realm, Org, Res, Val), State};
 
