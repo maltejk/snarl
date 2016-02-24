@@ -368,7 +368,7 @@ list(Realm, Requirements, FoldFn, Acc0) ->
                  {ok, UUID::fifo:user_id()}.
 
 add(Realm, undefined, User) ->
-    UUID = uuid:uuid4s(),
+    UUID = fifo_utils:uuid(user),
     lager:info("[~p:create] Creation Started.", [UUID]),
     case create(Realm, UUID, User) of
         {ok, UUID} ->

@@ -20,9 +20,6 @@
         C({_, UUID}, A1, A2) ->
                ?U:C(?REALM, UUID, A1, A2)).
 
--define(EQC_SETUP, true).
--define(EQC_EUNIT_TIMEUT, 1200).
-
 -define(KEY, <<"ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDZyw2HsD2TBPpBcCJLge4Eu1N9IXHx0S9APSdC4GEre3h4huNT9LUA78oOB1LDIyqmwbHy5yqVVBht4awmcveaSsBIDEPBrU+ZrSeibg3ikQxBYA+7IG8gwvEqxI9EdbnF6eqstfiUIaLsLuUY2E2b2DGIohy/NIw0tccchLR0kHUGz4yjmMZg78X9ux2VqFhlTfj3xDsagxFjo90FQkrO32SLULFS9fG5Ki8vsvhfkhhtgct74i894lj4DRThqmvgygODXcyvi/wtixaqKqcn+Y1JCr5AsvXvYmWQzdRh9Rv77j0mleo0xqosqXIH1HqsM4CJmdYGCPU7JB6k0j/H testkey@testbox">>).
 
 -import(snarl_test_helper,
@@ -31,13 +28,14 @@
          handoff/0, handon/1, delete/0]).
 
 -include_lib("eqc/include/eqc_statem.hrl").
--include_lib("fqc/include/fqc.hrl").
+-include_lib("eqc/include/eqc.hrl").
+-include_lib("fqc/include/fqci.hrl").
 -include_lib("riak_core/include/riak_core_vnode.hrl").
 -include_lib("snarl/include/snarl.hrl").
 
 -compile(export_all).
 
--record(state, {added = [], next_uuid=uuid:uuid4s(),
+-record(state, {added = [], next_uuid=fifo_utils:uuid(),
                 passwords = [], roles = [], orgs = [],
                 yubikeys = [], keys = [], metadata = [],
                 pid}).
@@ -57,21 +55,26 @@ maybe_a_password(#state{passwords = Pws}) ->
 initial_state() ->
     catch ets:delete(s2i),
     ets:new(s2i, [named_table, public, ordered_set]),
-    random:seed(now()),
+    random:seed(erlang:timestamp()),
     #state{}.
 
-prop_compare_to_model() ->
-    ?FORALL(Cmds,commands(?MODULE),
-            begin
-                {H,S,Res} = run_commands(?MODULE,Cmds),
-                cleanup(),
-                ?WHENFAIL(
-                   io:format(user, "History: ~p\nState: ~p\nRes: ~p\n", [H,S,Res]),
-                   Res == ok)
-            end).
+prop_compare_user_to_model() ->
+    ?SETUP(fun setup/0,
+           ?FORALL(Cmds,commands(?MODULE),
+                   begin
+                       {H,S,Res} = run_commands(?MODULE,Cmds),
+                       cleanup(),
+                       ?WHENFAIL(
+                          io:format(user, "History: ~p\nState: ~p\nRes: ~p\n", [H,S,Res]),
+                          Res == ok)
+                   end)).
 
 yubikey() ->
-    ?LET(L, resize(44, list(lower_char())), list_to_binary(L)).
+    oneof(
+      [<<"cccjgjgkhcbbirdrfdnlnghhfgrtnnlgedjlftrbdeut">>,
+       <<"cccjgjgkhcbbgefdkbbditfjrlniggevfhenublfnrev">>,
+       <<"cccjgjgkhcbbcvchfkfhiiuunbtnvgihdfiktncvlhck">>]).
+%%?LET(L, resize(44, list(lower_char())), list_to_binary(L)).
 
 maybe_role(#state{roles = Rs}) ->
     maybe_oneof([R || {_, R} <- Rs]).
@@ -106,7 +109,8 @@ command(S) ->
            %% List
            {call, ?U, list, [?REALM]},
            {call, ?U, list, [?REALM, [], bool()]},
-           {call, ?U, list_, [?REALM]},
+           %% We remove this since we'll mock it anyway
+           %%{call, ?U, list_, [?REALM]},
 
            %% Permissions
            {call, ?M, grant, [maybe_a_uuid(S), permission()]},
@@ -119,20 +123,16 @@ command(S) ->
            %% %% Org related commands
            {call, ?M, join_org, [maybe_a_uuid(S), non_blank_string()]},
            {call, ?M, leave_org, [maybe_a_uuid(S), maybe_org(S)]},
-           {call, ?M, active, [maybe_a_uuid(S)]},
-           {call, ?M, orgs, [maybe_a_uuid(S)]},
            {call, ?M, select_org, [maybe_a_uuid(S), maybe_org(S)]},
 
            %% SSH key related commands
            {call, ?M, add_key, [maybe_a_uuid(S), non_blank_string(), ?KEY]},
            {call, ?M, revoke_key, [maybe_a_uuid(S), maybe_key(S)]},
-           {call, ?M, keys, [maybe_a_uuid(S)]},
            {call, ?U, find_key, [?REALM, maybe_keyid(S)]},
 
            %% Yubi key related commands
            {call, ?M, add_yubikey, [maybe_a_uuid(S), yubikey()]},
            {call, ?M, remove_yubikey, [maybe_a_uuid(S), maybe_yubikey(S)]},
-           {call, ?M, yubikeys, [maybe_a_uuid(S)]},
 
            %% Metadata
            {call, ?M, set_metadata, [maybe_a_uuid(S), metadata_kvs()]},
@@ -154,15 +154,15 @@ auth({_, N}, P) ->
 ?FWD3(auth).
 
 add(UUID, User) ->
-    meck:new(uuid, [passthrough]),
-    meck:expect(uuid, uuid4s, fun() -> UUID end),
+    meck:new(fifo_utils, [passthrough]),
+    meck:expect(fifo_utils, uuid, fun(user) -> UUID end),
     R = case ?U:add(?REALM, User) of
             duplicate ->
                 duplicate;
             {ok, UUID} ->
                 {User, UUID}
         end,
-    meck:unload(uuid),
+    meck:unload(fifo_utils),
     R.
 
 ?FWD(get).
@@ -183,17 +183,13 @@ lookup({N, _}) ->
 ?FWD2(join_org).
 ?FWD2(leave_org).
 ?FWD2(select_org).
-?FWD(orgs).
-?FWD(active).
 
 ?FWD3(add_key).
 ?FWD2(revoke_key).
-?FWD(keys).
 ?FWD(find_key).
 
 ?FWD2(add_yubikey).
 ?FWD2(remove_yubikey).
-?FWD(yubikeys).
 
 ?FWD2(set_metadata).
 
@@ -260,10 +256,10 @@ next_state(S = #state{keys=Ks}, _V,
     end;
 
  next_state(S, duplicate, {call, _, add, [_, _User]}) ->
-    S#state{next_uuid=uuid:uuid4s()};
+    S#state{next_uuid=fifo_utils:uuid()};
 
 next_state(S = #state{added = Added}, V, {call, _, add, [_, _User]}) ->
-    S#state{added = [V | Added], next_uuid=uuid:uuid4s()};
+    S#state{added = [V | Added], next_uuid=fifo_utils:uuid()};
 
 next_state(S, _V, {call, _, delete, [UUIDAndName = {_, UUID}]}) ->
     S#state{added = lists:delete(UUIDAndName,  S#state.added),
@@ -363,18 +359,6 @@ postcondition(S, {call, _, leave_org, [{_, UUID}, _]}, not_found) ->
 postcondition(S, {call, _, leave_org, [{_, UUID}, _]}, ok) ->
     has_uuid(S, UUID);
 
-postcondition(S, {call, _, active, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, active, [{_, UUID}]}, {ok, _}) ->
-    has_uuid(S, UUID);
-
-postcondition(S, {call, _, orgs, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, orgs, [{_, UUID}]}, {ok, _}) ->
-    has_uuid(S, UUID);
-
 postcondition(S, {call, _, select_org, [{_, UUID}, Org]}, not_found) ->
     not (has_uuid(S, UUID) andalso
          lists:member(Org, known_orgs(S, UUID)));
@@ -399,15 +383,6 @@ postcondition(S, {call, _, revoke_key, [{_, UUID}, _]}, not_found) ->
 postcondition(S, {call, _, revoke_key, [{_, UUID}, _]}, ok) ->
     has_uuid(S, UUID);
 
-postcondition(S, {call, _, keys, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, keys, [{_, UUID}]}, {ok, L}) when is_list(L) ->
-    has_uuid(S, UUID);
-
-postcondition(#state{added = _Us}, {call, _, keys, [_UUID]}, _) ->
-    false;
-
 %% YubiKeys
 postcondition(S, {call, _, add_yubikey, [{_, UUID}, _]}, not_found) ->
     not has_uuid(S, UUID);
@@ -420,15 +395,6 @@ postcondition(S, {call, _, remove_yubikey, [{_, UUID}, _]}, not_found) ->
 
 postcondition(S, {call, _, remove_yubikey, [{_, UUID}, _]}, ok) ->
     has_uuid(S, UUID);
-
-postcondition(S, {call, _, yubikeys, [{_, UUID}]}, not_found) ->
-    not has_uuid(S, UUID);
-
-postcondition(S, {call, _, yubikeys, [{_, UUID}]}, {ok, L}) when is_list(L) ->
-    has_uuid(S, UUID);
-
-postcondition(#state{added = _Us}, {call, _, yubikeys, [_UUID]}, _) ->
-    false;
 
 %% Permissions
 postcondition(S, {call, _, grant, [{_, UUID}, _]}, not_found) ->
@@ -451,12 +417,11 @@ postcondition(S, {call, _, set_metadata, [{_, UUID}, _]}, ok) ->
     has_uuid(S, UUID);
 
 %% List
-
 postcondition(#state{added = A}, {call, _, list, [?REALM]}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) == lists:usort(R);
 
 postcondition(#state{added = A}, {call, _, list, [?REALM, _, true]}, {ok, R}) ->
-    lists:usort([U || {_, U} <- A]) == lists:usort([UUID || {_, {UUID, _}} <- R]);
+    lists:usort([U || {_, U} <- A]) == lists:usort([ft_user:uuid(U) || {_, U} <- R]);
 
 postcondition(#state{added = A}, {call, _, list, [?REALM, _, false]}, {ok, R}) ->
     lists:usort([U || {_, U} <- A]) == lists:usort([UUID || {_, UUID} <- R]);
@@ -614,17 +579,17 @@ setup() ->
     meck:expect(snarl_org, remove_target, fun(?REALM, _, _) -> ok end),
     meck:expect(snarl_org, list, fun(?REALM) -> {ok, []} end),
     meck:expect(snarl_org, get, fun(?REALM, _) -> {ok, dummy} end),
-    meck:new(snarl_opt, [passthrough]),
-    meck:expect(snarl_opt, get, fun(_,_,_,_,D) -> D end),
+    meck:new(fifo_opt, [passthrough]),
+    meck:expect(fifo_opt, get, fun(_,_,_,_,_,D) -> D end),
+    meck:expect(fifo_opt, get, fun(_,_,_) -> undefined end),
 
-    ok.
-
-cleanup(_) ->
-    cleanup_mock_servers(),
-    meck:unload(snarl_role),
-    meck:unload(snarl_org),
-    meck:unload(snarl_opt),
-    ok.
+    fun () ->
+            cleanup_mock_servers(),
+            meck:unload(snarl_role),
+            meck:unload(snarl_org),
+            meck:unload(fifo_opt),
+            ok
+    end.
 
 -endif.
 -endif.
