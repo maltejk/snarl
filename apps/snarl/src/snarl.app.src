@@ -25,10 +25,9 @@
      bitcask,
      snarl_oauth,
      snarl_coverage,
-     merklet,
+     %%merklet,
      esqlite,
      yubico,
-     uuid,
      esel
      ]},
   {mod, {snarl_app, []}},

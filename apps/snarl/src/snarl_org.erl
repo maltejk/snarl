@@ -71,7 +71,7 @@ sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
 
 add_trigger(Realm, Org, Trigger) ->
-    do_write(Realm, Org, add_trigger, {uuid:uuid4s(), Trigger}).
+    do_write(Realm, Org, add_trigger, {fifo_utils:uuid(), Trigger}).
 
 remove_target(Realm, Org, Target) ->
     do_write(Realm, Org, remove_target, Target).
@@ -272,7 +272,7 @@ list(Realm, Requirements, FoldFn, Acc0) ->
                  {error, timeout}.
 
 add(Realm, Org) ->
-    UUID = uuid:uuid4s(),
+    UUID = fifo_utils:uuid(org),
     create(Realm, UUID, Org).
 
 create(Realm, UUID, Org) ->

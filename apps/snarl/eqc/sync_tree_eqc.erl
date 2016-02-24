@@ -3,7 +3,8 @@
 -ifdef(TEST).
 -ifdef(EQC).
 
--include_lib("fqc/include/fqc.hrl").
+-include_lib("eqc/include/eqc.hrl").
+-include_lib("fqc/include/fqci.hrl").
 
 -compile(export_all).
 -define(M, ?MODULE).
