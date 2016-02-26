@@ -165,7 +165,7 @@ list(Realm) ->
 
 list_(Realm) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
+        ?FM(list, ?COVERAGE, start,
             [?MASTER, ?MODULE,
              {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],

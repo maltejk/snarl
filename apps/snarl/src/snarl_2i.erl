@@ -1,6 +1,7 @@
 -module(snarl_2i).
 
 -include_lib("riak_core/include/riak_core_vnode.hrl").
+-include("snarl_ent.hrl").
 
 -export([
          sync_repair/3,
@@ -30,7 +31,7 @@ reindex(_, _) -> ok.
 
 wipe(Realm, Type, Key) ->
     TK = term_to_binary({Type, Key}),
-    ?FM(wipe, snarl_coverage, start,
+    ?FM(wipe, ?COVERAGE, start,
         [snarl_2i_vnode_master, snarl_2i, {wipe, Realm, TK}]).
 
 sync_repair(Realm, TK, Obj) ->
@@ -71,7 +72,7 @@ raw(Realm, TK) ->
     end.
 
 list() ->
-    ?FM(list_all, snarl_coverage, start,
+    ?FM(list_all, ?COVERAGE, start,
         [snarl_2i_vnode_master, snarl_2i, list]).
 
 -spec list(Realm::binary()) -> {ok, [binary()]} |
@@ -79,14 +80,14 @@ list() ->
                                {error, timeout}.
 
 list(Realm) ->
-    {ok, Res} = ?FM(list, snarl_coverage, start,
+    {ok, Res} = ?FM(list, ?COVERAGE, start,
                   [snarl_2i_vnode_master, snarl_2i, {list, Realm}]),
     Res1 = [binary_to_term(R) || R <- Res],
     {ok,  Res1}.
 
 list_(Realm) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
+        ?FM(list, ?COVERAGE, start,
             [snarl_2i_vnode_master, snarl_2i,
              {list, Realm, [], true, true}]),
     Res1 = [binary_to_term(R) || {_, R} <- Res],
@@ -103,7 +104,7 @@ list_(Realm) ->
 list(Realm, Requirements, Full)
   when Full == true orelse Full == false ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
+        ?FM(list, ?COVERAGE, start,
             [snarl_2i_vnode_master, snarl_2i,
              {list, Realm, Requirements, Full}]),
     Res1 = rankmatcher:apply_scales(Res),
