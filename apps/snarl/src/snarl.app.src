@@ -14,6 +14,7 @@
      ranch,
      folsom_ddb,
      mdns_server_lib,
+     rankmatcher,
      lager,
      bugsnag,
      fifo_lager,
@@ -25,7 +26,6 @@
      bitcask,
      snarl_oauth,
      snarl_coverage,
-     %%merklet,
      esqlite,
      yubico,
      esel
