@@ -16,7 +16,7 @@
  {<<"esqlite">>,{pkg,<<"esqlite">>,<<"0.2.2">>},0},
  {<<"exometer_core">>,{pkg,<<"exometer_core">>,<<"1.0.0">>},1},
  {<<"fifo_db">>,{pkg,<<"fifo_db">>,<<"0.2.0">>},0},
- {<<"fifo_dt">>,{pkg,<<"fifo_dt">>,<<"0.1.66">>},0},
+ {<<"fifo_dt">>,{pkg,<<"fifo_dt">>,<<"0.1.67">>},0},
  {<<"fifo_lager">>,{pkg,<<"fifo_lager">>,<<"0.1.3">>},0},
  {<<"fifo_spec">>,{pkg,<<"fifo_spec">>,<<"0.1.27">>},0},
  {<<"fifo_utils">>,{pkg,<<"fifo_utils">>,<<"0.1.21">>},0},
