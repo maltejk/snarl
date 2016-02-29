@@ -30,4 +30,5 @@ current_counterexample.eqc
 *.log
 *.log.?
 _build
+TEST*
 .eqc
