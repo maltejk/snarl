@@ -129,7 +129,7 @@ usage() {
     echo "                    reip | wait-for-service | ringready | transfers | force-remove | down |"
     echo "                    cluster-info | member-status | ring-status | vnode-status |"
     echo "                    diag | stat | status | transfer-limit | downgrade-objects | services"
-    echo "                    ensemble-status | handoff | set | show | describe }"
+    echo "                    handoff | set | show | describe }"
     echo "               connections                        - shows the current connections to other srivces."
     echo "               ring                               - shows the ring."
 
@@ -715,7 +715,6 @@ case "$1" in
         case "$1" in
             list)
                 shift
-                $NODETOOL rpc fifo_console ensemble_status "$@"
                 $NODETOOL rpc snarl_console list_user $@
                 ;;
             add)
