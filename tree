@@ -47,7 +47,7 @@
 │  ├─ poolboy─0.8.1-p3
 │  ├─ riak_ensemble─2.1.3
 │  └─ riak_sysmon─2.1.2
-├─ snarl─0.7.3
+├─ snarl─0.8.0
 ├─ snarl_coverage─0.1.0
 ├─ snarl_oauth─0.1.0
 └─ yubico─0.1.4

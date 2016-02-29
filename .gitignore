@@ -33,3 +33,4 @@ TEST-*
 _build
 TEST*
 .eqc
+apps/snarl/.rebar3
