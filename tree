@@ -15,7 +15,7 @@
 │  ├─ lager_graylog─0.1.0
 │  └─ lager_logstash_backend─0.1.0
 ├─ fifo_spec─0.1.27
-├─ fifo_utils─0.1.21
+├─ fifo_utils─0.1.22
 │  └─ uuid─1.5.1
 │     └─ quickrand─1.5.1
 ├─ folsom_ddb─0.1.20

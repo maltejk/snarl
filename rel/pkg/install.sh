@@ -5,7 +5,7 @@ SED=/usr/bin/sed
 
 USER=snarl
 GROUP=$USER
-DBID=4
+DBID=5
 BACKUP_FILE=/var/db/snarl/backup_$DBID.tar.gz
 
 case $2 in
@@ -22,15 +22,14 @@ case $2 in
             echo "User already exists, skipping creation."
         else
             echo Creating snarl user ...
-            useradd -g $GROUP -d /var/db/snarl -s /bin/false $USER
+            useradd -g $GROUP -d /data/snarl -s /bin/false $USER
         fi
         echo Creating directories ...
-        mkdir -p /var/db/snarl/ring
-        mkdir -p /var/db/snarl/users
-        mkdir -p /var/db/snarl/groups
-        chown -R snarl:snarl /var/db/snarl
-        mkdir -p /var/log/snarl/sasl
-        chown -R snarl:snarl /var/log/snarl
+        mkdir -p /data/snarl/db/ring
+        mkdir -p /data/snarl/etc
+        mkdir -p /data/snarl/log/sasl
+        chown -R $USER:$GROUP /data/snarl
+
         if [ -d /var/db/snarl/0 ]
         then
             if [ ! -f $BACKUP_FILE ]
@@ -44,13 +43,21 @@ case $2 in
                 tar cfz $BACKUP_FILE /var/db/snarl/{[0-9]*,ring}
             fi
         fi
+        if [ -d /tmp/snarl ]
+        then
+            chown -R $USER:$GROUP /tmp/snarl/
+        fi
+
         ;;
     POST-INSTALL)
         echo Importing service ...
         svccfg import /opt/local/fifo-snarl/share/snarl.xml
         echo Trying to guess configuration ...
         IP=`ifconfig net0 | grep inet | $AWK '{print $2}'`
-        CONFFILE=/opt/local/fifo-snarl/etc/snarl.conf
+
+        CONFFILE=/data/snarl/etc/snarl.conf
+        cp /opt/local/fifo-snarl/etc/snarl.conf.example ${CONFFILE}.example
+
         if [ ! -f "${CONFFILE}" ]
         then
             echo "Creating new configuration from example file."

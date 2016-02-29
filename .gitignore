@@ -31,4 +31,5 @@ current_counterexample.eqc
 *.log.?
 TEST-*
 _build
+TEST*
 .eqc
