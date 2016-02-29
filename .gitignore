@@ -32,3 +32,4 @@ current_counterexample.eqc
 _build
 TEST*
 .eqc
+apps/snarl/.rebar3
