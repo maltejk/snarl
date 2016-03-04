@@ -14,7 +14,7 @@
          set_metadata/3,
          create/3,
          import/3,
-         trigger/4,
+         trigger/4, reverse_trigger/4,
          add_trigger/3, remove_trigger/3,
          resource_inc/4, resource_dec/4, resource_remove/3,
          remove_target/3,
@@ -71,7 +71,7 @@ sync_repair(Realm, UUID, Obj) ->
     do_write(Realm, UUID, sync_repair, Obj).
 
 add_trigger(Realm, Org, Trigger) ->
-    do_write(Realm, Org, add_trigger, {uuid:uuid4s(), Trigger}).
+    do_write(Realm, Org, add_trigger, {fifo_utils:uuid(), Trigger}).
 
 remove_target(Realm, Org, Target) ->
     do_write(Realm, Org, remove_target, Target).
@@ -89,6 +89,16 @@ trigger(Realm, Org, Event, Payload) ->
             R
     end.
 
+reverse_trigger(Realm, Org, Event, Payload) ->
+    case ?MODULE:get(Realm, Org) of
+        {ok, OrgObj} ->
+            Triggers = [T || {_, T} <- ft_org:triggers(OrgObj)],
+            Executed = reverse_events(Realm, Triggers, Event, Payload, 0),
+            {ok, Executed};
+        R  ->
+            R
+    end.
+
 do_events(Realm, [{Event, Template}|Ts], Event, Payload, N) ->
     do_event(Realm, Template, Payload),
     do_events(Realm, Ts, Event, Payload, N+1);
@@ -97,6 +107,16 @@ do_events(Realm, [_|Ts], Event, Payload, N) ->
     do_events(Realm, Ts, Event, Payload, N);
 
 do_events(_Realm, [], _Event, _Payload, N) ->
+    N.
+
+reverse_events(Realm, [{Event, Template}|Ts], Event, Payload, N) ->
+    reverse_event(Realm, Template, Payload),
+    reverse_events(Realm, Ts, Event, Payload, N+1);
+
+reverse_events(Realm, [_|Ts], Event, Payload, N) ->
+    reverse_events(Realm, Ts, Event, Payload, N);
+
+reverse_events(_Realm, [], _Event, _Payload, N) ->
     N.
 
 -spec do_event(Realm::binary(),
@@ -124,6 +144,33 @@ do_event(Realm, {grant, role, Role, Template}, Payload) ->
 
 do_event(Realm, {grant, user, Role, Template}, Payload) ->
     snarl_user:grant(Realm, Role, build_template(Template, Payload)),
+    ok.
+
+-spec reverse_event(Realm::binary(),
+               Action::{grant, role, Role::fifo:role_id(),
+                        Template::template()} |
+                       {grant, user, User::fifo:user_id(),
+                        Template::template()} |
+                       {join, role, Role::fifo:role_id()} |
+                       {join, org, Org::fifo:org_id()},
+               Payload::template()) ->
+                      ok.
+
+reverse_event(Realm, {join, role, Role}, Payload) ->
+    snarl_user:leave(Realm, Payload, Role),
+    ok;
+
+reverse_event(Realm, {join, org, Org}, Payload) ->
+    snarl_user:leave_org(Realm, Payload, Org),
+    snarl_user:select_org(Realm, Payload, <<>>),
+    ok;
+
+reverse_event(Realm, {grant, role, Role, Template}, Payload) ->
+    snarl_role:revoke(Realm, Role, build_template(Template, Payload)),
+    ok;
+
+reverse_event(Realm, {grant, user, Role, Template}, Payload) ->
+    snarl_user:revoke(Realm, Role, build_template(Template, Payload)),
     ok.
 
 build_template(Template, Payload) ->
@@ -225,7 +272,7 @@ list(Realm, Requirements, FoldFn, Acc0) ->
                  {error, timeout}.
 
 add(Realm, Org) ->
-    UUID = uuid:uuid4s(),
+    UUID = fifo_utils:uuid(org),
     create(Realm, UUID, Org).
 
 create(Realm, UUID, Org) ->

@@ -155,7 +155,7 @@ list(Realm, Requirements, FoldFn, Acc0) ->
                  {error, timeout}.
 
 add(Realm, Role) ->
-    UUID = uuid:uuid4s(),
+    UUID = fifo_utils:uuid(role),
     create(Realm, UUID, Role).
 
 create(Realm, UUID, Role) ->

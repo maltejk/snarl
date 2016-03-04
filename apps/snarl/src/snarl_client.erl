@@ -165,7 +165,7 @@ list(Realm) ->
 
 list_(Realm) ->
     {ok, Res} =
-        ?FM(list, snarl_full_coverage, start,
+        ?FM(list, ?COVERAGE, start,
             [?MASTER, ?MODULE,
              {list, Realm, [], true, true}]),
     Res1 = [R || {_, R} <- Res],
@@ -205,7 +205,7 @@ list(Realm, Requirements, FoldFn, Acc0) ->
                  {ok, UUID::fifo:client_id()}.
 
 add(Realm, undefined, Client) ->
-    UUID = uuid:uuid4s(),
+    UUID = fifo_utils:uuid(client),
     lager:info("[~p:create] Creation Started.", [UUID]),
     case create(Realm, UUID, Client) of
         {ok, UUID} ->

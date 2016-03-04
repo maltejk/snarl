@@ -11,8 +11,7 @@ id(I) ->
     {I, eqc}.
 
 id() ->
-    {Mega, Sec, Micro} = now(),
-    Now = (Mega * 1000000  + Sec) * 1000000 + Micro,
+    Now = erlang:system_time(),
     id(Now).
 
 atom() ->
@@ -51,6 +50,7 @@ metadata_kvs() ->
               andalso lists:sort([K || {K, _} <- L]) == lists:usort([K || {K, _} <- L])).
 
 start_mock_servers() ->
+    application:load(snarl_coverage),
     application:load(sasl),
     %%application:set_env(sasl, sasl_error_logger, {file, "snarl_user_eqc.log"}),
     application:set_env(snarl, hash_fun, sha512),
@@ -60,21 +60,23 @@ start_mock_servers() ->
     application:stop(lager),
     application:load(lager),
     application:set_env(lager, handlers,
-                        [{lager_file_backend, [{"snarl_user_eqc_lager.log", info, 10485760,"$D0",5}]}]),
+                        [{lager_file_backend,
+                          [{file, "snarl_user_eqc_lager.log"},
+                           {level, info}]}]),
     ok = lager:start(),
+    application:ensure_all_started(folsom),
     os:cmd("mkdir eqc_vnode_data"),
     application:set_env(fifo_db, db_path, "eqc_vnode_data"),
     application:set_env(fifo_db, backend, fifo_db_leveldb),
-    application:start(hanoidb),
-    application:start(bitcask),
-    application:start(eleveldb),
-    application:start(syntax_tools),
-    application:start(compiler),
-    application:start(goldrush),
-    application:start(lager),
-    application:start(folsom),
+    application:ensure_all_started(hanoidb),
+    application:ensure_all_started(bitcask),
+    application:ensure_all_started(eleveldb),
+    application:ensure_all_started(syntax_tools),
+    application:ensure_all_started(compiler),
+    application:ensure_all_started(goldrush),
+    application:ensure_all_started(lager),
     snarl_app:init_folsom(),
-    application:start(fifo_db),
+    application:ensure_all_started(fifo_db),
     meck:new(snarl_2i, [passthrough]),
     ets:new(s2i, [named_table, public, ordered_set]),
     meck:expect(snarl_2i, get, fun(_, T, K) ->
@@ -192,37 +194,55 @@ start_fake_write_fsm() ->
 
 start_fake_coverage(Pid) ->
     meck:new(snarl_coverage, [passthrough]),
-    meck:expect(snarl_coverage, start,
-                fun(_, O, C) ->
+    %% meck:expect(snarl_coverage, raw,
+    %%             fun(A, B, C, _D) ->
+    %%                     snarl_coverage:start(A, B, C)
+    %%             end),
+    meck:expect(snarl_coverage, fold,
+                %% The 4th argument here is for raw (aka obj) not full,
+                %% so we can skip it.
+                fun(_, O, {list, Realm, Requirements, true}, FoldFn, Acc0) ->
+                        M = list_to_atom(atom_to_list(O) ++ "_vnode"),
+                        Ref = make_ref(),
+                        Pid ! {coverage, M, self(), Ref, {list, Realm, Requirements, true}},
+                        receive
+                            {Ref,  {ok, Ref}} ->
+                                {ok, Ref};
+                            {Ref,  {ok, _, _, Res}} ->
+                                {ok, lists:foldl(FoldFn, Acc0, [Res])};
+                            {Ref, Res} ->
+                                lists:foldl(FoldFn, Acc0, [Res])
+                        after
+                            5000 ->
+                                {error, timeout}
+                        end;
+                   (A, O, {list, Realm}, FoldFn, Acc0) ->
+                        FoldFn1 = fun(Os, Acc) ->
+                                          Os1 = [K
+                                                 || {_P, {K, _Obj}} <- Os],
+                                          FoldFn(Os1, Acc)
+                                  end,
+                        snarl_coverage:fold(
+                          A, O, {list, Realm, [], true}, FoldFn1, Acc0);
+                   (A, O, {list, Realm, Requirements, false}, FoldFn, Acc0) ->
+                        FoldFn1 = fun(Os, Acc) ->
+                                          Os1 = [{P, ft_obj:val(Obj)}
+                                                 || {P, {_K, Obj}} <- Os],
+                                          FoldFn(Os1, Acc)
+                                  end,
+                        snarl_coverage:fold(
+                          A, O, {list, Realm, Requirements, true}, FoldFn1, Acc0);
+                   (_, O, C, FoldFn, Acc0) ->
                         M = list_to_atom(atom_to_list(O) ++ "_vnode"),
                         Ref = make_ref(),
                         Pid ! {coverage, M, self(), Ref, C},
                         receive
+                            {Ref,  {ok, Ref}} ->
+                                {ok, Ref};
                             {Ref,  {ok, _, _, Res}} ->
-                                {ok, Res};
+                                {ok, lists:foldl(FoldFn, Acc0, [Res])};
                             {Ref, Res} ->
-                                Res
-                        after
-                            5000 ->
-                                {error, timeout}
-                        end
-                end),
-    meck:new(snarl_full_coverage, [passthrough]),
-    meck:expect(snarl_full_coverage, start,
-                fun (A, B, {C, Realm, Req, Full, true}) ->
-                        snarl_full_coverage:start(A, B, {C, Realm, Req, Full});
-                    (A, B, {C, Realm, Req, Full, false}) ->
-                        {ok, R} = snarl_full_coverage:start(A, B, {C, Realm, Req, Full}),
-                        {ok, [ft_obj:val(U) || U <- R]};
-                    (_, O, {C, Realm, Req, Full}) ->
-                        M = list_to_atom(atom_to_list(O) ++ "_vnode"),
-                        Ref = make_ref(),
-                        Pid ! {coverage, M, self(), Ref, {C, Realm, Req, Full}},
-                        receive
-                            {Ref,  {ok, _, _, Res}} ->
-                                {ok, Res};
-                            {Ref, Res} ->
-                                Res
+                                lists:foldl(FoldFn, Acc0, [Res])
                         after
                             5000 ->
                                 {error, timeout}
@@ -239,13 +259,14 @@ stop_fake_write_fsm() ->
     catch meck:unload(snarl_entity_write_fsm).
 
 stop_fake_coverage() ->
-    catch meck:unload(snarl_coverage),
-    catch meck:unload(snarl_full_coverage).
+    catch meck:unload(snarl_coverage).
 
 mock_vnode(Mod, Args) ->
     {ok, S, _} = Mod:init(Args),
     Pid = spawn(?MODULE, mock_vnode_loop, [Mod, S]),
     register(eqc_vnode, Pid),
+    Pid = whereis(eqc_vnode),
+
     start_fake_vnode_master(Pid),
     start_fake_coverage(Pid),
     Pid.

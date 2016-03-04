@@ -31,3 +31,6 @@ current_counterexample.eqc
 *.log.?
 TEST-*
 _build
+TEST*
+.eqc
+apps/snarl/.rebar3

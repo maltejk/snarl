@@ -9,10 +9,11 @@
          start/3,
          mk_reqid/0,
          full/4, raw/4,
-         full/6, raw/6
+         full/6, raw/6,
+         fold/5
         ]).
 
--ignore_xref([list/5, raw/5]).
+-ignore_xref([list/5, raw/5, fold/5]).
 
 -record(state, {replies = #{} :: #{binary() => pos_integer()},
                 seen = sets:new() :: sets:set(),
@@ -33,18 +34,19 @@ raw(VNodeMaster, NodeCheckService, Realm, Requirements) ->
     raw(VNodeMaster, NodeCheckService, Realm, Requirements, fun concat/2, []).
 
 raw(VNodeMaster, NodeCheckService, Realm, Requirements, FoldFn, Acc0) ->
-    fold(VNodeMaster, NodeCheckService,
+    snarl_coverage:fold(VNodeMaster, NodeCheckService,
          {list, Realm, Requirements, true}, FoldFn, Acc0).
 
 full(VNodeMaster, NodeCheckService, Realm, Requirements) ->
     full(VNodeMaster, NodeCheckService, Realm, Requirements, fun concat/2, []).
 
 full(VNodeMaster, NodeCheckService, Realm, Requirements, FoldFn, Acc0) ->
-    fold(VNodeMaster, NodeCheckService,
+    snarl_coverage:fold(VNodeMaster, NodeCheckService,
           {list, Realm, Requirements, false}, FoldFn, Acc0).
 
 start(VNodeMaster, NodeCheckService, Request) ->
-    fold(VNodeMaster, NodeCheckService, Request, fun concat/2, []).
+    snarl_coverage:fold(VNodeMaster, NodeCheckService, Request,
+                        fun concat/2, []).
 
 fold(VNodeMaster, NodeCheckService, Request, FoldFn, Acc0) ->
     ReqID = mk_reqid(),

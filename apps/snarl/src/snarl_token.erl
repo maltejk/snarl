@@ -49,7 +49,7 @@ api_token(Realm, User, Scope, Comment) ->
                     %% This os mostly copied from:
                     %% snarl_oauth:associate_access_token/3
                     AccessToken = oauth2_token:generate([]),
-                    TokenID = uuid:uuid4s(),
+                    TokenID = fifo_utils:uuid(),
                     Expiery = infinity,
                     Client = undefined,
                     Context = [{<<"client">>, Client},
@@ -83,7 +83,7 @@ ssl_cert_token(Realm, User, Scope, Comment, CSR) ->
                     {ok, Cert} = esel:sign_csr(Days, CSR),
                     Fingerprint = esel_cert:fingerprint(Cert),
                     Token = Fingerprint,
-                    TokenID = uuid:uuid4s(),
+                    TokenID = fifo_utils:uuid(),
                     Expiery = Days*24*60*60 + erlang:system_time(seconds),
                     Client = undefined,
                     Context = [{<<"client">>, Client},

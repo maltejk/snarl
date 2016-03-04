@@ -16,6 +16,7 @@ xref: $(REBAR)
 
 test: $(REBAR)
 	$(REBAR) eunit
+	$(REBAR) as eqc eqc
 
 lint: $(REBAR)
 	$(REBAR) as lint lint
