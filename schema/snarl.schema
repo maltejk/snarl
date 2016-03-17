@@ -24,6 +24,16 @@
  [{commented, {"{{snarl_ip}}", {{snarl_sync_port}} }},
   {datatype, ip}]}.
 
+{translation,
+ "snarl.sync_ip",
+ fun(Conf) ->
+         {IP, Port} = cuttlefish:conf_get("sync.ip", Conf),
+         [A, B, C, D] = [list_to_integer(O) ||
+                            O <- re:split(IP, "\\.", [{return, list}])],
+         { {A, B, C, D}, Port}
+ end
+}.
+
 %% @doc Specification of a sync partner, there should be one or
 %% more per remote datacenter.
 
