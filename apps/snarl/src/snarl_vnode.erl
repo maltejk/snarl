@@ -333,7 +333,7 @@ handle_command({delete, {ReqID, _Coordinator}, {Realm, UUID}}, _Sender,
     Bucket = mk_pfx(Realm, State),
     ?FM(fifo_db, delete, [State#vstate.db, Bucket, UUID]),
     riak_core_index_hashtree:delete(
-      {Realm, UUID}, State#vstate.hashtrees),
+      [{Realm, UUID}], State#vstate.hashtrees),
     {reply, {ok, ReqID}, State};
 
 handle_command({import, {ReqID, Coordinator} = ID, {Realm, UUID}, Data},
@@ -381,7 +381,7 @@ handle_command({rehash, {Realm, UUID}}, _,
               Realm, UUID, vc_bin(ft_obj:vclock(Obj)), HT);
         _ ->
             %% Make sure hashtree isn't tracking deleted data
-            riak_core_index_hashtree:delete({Realm, UUID}, HT)
+            riak_core_index_hashtree:delete([{Realm, UUID}], HT)
     end,
     {noreply, State};
 

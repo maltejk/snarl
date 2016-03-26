@@ -74,7 +74,8 @@ master() ->
 hash_object(Key, Obj) ->
     integer_to_binary(erlang:phash2({Key, Obj})).
 
-aae_repair(Realm, {OrgID, Resource}) ->
+aae_repair(Realm, OrgRes) ->
+    {OrgID, Resource} = binary_to_term(OrgRes),
     lager:debug("AAE Repair: ~p/~p", [OrgID, Resource]),
     snarl_accounting:get(Realm, OrgID, Resource).
 
@@ -199,7 +200,7 @@ insert(Action, Realm, OrgID, Resource, Timestamp, Metadata, State) ->
     snarl_sync_tree:update(State#state.sync_tree, snarl_accounting,
                            {Realm, {OrgID, Resource}}, Res),
     riak_core_aae_vnode:update_hashtree(
-      Realm, {OrgID, Resource}, Hash, State#state.hashtrees),
+      Realm, term_to_binary({OrgID, Resource}), Hash, State#state.hashtrees),
     State2.
 
 insert1(create, Relam, OrgID, Resource, Timestamp, Metadata, State) ->
@@ -294,17 +295,20 @@ handle_command({hashtree_pid, Node}, _, State) ->
             {reply, {error, wrong_node}, State}
     end;
 
-handle_command({rehash, {Realm, {OrgID, Resource}}}, _,
-               State=#state{hashtrees=HT}) when is_binary(Realm) ->
+handle_command({rehash, {Realm, OrgRes}}, _,
+               State=#state{hashtrees=HT}) when is_binary(Realm),
+                                                is_binary(OrgRes) ->
+    {OrgID, Resource} = binary_to_term(OrgRes),
     case for_resource(Realm, OrgID, Resource, State) of
         {[], State1} ->
             %% Make sure hashtree isn't tracking deleted data
-            riak_core_index_hashtree:delete({Realm, {OrgID, Resource}}, HT),
+            riak_core_index_hashtree:delete(
+              [{Realm, OrgRes}], HT),
             {noreply, State1};
         {Res, State1} ->
             Hash = hash_object({Realm, OrgID, Resource}, Res),
             riak_core_aae_vnode:update_hashtree(
-              Realm, {OrgID, Resource}, Hash, HT),
+              Realm, OrgRes, Hash, HT),
             {noreply, State1}
     end;
 
