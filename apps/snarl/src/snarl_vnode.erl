@@ -448,15 +448,19 @@ handle_info(retry_create_hashtree,
     lager:debug("~p/~p retrying to create a hash tree.", [Srv, Idx]),
     HT = riak_core_aae_vnode:maybe_create_hashtrees(Srv, Idx, VNode, undefined),
     {ok, State#vstate{hashtrees = HT}};
+
 handle_info(retry_create_hashtree, State) ->
     {ok, State};
+
 handle_info({'DOWN', _, _, Pid, _},
             State=#vstate{service=Service, hashtrees=Pid, partition=Idx}) ->
     lager:debug("~p/~p hashtree ~p went down.", [Service, Idx, Pid]),
     erlang:send_after(1000, self(), retry_create_hashtree),
     {ok, State#vstate{hashtrees = undefined}};
+
 handle_info({'DOWN', _, _, _, _}, State) ->
     {ok, State};
+
 handle_info(_, State) ->
     {ok, State}.
 
