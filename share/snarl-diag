@@ -45,13 +45,13 @@ log_run lsof -P $pid
 log_run lsof -F $pid
 
 echo "Copying Logfiles"
-cp -r /var/log/snarl $dir/logs
+cp -r /data/snarl/log $dir/logs
 cp /var/svc/log/network-snarl:default.log $dir/logs
 
 echo "Copying config files"
 mkdir $dir/config
 cp /opt/local/fifo-snarl/etc/snarl.conf* $dir/config
-cp -r /var/db/snarl/generated.configs/ $dir/config
+cp -r /data/snarl/db/generated.configs/ $dir/config
 
 echo "Compressing data"
 (cd $base; tar cfz snarl-diag-$date.tgz $date)
