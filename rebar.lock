@@ -72,7 +72,7 @@
   {git,"https://github.com/Licenser/rankmatcher.git",
        {ref,"dbffc0dc37a0156b50afa2b9e49e7403a5e4ae36"}},
   0},
- {<<"recon">>,{pkg,<<"recon">>,<<"2.2.1">>},0},
+ {<<"recon">>,{pkg,<<"recon">>,<<"2.3.1">>},0},
  {<<"riak_core">>,
   {git,"https://github.com/project-fifo/riak_core",
        {ref,"51d15f5277f2c418da0e236488f28db318a43906"}},
