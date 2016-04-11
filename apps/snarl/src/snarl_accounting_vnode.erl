@@ -303,7 +303,7 @@ handle_command({rehash, {Realm, OrgRes}}, _,
         {[], State1} ->
             %% Make sure hashtree isn't tracking deleted data
             riak_core_index_hashtree:delete(
-              [{Realm, OrgRes}], HT),
+              [{object, {Realm, OrgRes}}], HT),
             {noreply, State1};
         {Res, State1} ->
             Hash = hash_object({Realm, OrgID, Resource}, Res),
