@@ -233,6 +233,9 @@ init_user([RealmS, OrgS, RoleS, UserS, PassS]) ->
                  [<<"cloud">>, <<"vms">>, <<"create">>],
                  [<<"hypervisors">>, <<"_">>, <<"create">>],
                  [<<"datasets">>, <<"_">>, <<"create">>],
+                 [<<"datasets">>, <<"_">>, <<"get">>],
+
+                 [<<"packages">>, <<"_">>, <<"get">>],
 
                  [<<"roles">>, RoleUUID, <<"get">>]
                 ],
