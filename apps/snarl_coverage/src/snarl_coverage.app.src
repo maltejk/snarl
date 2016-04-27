@@ -5,6 +5,7 @@
   {registered, []},
   {applications, [
                   kernel,
+                  riak_core,
                   stdlib
                  ]},
   {mod, { snarl_coverage_app, []}},
