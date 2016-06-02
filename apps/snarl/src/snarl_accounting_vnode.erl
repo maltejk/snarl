@@ -74,8 +74,7 @@ master() ->
 hash_object(Key, Obj) ->
     integer_to_binary(erlang:phash2({Key, Obj})).
 
-aae_repair(Realm, OrgRes) ->
-    {OrgID, Resource} = binary_to_term(OrgRes),
+aae_repair(Realm, {OrgID, Resource}) ->
     lager:debug("AAE Repair: ~p/~p", [OrgID, Resource]),
     snarl_accounting:get(Realm, OrgID, Resource).
 
